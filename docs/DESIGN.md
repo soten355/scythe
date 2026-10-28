@@ -220,7 +220,7 @@ Each phase ends in something playable on the phone. A phase is done when its che
 - [x] Monorepo, Vite, PWA plugin, Vitest
 - [x] CLAUDE.md
 - [x] GitHub repo and Pages deploy
-- [ ] Installs on iPhone and opens in airplane mode
+- [x] Installs on iPhone and opens in airplane mode
 
 **Phase 1: Engine core and hot-seat board**
 
