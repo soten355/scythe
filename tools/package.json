@@ -1,0 +1,14 @@
+{
+  "name": "@scythe/tools",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "sim": "tsx src/simulate.ts"
+  },
+  "dependencies": {
+    "@scythe/engine": "*",
+    "@scythe/content": "*",
+    "@scythe/bots": "*"
+  }
+}
