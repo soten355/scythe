@@ -225,7 +225,7 @@ Each phase ends in something playable on the phone. A phase is done when its che
 **Phase 1: Engine core and hot-seat board**
 
 - [x] Board data: all hexes, terrain, rivers, lakes, tunnels, home bases
-- [ ] Turn structure: choose a section, top-row action, bottom-row action, can't repeat the last section
+- [x] Turn structure: choose a section, top-row action, bottom-row action, can't repeat the last section
 - [ ] All four top-row and four bottom-row actions, with costs and rewards
 - [ ] Movement, production, workers and resources on hexes
 - [ ] 2 factions and 2 player mats
