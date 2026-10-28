@@ -3,7 +3,8 @@
 // A map is written as a BoardLayout: one string per row, top to bottom, with
 // a two-letter terrain code per hex. Rows are lettered A, B, C... and hexes
 // are numbered from 1 left to right, so hex IDs read like "C4". Odd rows
-// (B, D, F...) sit half a hex to the right of the row above.
+// (B, D, F...) sit half a hex to the right of the row above, unless
+// shiftEvenRows is set, in which case rows A, C, E... do.
 //
 // Codes: Fa farm, Fo forest, Mo mountain, Tu tundra, Vi village, ~~ lake,
 // FF factory, -- no hex. Suffix T marks a tunnel, * an encounter token.
@@ -37,6 +38,8 @@ export interface BoardLayout {
   /** Edges written as "A3|A4". */
   rivers: string[];
   homeBases: Record<HomeBaseId, HexId[]>;
+  /** Shift rows A, C, E... right instead of B, D, F... */
+  shiftEvenRows?: boolean;
 }
 
 const TERRAIN_CODES: Record<string, Terrain> = {
@@ -66,8 +69,8 @@ export function buildBoard(layout: BoardLayout): Board {
       if (!terrain) throw new Error(`unknown terrain code "${token.slice(0, 2)}" at ${id}`);
       const flags = token.slice(2);
       if (/[^T*]/.test(flags)) throw new Error(`unknown marker "${flags}" at ${id}`);
-      // Offset ("odd rows shifted right") to axial conversion.
-      const q = i + 1 - (r - (r & 1)) / 2;
+      // Offset to axial conversion ("odd-r" or "even-r" layout).
+      const q = i + 1 - (layout.shiftEvenRows ? (r + (r & 1)) / 2 : (r - (r & 1)) / 2);
       hexes[id] = { id, q, r, terrain, tunnel: flags.includes('T'), encounter: flags.includes('*') };
     });
   });
@@ -101,7 +104,7 @@ export function buildBoard(layout: BoardLayout): Board {
 }
 
 /** Hexes that share an edge with this one (including lakes; ignores rivers). */
-export function neighbors(board: Board, id: HexId): HexId[] {
+export function neighbors(board: Board, id: HexId): readonly HexId[] {
   return board.adjacent[id] ?? [];
 }
 
@@ -109,6 +112,6 @@ export function hasRiver(board: Board, a: HexId, b: HexId): boolean {
   return board.rivers.some(([x, y]) => (x === a && y === b) || (x === b && y === a));
 }
 
-export function homeBaseNeighbors(board: Board, id: HomeBaseId): HexId[] {
+export function homeBaseNeighbors(board: Board, id: HomeBaseId): readonly HexId[] {
   return board.homeBases[id] ?? [];
 }

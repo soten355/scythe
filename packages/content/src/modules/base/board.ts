@@ -1,4 +1,4 @@
-import { buildBoard } from '@scythe/engine';
+import { buildBoard, type BoardLayout } from '@scythe/engine';
 
 // The base game map. See packages/engine/src/board.ts for the code letters:
 // Fa farm, Fo forest, Mo mountain, Tu tundra, Vi village, ~~ lake,
@@ -6,8 +6,9 @@ import { buildBoard } from '@scythe/engine';
 // Rows run A (top) to H (bottom); odd rows (B, D, F, H) sit half a hex right.
 //
 // Draft taken from a community reading of the printed board. Not yet checked
-// against the physical board; run `npm run board-preview` to compare.
-export const baseBoard = buildBoard({
+// against the physical board; run `npm run board-preview` to compare, or edit
+// it in the map editor (editor.html in the app) and paste the export here.
+export const baseBoardLayout: BoardLayout = {
   rows: [
     /* A */ 'Fo  Mo  Fa  Vi* Fo  Tu  Vi',
     /* B */ '~~  Tu* ~~  TuT Mo* Fa  Mo*',
@@ -35,4 +36,6 @@ export const baseBoard = buildBoard({
     sw: ['F1', 'G2'],
     w: ['C2', 'D1'],
   },
-});
+};
+
+export const baseBoard = buildBoard(baseBoardLayout);

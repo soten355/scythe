@@ -28,9 +28,9 @@ describe('buildBoard', () => {
   });
 
   it('finds the six neighbors of a hex, accounting for the row offset', () => {
-    expect(neighbors(board, 'B2').sort()).toEqual(['A2', 'A3', 'B1', 'B3', 'C3'].sort());
-    expect(neighbors(board, 'A1').sort()).toEqual(['A2', 'B1'].sort());
-    expect(neighbors(board, 'C1').sort()).toEqual(['B1'].sort());
+    expect([...neighbors(board, 'B2')].sort()).toEqual(['A2', 'A3', 'B1', 'B3', 'C3'].sort());
+    expect([...neighbors(board, 'A1')].sort()).toEqual(['A2', 'B1'].sort());
+    expect([...neighbors(board, 'C1')].sort()).toEqual(['B1'].sort());
   });
 
   it('reports rivers in both directions, and only where listed', () => {
@@ -46,6 +46,17 @@ describe('buildBoard', () => {
 
   it('produces plain JSON data', () => {
     expect(JSON.parse(JSON.stringify(board))).toEqual(board);
+  });
+});
+
+describe('buildBoard with even rows shifted', () => {
+  //   A1 A2     (row A sits half a hex to the right)
+  // B1 B2
+  const board = buildBoard({ rows: ['Fa Fo', 'Mo Tu'], rivers: [], homeBases: {}, shiftEvenRows: true });
+
+  it('offsets row A instead of row B', () => {
+    expect([...neighbors(board, 'B1')].sort()).toEqual(['A1', 'B2']);
+    expect([...neighbors(board, 'B2')].sort()).toEqual(['A1', 'A2', 'B1']);
   });
 });
 

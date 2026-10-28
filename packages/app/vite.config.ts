@@ -6,6 +6,12 @@ const base = '/scythe/';
 
 export default defineConfig({
   base,
+  build: {
+    rollupOptions: {
+      // editor.html is the map editor, used to enter board layouts.
+      input: { main: 'index.html', editor: 'editor.html' },
+    },
+  },
   plugins: [
     VitePWA({
       registerType: 'autoUpdate',
