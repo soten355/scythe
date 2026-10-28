@@ -8,4 +8,7 @@ const app = document.querySelector<HTMLDivElement>('#app')!;
 app.innerHTML = `
   <h1>Scythe — setup OK</h1>
   <p class="meta">engine v${ENGINE_VERSION}</p>
+  <nav class="menu">
+    <a href="${import.meta.env.BASE_URL}editor.html">Map editor</a>
+  </nav>
 `;

@@ -157,6 +157,7 @@ function toolButton(t: Tool, label: string, swatch?: string) {
 
 function renderTools() {
   toolsEl.innerHTML = `
+    <a class="back" href="${import.meta.env.BASE_URL}">← Back to app</a>
     <section><h2>Terrain (tap or drag)</h2><div class="group">
       ${TERRAINS.map(([code, name, color]) => toolButton({ kind: 'terrain', code }, name, color)).join('')}
       ${toolButton({ kind: 'erase' }, 'No hex')}

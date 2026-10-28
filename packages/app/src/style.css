@@ -36,6 +36,16 @@ h1 {
   font-weight: 600;
 }
 
+.menu a {
+  display: inline-block;
+  margin-top: 1rem;
+  padding: 0.7rem 1.4rem;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  color: var(--accent);
+  text-decoration: none;
+}
+
 .meta {
   opacity: 0.6;
   font-size: 0.85rem;
