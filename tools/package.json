@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "sim": "tsx src/simulate.ts"
+    "sim": "tsx src/simulate.ts",
+    "board-preview": "tsx src/board-preview.ts"
   },
   "dependencies": {
     "@scythe/engine": "*",
