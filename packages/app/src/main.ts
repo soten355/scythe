@@ -10,5 +10,6 @@ app.innerHTML = `
   <p class="meta">engine v${ENGINE_VERSION}</p>
   <nav class="menu">
     <a href="${import.meta.env.BASE_URL}editor.html">Map editor</a>
+    <a href="${import.meta.env.BASE_URL}mats.html">Mat editor</a>
   </nav>
 `;

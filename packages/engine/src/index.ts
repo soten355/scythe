@@ -5,3 +5,4 @@ export const ENGINE_VERSION = '0.0.0';
 export * from './rng';
 export * from './board';
 export * from './game';
+export * from './mat';

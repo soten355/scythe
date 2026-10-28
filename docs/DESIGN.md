@@ -226,9 +226,10 @@ Each phase ends in something playable on the phone. A phase is done when its che
 
 - [x] Board data: all hexes, terrain, rivers, lakes, tunnels, home bases
 - [x] Turn structure: choose a section, top-row action, bottom-row action, can't repeat the last section
+- [x] Player mats as data, with a mat editor so new mats can be designed (like the map editor)
+- [ ] 2 factions and 2 player mats (Nordic + Rusviet; Industrial + Engineering), entered from the physical game
 - [ ] All four top-row and four bottom-row actions, with costs and rewards
 - [ ] Movement, production, workers and resources on hexes
-- [ ] 2 factions and 2 player mats
 - [ ] 2D board, player mat drawer, legal-move highlighting
 - [ ] Installs on iPhone and runs offline
 - [ ] Done when: two humans can play a full turn cycle pass-and-play on the phone
@@ -269,7 +270,7 @@ Each phase ends in something playable on the phone. A phase is done when its che
 
 - [ ] Do we have the physical game or PDF rulebooks (base, Invaders from Afar, Automa rules)? Card-by-card data entry depends on having them on hand.
 - [ ] Svelte or React for the UI?
-- [ ] Which two factions and mats for Phase 1?
+- [x] Which two factions and mats for Phase 1? Nordic + Rusviet; Industrial + Engineering.
 - [ ] Original faction names and theme, or neutral placeholders until the art pass?
 
 **Risks**

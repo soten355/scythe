@@ -8,8 +8,8 @@ export default defineConfig({
   base,
   build: {
     rollupOptions: {
-      // editor.html is the map editor, used to enter board layouts.
-      input: { main: 'index.html', editor: 'editor.html' },
+      // editor.html and mats.html are the map and player mat editors.
+      input: { main: 'index.html', editor: 'editor.html', mats: 'mats.html' },
     },
   },
   plugins: [

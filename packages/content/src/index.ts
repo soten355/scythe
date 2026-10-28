@@ -12,3 +12,4 @@ export interface ContentModule {
 export { baseModule } from './modules/base';
 export { invadersFromAfarModule } from './modules/invaders-from-afar';
 export { baseBoard, baseBoardLayout } from './modules/base/board';
+export { baseMats } from './modules/base/mats';
