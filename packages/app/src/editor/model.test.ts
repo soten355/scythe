@@ -37,7 +37,7 @@ describe('map editor model', () => {
   });
 
   it('labels hexes as they will be exported, even with an empty row on top', () => {
-    const map = addRow(fromLayout(baseBoardLayout), 'top');
+    const map = addRow(fromLayout({ rows: ['Fa Fo', 'Mo Tu'], rivers: [], homeBases: {} }), 'top');
     expect(labelOf(map, '1,0')).toBe('A1');
     expect(labelOf(map, '0,0')).toBeNull();
   });
@@ -98,9 +98,13 @@ describe('map editor model', () => {
   });
 
   it('formats the export so it can be pasted straight into the content file', () => {
-    const text = formatLayout(toLayout(fromLayout(baseBoardLayout)));
-    expect(text).toContain("/* A */ 'Fo  Mo  Fa  Vi* Fo  Tu  Vi',");
-    expect(text).toContain("nw: ['A2', 'A3'],");
+    const text = formatLayout({ rows: ['@w Fa Fo* MoT'], rivers: ['A2|A3'], homeBases: { w: ['A2'] } });
+    expect(text).toContain("/* A */ '@w  Fa  Fo* MoT',");
+    expect(text).toContain("'A2|A3',");
+    expect(text).toContain("w: ['A2'],");
     expect(text).not.toContain('shiftEvenRows');
+    expect(formatLayout({ rows: ['Fa'], rivers: [], homeBases: {}, shiftEvenRows: true })).toContain(
+      'shiftEvenRows: true,',
+    );
   });
 });
