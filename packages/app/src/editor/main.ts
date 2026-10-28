@@ -7,12 +7,14 @@ import './editor.css';
 import {
   addCol,
   addRow,
+  homeAt,
   edgeKey,
   formatLayout,
   fromLayout,
   HOME_IDS,
   key,
   labelOf,
+  placeHome,
   slotPosition,
   slotsTouch,
   toggleHome,
@@ -52,7 +54,8 @@ function startingMap(): EditorMap {
   const saved = localStorage.getItem(STORAGE_KEY);
   if (saved) {
     try {
-      return JSON.parse(saved) as EditorMap;
+      const map = JSON.parse(saved) as EditorMap;
+      return { ...map, homeSpots: map.homeSpots ?? {} }; // older saves lack spots
     } catch {
       // Fall through to the draft if the saved copy is unreadable.
     }
@@ -92,8 +95,12 @@ function undo() {
 function applyToSlot(m: EditorMap, k: SlotKey): EditorMap {
   const cell = m.cells[k];
   switch (tool.kind) {
-    case 'terrain':
-      return { ...m, cells: { ...m.cells, [k]: { tunnel: false, encounter: false, ...cell, code: tool.code } } };
+    case 'terrain': {
+      // A hex can't share a slot with a home base, so painting one clears it.
+      const home = homeAt(m, k);
+      const cleared = home ? placeHome(m, home, k) : m;
+      return { ...cleared, cells: { ...m.cells, [k]: { tunnel: false, encounter: false, ...cell, code: tool.code } } };
+    }
     case 'erase': {
       if (!cell) return m;
       const { [k]: _gone, ...cells } = m.cells;
@@ -109,7 +116,7 @@ function applyToSlot(m: EditorMap, k: SlotKey): EditorMap {
     case 'encounter':
       return cell ? { ...m, cells: { ...m.cells, [k]: { ...cell, encounter: !cell.encounter } } } : m;
     case 'home':
-      return cell ? toggleHome(m, tool.id, k) : m;
+      return cell ? toggleHome(m, tool.id, k) : placeHome(m, tool.id, k);
     case 'river':
       return m;
   }
@@ -159,7 +166,7 @@ function renderTools() {
       ${toolButton({ kind: 'encounter' }, '★ Encounter')}
       ${toolButton({ kind: 'river' }, 'River')}
     </div></section>
-    <section><h2>Home bases (tap hexes they touch)</h2><div class="group homes">
+    <section><h2>Home bases (tap empty slot to place, hexes it touches)</h2><div class="group homes">
       ${HOME_IDS.map((id) => toolButton({ kind: 'home', id }, id.toUpperCase())).join('')}
     </div></section>
     <section><h2>Grid</h2><div class="group">
@@ -183,7 +190,7 @@ const HINTS: Record<Tool['kind'], string> = {
   tunnel: 'Tap a hex to add or remove a tunnel.',
   encounter: 'Tap a hex to add or remove an encounter token.',
   river: 'Tap the edge between two hexes to add or remove a river.',
-  home: 'Tap the hexes this home base touches (highlighted in red). Tap again to remove.',
+  home: 'Tap an empty slot to place this home base there. Tap the hexes it touches (outlined in red). Tap again to remove.',
 };
 
 function hexPoints(cx: number, cy: number, r = S) {
@@ -231,6 +238,13 @@ function renderBoard() {
       parts.push(
         `<polygon data-slot="${k}" points="${hexPoints(cx, cy)}" fill="#ffffff08" stroke="#ffffff30" stroke-dasharray="4 4"/>`,
       );
+      const home = homeAt(map, k);
+      if (home) {
+        const ring = tool.kind === 'home' && tool.id === home ? '#ff3b30' : '#222';
+        parts.push(`<circle cx="${cx}" cy="${cy}" r="${S * 0.72}" fill="#fff" stroke="${ring}" stroke-width="4" pointer-events="none"/>`);
+        parts.push(`<text x="${cx}" y="${cy - 2}" class="spot">⌂</text>`);
+        parts.push(`<text x="${cx}" y="${cy + 14}" class="spot">${home.toUpperCase()}</text>`);
+      }
       continue;
     }
     const outline = selectedHome.includes(k) ? 'stroke="#ff3b30" stroke-width="5"' : 'stroke="#222" stroke-width="1.5"';
@@ -274,6 +288,7 @@ function renderBoard() {
         .lbl { font-size: 13px; font-weight: 700; }
         .mark { font-size: 10px; font-weight: 800; }
         .home { font-size: 10px; font-weight: 800; fill: #8b0000; }
+        .spot { font-size: 14px; font-weight: 800; }
       </style>
       ${parts.join('\n')}
     </svg>`;
@@ -307,7 +322,7 @@ toolsEl.addEventListener('click', (e) => {
       return;
     case 'clear':
       if (confirm('Remove every hex, river and home base?')) {
-        commit({ ...map, cells: {}, rivers: [], homes: Object.fromEntries(HOME_IDS.map((id) => [id, []])) });
+        commit({ ...map, cells: {}, rivers: [], homes: Object.fromEntries(HOME_IDS.map((id) => [id, []])), homeSpots: {} });
       }
       return;
   }
@@ -372,7 +387,10 @@ function openExport() {
   try {
     const board = buildBoard(layout);
     const hexes = Object.values(board.hexes);
-    const homes = Object.entries(board.homeBases).map(([id, h]) => `${id.toUpperCase()} ${h.length}`);
+    const homes = HOME_IDS.map((id) => {
+      const where = board.homeBasePositions[id] ? 'placed' : 'not placed';
+      return `${id.toUpperCase()} ${where}, touches ${board.homeBases[id]?.length ?? 0}`;
+    });
     check.className = 'check';
     check.textContent =
       `✓ ${hexes.length} hexes · ${hexes.filter((h) => h.tunnel).length} tunnels · ` +

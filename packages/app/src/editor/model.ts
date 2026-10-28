@@ -20,7 +20,10 @@ export interface EditorMap {
   cells: Record<SlotKey, Cell>;
   /** Edges as "r,c|r,c", endpoints sorted. */
   rivers: string[];
+  /** Hexes each home base borders. */
   homes: Record<string, SlotKey[]>;
+  /** Empty slot where each home base sits (drawn there, not a hex). */
+  homeSpots: Record<string, SlotKey>;
 }
 
 export const HOME_IDS = ['nw', 'ne', 'e', 'se', 's', 'sw', 'w'];
@@ -54,6 +57,7 @@ export function slotsTouch(map: EditorMap, a: SlotKey, b: SlotKey): boolean {
 
 export function fromLayout(layout: BoardLayout): EditorMap {
   const cells: Record<SlotKey, Cell> = {};
+  const homeSpots: Record<string, SlotKey> = {};
   const byLabel: Record<string, SlotKey> = {};
   let cols = 0;
   layout.rows.forEach((row, r) => {
@@ -62,6 +66,10 @@ export function fromLayout(layout: BoardLayout): EditorMap {
     tokens.forEach((token, c) => {
       if (token === '--') return;
       const k = key(r, c);
+      if (token.startsWith('@')) {
+        homeSpots[token.slice(1)] = k;
+        return;
+      }
       cells[k] = {
         code: token.slice(0, 2) as TerrainCode,
         tunnel: token.slice(2).includes('T'),
@@ -88,6 +96,7 @@ export function fromLayout(layout: BoardLayout): EditorMap {
       return edgeKey(slot(a), slot(b));
     }),
     homes,
+    homeSpots,
   };
 }
 
@@ -104,6 +113,7 @@ function remap(map: EditorMap, dr: number, dc: number): EditorMap {
       return edgeKey(move(a), move(b));
     }),
     homes: Object.fromEntries(Object.entries(map.homes).map(([id, ks]) => [id, ks.map(move)])),
+    homeSpots: Object.fromEntries(Object.entries(map.homeSpots).map(([id, k]) => [id, move(k)])),
   };
 }
 
@@ -131,8 +141,20 @@ export function toggleHome(map: EditorMap, id: string, k: SlotKey): EditorMap {
   return { ...map, homes: { ...map.homes, [id]: next } };
 }
 
+/** Puts a home base on a slot, moving it if placed elsewhere; tapping its own slot removes it. */
+export function placeHome(map: EditorMap, id: string, k: SlotKey): EditorMap {
+  const others = Object.entries(map.homeSpots).filter(([other, spot]) => other !== id && spot !== k);
+  const homeSpots = Object.fromEntries(others);
+  if (map.homeSpots[id] !== k) homeSpots[id] = k;
+  return { ...map, homeSpots };
+}
+
+export function homeAt(map: EditorMap, k: SlotKey): string | undefined {
+  return Object.keys(map.homeSpots).find((id) => map.homeSpots[id] === k);
+}
+
 function bounds(map: EditorMap) {
-  const ks = Object.keys(map.cells).map(parseKey);
+  const ks = [...Object.keys(map.cells), ...Object.values(map.homeSpots)].map(parseKey);
   if (ks.length === 0) return null;
   return {
     minRow: Math.min(...ks.map(([r]) => r)),
@@ -157,7 +179,9 @@ export function toLayout(map: EditorMap): BoardLayout {
     const tokens: string[] = [];
     for (let c = b.minCol; c < map.cols; c++) {
       const cell = map.cells[key(r, c)];
-      tokens.push(cell ? cell.code + (cell.tunnel ? 'T' : '') + (cell.encounter ? '*' : '') : '--');
+      const home = homeAt(map, key(r, c));
+      if (cell) tokens.push(cell.code + (cell.tunnel ? 'T' : '') + (cell.encounter ? '*' : ''));
+      else tokens.push(home ? `@${home}` : '--');
     }
     while (tokens.at(-1) === '--') tokens.pop();
     rows.push(tokens.join(' '));

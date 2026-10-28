@@ -60,6 +60,22 @@ describe('buildBoard with even rows shifted', () => {
   });
 });
 
+describe('home base positions', () => {
+  // @w marks where home base "w" sits on the grid; it is not a hex.
+  const board = buildBoard({ rows: ['@w Fa Fo'], rivers: [], homeBases: { w: ['A2'] } });
+
+  it('records the position without making it a hex', () => {
+    expect(board.homeBasePositions.w).toEqual({ q: 1, r: 0 });
+    expect(board.hexes.A1).toBeUndefined();
+    expect(board.hexes.A2?.terrain).toBe('farm');
+    expect([...neighbors(board, 'A2')]).toEqual(['A3']);
+  });
+
+  it('rejects a home base placed twice', () => {
+    expect(() => buildBoard({ rows: ['@w Fa @w'], rivers: [], homeBases: {} })).toThrow(/home base w is placed twice/);
+  });
+});
+
 describe('buildBoard rejects bad layouts', () => {
   const bad = (patch: Partial<BoardLayout>) => () => buildBoard({ ...tiny, ...patch });
 

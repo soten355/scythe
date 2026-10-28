@@ -16,7 +16,7 @@ const FILL: Record<Terrain, string> = {
   factory: '#7a4e8a',
 };
 
-const center = ({ q, r }: Hex): [number, number] => [SIZE * Math.sqrt(3) * (q + r / 2), SIZE * 1.5 * r];
+const center = ({ q, r }: { q: number; r: number }): [number, number] => [SIZE * Math.sqrt(3) * (q + r / 2), SIZE * 1.5 * r];
 
 const corners = (h: Hex): [number, number][] => {
   const [cx, cy] = center(h);
@@ -55,7 +55,7 @@ for (const [a, b] of baseBoard.rivers) {
   );
 }
 
-// Home bases: a circle pushed outward from the two hexes they border.
+// Home bases: a circle at its placed spot, linked to the hexes it borders.
 const all = hexes.map(center);
 const midX = all.reduce((s, p) => s + p[0], 0) / all.length;
 const midY = all.reduce((s, p) => s + p[1], 0) / all.length;
@@ -64,8 +64,11 @@ for (const [id, borders] of Object.entries(baseBoard.homeBases)) {
   const ax = pts.reduce((s, p) => s + p[0], 0) / pts.length;
   const ay = pts.reduce((s, p) => s + p[1], 0) / pts.length;
   const len = Math.hypot(ax - midX, ay - midY);
-  const hx = ax + ((ax - midX) / len) * SIZE * 1.6;
-  const hy = ay + ((ay - midY) / len) * SIZE * 1.6;
+  const placed = baseBoard.homeBasePositions[id];
+  // Use the placed spot if the layout has one; otherwise push outward.
+  const [hx, hy] = placed
+    ? center(placed)
+    : [ax + ((ax - midX) / len) * SIZE * 1.6, ay + ((ay - midY) / len) * SIZE * 1.6];
   for (const [px, py] of pts) {
     parts.push(`<line x1="${hx}" y1="${hy}" x2="${px}" y2="${py}" stroke="#222" stroke-dasharray="4 4"/>`);
   }

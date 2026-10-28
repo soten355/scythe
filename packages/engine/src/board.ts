@@ -8,6 +8,7 @@
 //
 // Codes: Fa farm, Fo forest, Mo mountain, Tu tundra, Vi village, ~~ lake,
 // FF factory, -- no hex. Suffix T marks a tunnel, * an encounter token.
+// @id marks where home base "id" sits: a grid position, not a hex.
 
 export type Terrain = 'farm' | 'forest' | 'mountain' | 'tundra' | 'village' | 'lake' | 'factory';
 export type HexId = string;
@@ -29,8 +30,10 @@ export interface Board {
   adjacent: Record<HexId, HexId[]>;
   /** Each river runs along the edge between two touching hexes. */
   rivers: [HexId, HexId][];
-  /** Home bases sit off the grid; each lists the hexes it borders. */
+  /** Home bases are not hexes; each lists the hexes it borders. */
   homeBases: Record<HomeBaseId, HexId[]>;
+  /** Where each home base is drawn, in the same axial coordinates as hexes. */
+  homeBasePositions: Record<HomeBaseId, { q: number; r: number }>;
 }
 
 export interface BoardLayout {
@@ -60,17 +63,24 @@ const AXIAL_DIRECTIONS: [number, number][] = [
 
 export function buildBoard(layout: BoardLayout): Board {
   const hexes: Record<HexId, Hex> = {};
+  const homeBasePositions: Board['homeBasePositions'] = {};
 
   layout.rows.forEach((row, r) => {
     row.trim().split(/\s+/).forEach((token, i) => {
       if (token === '--') return;
       const id = `${ROW_LETTERS[r]}${i + 1}`;
+      // Offset to axial conversion ("odd-r" or "even-r" layout).
+      const q = i + 1 - (layout.shiftEvenRows ? (r + (r & 1)) / 2 : (r - (r & 1)) / 2);
+      if (token.startsWith('@')) {
+        const home = token.slice(1);
+        if (homeBasePositions[home]) throw new Error(`home base ${home} is placed twice`);
+        homeBasePositions[home] = { q, r };
+        return;
+      }
       const terrain = TERRAIN_CODES[token.slice(0, 2)];
       if (!terrain) throw new Error(`unknown terrain code "${token.slice(0, 2)}" at ${id}`);
       const flags = token.slice(2);
       if (/[^T*]/.test(flags)) throw new Error(`unknown marker "${flags}" at ${id}`);
-      // Offset to axial conversion ("odd-r" or "even-r" layout).
-      const q = i + 1 - (layout.shiftEvenRows ? (r + (r & 1)) / 2 : (r - (r & 1)) / 2);
       hexes[id] = { id, q, r, terrain, tunnel: flags.includes('T'), encounter: flags.includes('*') };
     });
   });
@@ -81,7 +91,7 @@ export function buildBoard(layout: BoardLayout): Board {
     adjacent[id] = AXIAL_DIRECTIONS.flatMap(([dq, dr]) => byCoord.get(`${q + dq},${r + dr}`) ?? []);
   }
 
-  const board: Board = { hexes, adjacent, rivers: [], homeBases: {} };
+  const board: Board = { hexes, adjacent, rivers: [], homeBases: {}, homeBasePositions };
 
   for (const edge of layout.rivers) {
     const [a = '', b = ''] = edge.split('|');

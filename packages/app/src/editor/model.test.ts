@@ -8,6 +8,7 @@ import {
   formatLayout,
   fromLayout,
   labelOf,
+  placeHome,
   slotsTouch,
   toLayout,
   toggleHome,
@@ -73,6 +74,27 @@ describe('map editor model', () => {
     map = toggleHome(map, 'w', '0,1');
     map = toggleHome(map, 'w', '0,0');
     expect(toLayout(map).homeBases).toEqual({ w: ['A2'] });
+  });
+
+  it('places, moves and removes a home base on an empty slot', () => {
+    let map = fromLayout({ rows: ['-- Fa Fo -- --'], rivers: [], homeBases: {} });
+    map = placeHome(map, 'w', '0,0');
+    expect(toLayout(map).rows).toEqual(['@w Fa Fo']);
+    map = placeHome(map, 'w', '0,3');
+    expect(toLayout(map).rows).toEqual(['Fa Fo @w']);
+    map = placeHome(map, 'e', '0,3'); // takes the spot from w
+    expect(map.homeSpots).toEqual({ e: '0,3' });
+    map = placeHome(map, 'e', '0,3'); // tapping again removes it
+    expect(toLayout(map).rows).toEqual(['Fa Fo']);
+  });
+
+  it('keeps a home base placed above the map, and round-trips it', () => {
+    let map = addRow(fromLayout({ rows: ['Fa Fo'], rivers: [], homeBases: {} }), 'top');
+    map = placeHome(map, 'nw', '0,0');
+    const layout = toLayout(map);
+    expect(layout.rows).toEqual(['@nw', 'Fa Fo']);
+    expect(buildBoard(layout).homeBasePositions.nw).toBeDefined();
+    expect(toLayout(fromLayout(layout))).toEqual(layout);
   });
 
   it('formats the export so it can be pasted straight into the content file', () => {
