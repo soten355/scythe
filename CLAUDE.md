@@ -1,5 +1,8 @@
 # Scythe PWA
 
+**Read `docs/DESIGN.md` before starting any phase work, and tick its checklist
+items (`- [ ]` → `- [x]`) as they're completed.**
+
 ## Goal
 Personal offline PWA of Scythe (base game + Invaders from Afar) for iPhone
 (landscape only) and Mac browser. Clean and functional first; animation,
