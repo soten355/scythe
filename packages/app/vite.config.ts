@@ -1,3 +1,4 @@
+import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
@@ -8,11 +9,12 @@ export default defineConfig({
   base,
   build: {
     rollupOptions: {
-      // editor.html, mats.html and factions.html are the map, player mat and faction editors.
-      input: { main: 'index.html', editor: 'editor.html', mats: 'mats.html', factions: 'factions.html' },
+      // play.html is the game; editor.html, mats.html and factions.html are the map, player mat and faction editors.
+      input: { main: 'index.html', play: 'play.html', editor: 'editor.html', mats: 'mats.html', factions: 'factions.html' },
     },
   },
   plugins: [
+    svelte(),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['apple-touch-icon.png', 'favicon.svg'],

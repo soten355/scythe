@@ -186,7 +186,7 @@ Everything is TypeScript, kept in one Git repository, so the engine, bots and UI
 | --- | --- | --- |
 | Language | TypeScript | Catches rule bugs at compile time; one language everywhere |
 | Build tool | Vite | Fast, simple, first-class PWA plugin |
-| UI | Svelte or React (decide in Phase 1) | Lightweight, reactive views of game state |
+| UI | Svelte 5 | Small and fast on the phone, built-in animation, short readable components |
 | Board | SVG | Sharp at any size; easy hit-testing on hexes |
 | 3D (later) | Three.js | Runs in the same app |
 | Offline | Service worker via vite-plugin-pwa | Caches the app for full offline play |
@@ -231,7 +231,7 @@ Each phase ends in something playable on the phone. A phase is done when its che
 - [x] 2 factions and 2 player mats (Nordic + Rusviet; Industrial + Engineering), entered from the physical game
 - [x] All four top-row and four bottom-row actions, with costs and rewards
 - [x] Movement, production, workers and resources on hexes (crossing rivers and lakes, Speed and combat on moving come with mech and faction abilities in Phase 2)
-- [ ] 2D board, player mat drawer, legal-move highlighting
+- [x] 2D board, player mat drawer, legal-move highlighting (pinch-zoom and pan still to add)
 - [ ] Installs on iPhone and runs offline
 - [ ] Done when: two humans can play a full turn cycle pass-and-play on the phone
 
@@ -271,7 +271,7 @@ Each phase ends in something playable on the phone. A phase is done when its che
 **Open questions**
 
 - [ ] Do we have the physical game or PDF rulebooks (base, Invaders from Afar, Automa rules)? Card-by-card data entry depends on having them on hand.
-- [ ] Svelte or React for the UI?
+- [x] Svelte or React for the UI? Svelte (5), chosen Oct 29, 2026 for its small size on the phone, built-in animation and readable code. Switching to React later would only touch the app, never the engine.
 - [x] Which two factions and mats for Phase 1? Nordic + Rusviet; Industrial + Engineering.
 - [ ] Original faction names and theme, or neutral placeholders until the art pass?
 

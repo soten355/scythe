@@ -9,6 +9,7 @@ app.innerHTML = `
   <h1>Scythe — setup OK</h1>
   <p class="meta">engine v${ENGINE_VERSION}</p>
   <nav class="menu">
+    <a href="${import.meta.env.BASE_URL}play.html">Play (pass-and-play)</a>
     <a href="${import.meta.env.BASE_URL}editor.html">Map editor</a>
     <a href="${import.meta.env.BASE_URL}mats.html">Mat editor</a>
     <a href="${import.meta.env.BASE_URL}factions.html">Faction editor</a>
