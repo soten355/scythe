@@ -6,3 +6,4 @@ export * from './rng';
 export * from './board';
 export * from './game';
 export * from './mat';
+export * from './faction';
