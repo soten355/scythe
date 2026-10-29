@@ -239,6 +239,7 @@ Each phase ends in something playable on the phone. A phase is done when its che
 
 - [ ] Combat (power dial, combat cards), retreats, popularity loss
 - [ ] Mechs and all mech abilities; faction abilities
+  - Note from play-testing: a mech moving more than one hex (Speed) can drop off and pick up any number of workers and resources at each hex along the way, then keep moving.
 - [ ] Stars, triumph track, game end and final scoring
 - [ ] Encounters, the Factory, objectives, structure bonus tiles
 - [ ] All 5 base factions and 5 mats; Invaders from Afar factions and mats

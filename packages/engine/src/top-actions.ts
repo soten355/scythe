@@ -2,7 +2,9 @@
 //
 // Still to come in Phase 2, with mech and faction abilities: crossing
 // rivers, moving onto lakes, moving two hexes, and combat when moving onto
-// another player's units.
+// another player's units. When a mech moves two hexes, it may drop off and
+// pick up any workers and resources at the hex in between, then keep moving
+// (one load/move step per hex should handle this).
 import { hasRiver, neighbors, type HexId } from './board';
 import type { Action, GameState, Load, Location, PlayerState, SectionIndex, TurnStep, UnitRef } from './game';
 import type { Resource, TopAction } from './mat';
