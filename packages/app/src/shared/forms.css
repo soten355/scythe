@@ -17,7 +17,7 @@ body {
   color: var(--fg);
 }
 
-#mat-editor {
+.form-editor {
   min-height: 100%;
   display: flex;
   flex-direction: column;

@@ -13,7 +13,8 @@ import {
   type TopActionType,
   type BottomActionType,
 } from '@scythe/engine';
-import './mat-editor.css';
+import '../shared/forms.css';
+import { esc, showExport } from '../shared/editor-utils';
 import { defaultTop, formatMats, newMat, setBottomAction, setField, setTopAction } from './model';
 
 const STORAGE_KEY = 'scythe-mat-editor';
@@ -88,9 +89,6 @@ const updateMat = (next: PlayerMat) => {
 
 const root = document.querySelector<HTMLDivElement>('#mat-editor')!;
 
-const esc = (s: string) =>
-  s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-
 const num = (path: string, value: number) =>
   `<input type="number" inputmode="numeric" min="0" step="1" data-path="${path}" value="${Number.isFinite(value) ? value : ''}">`;
 
@@ -154,13 +152,7 @@ function render() {
       <label>Objective cards${num('objectiveCards', m.objectiveCards)}</label>
     </div>
     <div class="sections">${[0, 1, 2, 3].map(sectionHtml).join('')}</div>
-    <div class="status"></div>
-    <dialog>
-      <h3 style="margin-top:0">Export mats</h3>
-      <p style="font-size:0.85rem;opacity:0.8">All ${state.mats.length} mat(s). Copy this text and paste it into the chat with Claude.</p>
-      <textarea readonly></textarea>
-      <div class="row"><button data-act="copy">Copy</button><button data-act="close">Close</button></div>
-    </dialog>`;
+    <div class="status"></div>`;
   renderStatus();
 }
 
@@ -201,7 +193,7 @@ root.addEventListener('change', (e) => {
   }
 });
 
-root.addEventListener('click', async (e) => {
+root.addEventListener('click', (e) => {
   const btn = (e.target as HTMLElement).closest('button');
   switch (btn?.dataset.act) {
     case 'new':
@@ -218,26 +210,12 @@ root.addEventListener('click', async (e) => {
       if (state.mats.length === 0) state.mats.push(newMat('mat-1'));
       state = { mats: state.mats, selected: Math.min(state.selected, state.mats.length - 1) };
       break;
-    case 'export': {
-      const dialog = root.querySelector('dialog')!;
-      dialog.querySelector('textarea')!.value = formatMats(state.mats);
-      dialog.querySelector<HTMLElement>('[data-act="copy"]')!.textContent = 'Copy';
-      dialog.showModal();
-      return;
-    }
-    case 'copy': {
-      const area = root.querySelector('textarea')!;
-      try {
-        await navigator.clipboard.writeText(area.value);
-      } catch {
-        area.select();
-        document.execCommand('copy');
-      }
-      btn!.textContent = 'Copied ✓';
-      return;
-    }
-    case 'close':
-      root.querySelector('dialog')!.close();
+    case 'export':
+      showExport(
+        'Export mats',
+        `All ${state.mats.length} mat(s). Copy this text and paste it into the chat with Claude.`,
+        formatMats(state.mats),
+      );
       return;
     default:
       return;

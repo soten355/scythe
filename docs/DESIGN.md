@@ -227,6 +227,7 @@ Each phase ends in something playable on the phone. A phase is done when its che
 - [x] Board data: all hexes, terrain, rivers, lakes, tunnels, home bases
 - [x] Turn structure: choose a section, top-row action, bottom-row action, can't repeat the last section
 - [x] Player mats as data, with a mat editor so new mats can be designed (like the map editor)
+- [x] Factions as data, with a faction editor (home base, power, combat cards, stars, abilities, recruit bonuses)
 - [x] 2 factions and 2 player mats (Nordic + Rusviet; Industrial + Engineering), entered from the physical game
 - [ ] All four top-row and four bottom-row actions, with costs and rewards
 - [ ] Movement, production, workers and resources on hexes

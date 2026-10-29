@@ -8,8 +8,8 @@ export default defineConfig({
   base,
   build: {
     rollupOptions: {
-      // editor.html and mats.html are the map and player mat editors.
-      input: { main: 'index.html', editor: 'editor.html', mats: 'mats.html' },
+      // editor.html, mats.html and factions.html are the map, player mat and faction editors.
+      input: { main: 'index.html', editor: 'editor.html', mats: 'mats.html', factions: 'factions.html' },
     },
   },
   plugins: [

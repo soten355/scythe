@@ -29,3 +29,9 @@ should check it against the rulebook; tick it once confirmed.
       popularity (Bolster), Armory +1 power (Trade), Mill counts as an extra
       hex to produce on (Produce), Mine is a tunnel only you can use (Move).
       Source: rulebook, Build. Stored per section so new mats can vary it.
+- [x] Faction mat also holds: the faction ability, 4 mech abilities (each
+      covered by a mech until deployed), 6 stars, and the 4 recruit one-time
+      bonuses (2 power, 2 coins, 2 popularity, 2 combat cards). The
+      character starts on the home base and one worker on each land hex
+      next to it; those are board rules, not faction data. Source: rulebook
+      setup.

@@ -1,0 +1,64 @@
+.faction-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 8px;
+  padding: 0 10px;
+}
+
+.card {
+  background: var(--panel);
+  border-radius: 10px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.card.ability {
+  background: var(--top);
+}
+
+.card h3 {
+  margin: 0;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.6;
+}
+
+.card textarea {
+  font: inherit;
+  font-size: 0.85rem;
+  color: var(--fg);
+  background: #3a322a;
+  border: 1px solid #fff2;
+  border-radius: 6px;
+  padding: 6px 8px;
+  resize: vertical;
+}
+
+.recruits {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.recruits label {
+  white-space: nowrap;
+  gap: 6px;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+input[type='color'] {
+  width: 3.2em;
+  height: 2.1em;
+  padding: 2px;
+}
+
+.note {
+  margin: 0 10px;
+  font-size: 0.8rem;
+  opacity: 0.7;
+}

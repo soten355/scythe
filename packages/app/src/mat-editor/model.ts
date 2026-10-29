@@ -1,6 +1,7 @@
 // Data helpers for the player mat editor. Mats are edited as plain
 // PlayerMat objects; every helper returns a new mat.
 import type { BottomAction, BottomActionType, PlayerMat, TopAction, TopActionType } from '@scythe/engine';
+import { setPath } from '../shared/editor-utils';
 
 /** Standard top-row values and building bonus, used when a section switches action type. */
 export function defaultTop(action: TopActionType): TopAction {
@@ -58,13 +59,7 @@ export function setBottomAction(mat: PlayerMat, section: number, action: BottomA
 
 /** Sets a value by dotted path, e.g. "sections.0.top.units.base". */
 export function setField(mat: PlayerMat, path: string, value: string | number): PlayerMat {
-  const next = clone(mat);
-  const keys = path.split('.');
-  const last = keys.pop()!;
-  let obj: Record<string, unknown> = next as unknown as Record<string, unknown>;
-  for (const k of keys) obj = obj[k] as Record<string, unknown>;
-  obj[last] = value;
-  return next;
+  return setPath(mat, path, value);
 }
 
 export function formatMats(mats: PlayerMat[]): string {
