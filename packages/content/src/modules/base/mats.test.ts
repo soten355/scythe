@@ -9,7 +9,8 @@ describe('base player mats', () => {
     expect(new Set(baseMats.map((m) => m.turnOrder)).size).toBe(baseMats.length);
   });
 
-  it('include Industrial as mat 1', () => {
+  it('include Industrial and Engineering as mats 1 and 2', () => {
     expect(baseMats.find((m) => m.name === 'Industrial')).toMatchObject({ id: 'mat-1', turnOrder: 1 });
+    expect(baseMats.find((m) => m.name === 'Engineering')).toMatchObject({ id: 'mat-2', turnOrder: 2, coins: 5 });
   });
 });

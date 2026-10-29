@@ -29,4 +29,30 @@ export const baseMats: PlayerMat[] = [
       },
     ],
   },
+  {
+    id: 'mat-2',
+    name: 'Engineering',
+    turnOrder: 2,
+    popularity: 2,
+    coins: 5,
+    objectiveCards: 2,
+    sections: [
+      {
+        top: { action: 'produce', hexes: { base: 2, upgraded: 3 }, structure: 'mill' },
+        bottom: { action: 'upgrade', cost: 3, upgradeSpaces: 1, coins: 2, recruitBonus: 'power' },
+      },
+      {
+        top: { action: 'trade', cost: 1, resources: 2, popularity: { base: 1, upgraded: 2 }, structure: 'armory' },
+        bottom: { action: 'deploy', cost: 4, upgradeSpaces: 2, coins: 0, recruitBonus: 'coins' },
+      },
+      {
+        top: { action: 'bolster', cost: 1, power: { base: 2, upgraded: 3 }, combatCards: { base: 1, upgraded: 2 }, structure: 'monument' },
+        bottom: { action: 'build', cost: 3, upgradeSpaces: 2, coins: 3, recruitBonus: 'popularity' },
+      },
+      {
+        top: { action: 'move', units: { base: 2, upgraded: 3 }, coins: { base: 1, upgraded: 2 }, structure: 'mine' },
+        bottom: { action: 'enlist', cost: 3, upgradeSpaces: 1, coins: 1, recruitBonus: 'combatCard' },
+      },
+    ],
+  },
 ];
