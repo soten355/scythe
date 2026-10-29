@@ -44,9 +44,10 @@ Vite `base` is `/scythe/`.
   export/import `.scythe.json` save files; saves record engine version.
 
 ## Stack
-TypeScript, Vite, vite-plugin-pwa, Vitest, SVG for the 2D board, Three.js
-later, IndexedDB, Web Workers. UI framework not chosen yet; don't add one
-until it is.
+TypeScript, Vite, vite-plugin-pwa, Vitest, Svelte 5 (runes syntax:
+`$state`, `$derived`, `$props`; not the old Svelte 4 style), SVG for the 2D
+board, Three.js later, IndexedDB, Web Workers. Keep game logic out of
+components: put it in plain `.ts` files that can be unit tested.
 
 ## Testing
 Every rule gets scenario tests; fuzz tests (random legal games) check

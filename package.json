@@ -15,7 +15,7 @@
     "preview": "npm run preview -w @scythe/app",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc -p packages/engine && tsc -p packages/content && tsc -p packages/bots && tsc -p packages/app && tsc -p tools",
+    "typecheck": "tsc -p packages/engine && tsc -p packages/content && tsc -p packages/bots && svelte-check --workspace packages/app --tsconfig ./tsconfig.json --fail-on-warnings && tsc -p tools",
     "sim": "npm run sim -w @scythe/tools",
     "board-preview": "npm run board-preview -w @scythe/tools"
   },
