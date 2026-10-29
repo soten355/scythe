@@ -2,17 +2,17 @@
 // PlayerMat objects; every helper returns a new mat.
 import type { BottomAction, BottomActionType, PlayerMat, TopAction, TopActionType } from '@scythe/engine';
 
-/** Standard top-row values, used when a section switches action type. */
+/** Standard top-row values and building bonus, used when a section switches action type. */
 export function defaultTop(action: TopActionType): TopAction {
   switch (action) {
     case 'move':
-      return { action, units: { base: 2, upgraded: 3 }, coins: { base: 1, upgraded: 2 } };
+      return { action, units: { base: 2, upgraded: 3 }, coins: { base: 1, upgraded: 2 }, structure: 'mine' };
     case 'trade':
-      return { action, cost: 1, resources: 2, popularity: { base: 1, upgraded: 2 } };
+      return { action, cost: 1, resources: 2, popularity: { base: 1, upgraded: 2 }, structure: 'armory' };
     case 'produce':
-      return { action, hexes: { base: 2, upgraded: 3 } };
+      return { action, hexes: { base: 2, upgraded: 3 }, structure: 'mill' };
     case 'bolster':
-      return { action, cost: 1, power: { base: 2, upgraded: 3 }, combatCards: { base: 1, upgraded: 2 } };
+      return { action, cost: 1, power: { base: 2, upgraded: 3 }, combatCards: { base: 1, upgraded: 2 }, structure: 'monument' };
   }
 }
 

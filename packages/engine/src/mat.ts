@@ -11,10 +11,14 @@ export type TopActionType = 'move' | 'trade' | 'produce' | 'bolster';
 export type BottomActionType = 'upgrade' | 'deploy' | 'build' | 'enlist';
 export type Resource = 'oil' | 'metal' | 'wood' | 'food';
 export type RecruitBonus = 'power' | 'coins' | 'popularity' | 'combatCard';
+/** Structures start on the mat, one per section, under a top-row action.
+ *  Building one reveals a bonus for that top-row action from then on. */
+export type Structure = 'mine' | 'mill' | 'armory' | 'monument';
 
 export const TOP_ACTIONS: TopActionType[] = ['move', 'trade', 'produce', 'bolster'];
 export const BOTTOM_ACTIONS: BottomActionType[] = ['upgrade', 'deploy', 'build', 'enlist'];
 export const RECRUIT_BONUSES: RecruitBonus[] = ['power', 'coins', 'popularity', 'combatCard'];
+export const STRUCTURES: Structure[] = ['mine', 'mill', 'armory', 'monument'];
 
 /** The resource each bottom-row action costs (a rule, not mat data). */
 export const BOTTOM_COST_RESOURCE: Record<BottomActionType, Resource> = {
@@ -30,11 +34,15 @@ export interface Upgradeable {
   upgraded: number;
 }
 
-export type TopAction =
+export type TopAction = (
   | { action: 'move'; units: Upgradeable; coins: Upgradeable }
   | { action: 'trade'; cost: number; resources: number; popularity: Upgradeable }
   | { action: 'produce'; hexes: Upgradeable }
-  | { action: 'bolster'; cost: number; power: Upgradeable; combatCards: Upgradeable };
+  | { action: 'bolster'; cost: number; power: Upgradeable; combatCards: Upgradeable }
+) & {
+  /** The structure in this section (its building bonus). */
+  structure: Structure;
+};
 
 export interface BottomAction {
   action: BottomActionType;
@@ -97,6 +105,10 @@ export function validateMat(mat: PlayerMat): string[] {
   const bottoms = mat.sections.map((s) => s.bottom.action);
   if (BOTTOM_ACTIONS.some((a) => bottoms.filter((b) => b === a).length !== 1)) {
     problems.push(`bottom row needs each of ${BOTTOM_ACTIONS.join(', ')} once`);
+  }
+  const structures = mat.sections.map((s) => s.top.structure);
+  if (STRUCTURES.some((st) => structures.filter((x) => x === st).length !== 1)) {
+    problems.push(`building bonuses need each of ${STRUCTURES.join(', ')} once`);
   }
 
   mat.sections.forEach(({ top, bottom }, i) => {

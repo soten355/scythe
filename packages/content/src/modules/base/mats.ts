@@ -12,19 +12,19 @@ export const baseMats: PlayerMat[] = [
     objectiveCards: 2,
     sections: [
       {
-        top: { action: 'bolster', cost: 1, power: { base: 2, upgraded: 3 }, combatCards: { base: 1, upgraded: 2 } },
+        top: { action: 'bolster', cost: 1, power: { base: 2, upgraded: 3 }, combatCards: { base: 1, upgraded: 2 }, structure: 'monument' },
         bottom: { action: 'upgrade', cost: 3, upgradeSpaces: 1, coins: 3, recruitBonus: 'power' },
       },
       {
-        top: { action: 'produce', hexes: { base: 2, upgraded: 3 } },
+        top: { action: 'produce', hexes: { base: 2, upgraded: 3 }, structure: 'mill' },
         bottom: { action: 'deploy', cost: 3, upgradeSpaces: 2, coins: 2, recruitBonus: 'coins' },
       },
       {
-        top: { action: 'move', units: { base: 2, upgraded: 3 }, coins: { base: 1, upgraded: 2 } },
+        top: { action: 'move', units: { base: 2, upgraded: 3 }, coins: { base: 1, upgraded: 2 }, structure: 'mine' },
         bottom: { action: 'build', cost: 3, upgradeSpaces: 1, coins: 1, recruitBonus: 'popularity' },
       },
       {
-        top: { action: 'trade', cost: 1, resources: 2, popularity: { base: 1, upgraded: 2 } },
+        top: { action: 'trade', cost: 1, resources: 2, popularity: { base: 1, upgraded: 2 }, structure: 'armory' },
         bottom: { action: 'enlist', cost: 4, upgradeSpaces: 2, coins: 0, recruitBonus: 'combatCard' },
       },
     ],

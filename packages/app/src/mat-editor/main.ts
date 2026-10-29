@@ -6,6 +6,7 @@ import {
   BOTTOM_COST_RESOURCE,
   matUpgradeCubes,
   RECRUIT_BONUSES,
+  STRUCTURES,
   TOP_ACTIONS,
   validateMat,
   type PlayerMat,
@@ -13,7 +14,7 @@ import {
   type BottomActionType,
 } from '@scythe/engine';
 import './mat-editor.css';
-import { formatMats, newMat, setBottomAction, setField, setTopAction } from './model';
+import { defaultTop, formatMats, newMat, setBottomAction, setField, setTopAction } from './model';
 
 const STORAGE_KEY = 'scythe-mat-editor';
 
@@ -25,6 +26,12 @@ interface EditorState {
 const TOP_LABEL: Record<TopActionType, string> = { move: 'Move', trade: 'Trade', produce: 'Produce', bolster: 'Bolster' };
 const BOTTOM_LABEL: Record<BottomActionType, string> = { upgrade: 'Upgrade', deploy: 'Deploy', build: 'Build', enlist: 'Enlist' };
 const BONUS_LABEL = { power: 'Power', coins: 'Coins', popularity: 'Popularity', combatCard: 'Combat card' };
+const STRUCTURE_LABEL = {
+  mine: 'Mine (private tunnel)',
+  mill: 'Mill (extra hex to produce on)',
+  armory: 'Armory (+1 power)',
+  monument: 'Monument (+1 popularity)',
+};
 
 // Fields shown for each top-row action. Upgradeable ones get a start and an
 // upgraded value; an upgrade cube sits on them if the two differ.
@@ -51,8 +58,17 @@ function load(): EditorState {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       const loaded = JSON.parse(saved) as EditorState;
-      // Mats saved before objective cards were added get the usual 2.
-      return { ...loaded, mats: loaded.mats.map((m) => ({ ...m, objectiveCards: m.objectiveCards ?? 2 })) };
+      // Fill in fields added after a mat was saved: objective cards (usually 2)
+      // and building bonuses (the standard one for each top-row action).
+      const upgrade = (m: PlayerMat): PlayerMat => ({
+        ...m,
+        objectiveCards: m.objectiveCards ?? 2,
+        sections: m.sections.map((s) => ({
+          ...s,
+          top: { ...s.top, structure: s.top.structure ?? defaultTop(s.top.action).structure },
+        })) as PlayerMat['sections'],
+      });
+      return { ...loaded, mats: loaded.mats.map(upgrade) };
     }
   } catch {
     // Fall through to a fresh start if the saved copy is unreadable.
@@ -101,6 +117,9 @@ function sectionHtml(i: number) {
       <div class="top">
         <select data-top="${i}">${options(TOP_ACTIONS, top.action, TOP_LABEL)}</select>
         ${topFields}
+        <label>Building bonus
+          <select data-path="sections.${i}.top.structure" data-text>${options(STRUCTURES, top.structure, STRUCTURE_LABEL)}</select>
+        </label>
       </div>
       <div class="bottom">
         <select data-bottom="${i}">${options(BOTTOM_ACTIONS, bottom.action, BOTTOM_LABEL)}</select>

@@ -12,19 +12,19 @@ const mat: PlayerMat = {
   objectiveCards: 2,
   sections: [
     {
-      top: { action: 'trade', cost: 1, resources: 2, popularity: { base: 1, upgraded: 2 } },
+      top: { action: 'trade', cost: 1, resources: 2, popularity: { base: 1, upgraded: 2 }, structure: 'armory' },
       bottom: { action: 'upgrade', cost: 3, upgradeSpaces: 2, coins: 1, recruitBonus: 'power' },
     },
     {
-      top: { action: 'bolster', cost: 1, power: { base: 2, upgraded: 3 }, combatCards: { base: 1, upgraded: 2 } },
+      top: { action: 'bolster', cost: 1, power: { base: 2, upgraded: 3 }, combatCards: { base: 1, upgraded: 2 }, structure: 'monument' },
       bottom: { action: 'deploy', cost: 3, upgradeSpaces: 1, coins: 0, recruitBonus: 'coins' },
     },
     {
-      top: { action: 'move', units: { base: 2, upgraded: 3 }, coins: { base: 1, upgraded: 2 } },
+      top: { action: 'move', units: { base: 2, upgraded: 3 }, coins: { base: 1, upgraded: 2 }, structure: 'mine' },
       bottom: { action: 'build', cost: 3, upgradeSpaces: 2, coins: 2, recruitBonus: 'popularity' },
     },
     {
-      top: { action: 'produce', hexes: { base: 2, upgraded: 3 } },
+      top: { action: 'produce', hexes: { base: 2, upgraded: 3 }, structure: 'mill' },
       bottom: { action: 'enlist', cost: 4, upgradeSpaces: 1, coins: 3, recruitBonus: 'combatCard' },
     },
   ],
@@ -52,6 +52,12 @@ describe('player mats', () => {
     expect(validateMat(twoBuilds)).toContainEqual(expect.stringMatching(/bottom row needs each of upgrade, deploy, build, enlist once/));
   });
 
+  it('requires each structure (building bonus) exactly once', () => {
+    const twoMines = clone(mat);
+    twoMines.sections[0].top.structure = 'mine';
+    expect(validateMat(twoMines)).toContainEqual(expect.stringMatching(/building bonuses need each of mine, mill, armory, monument once/));
+  });
+
   it('needs as many bottom-row upgrade spaces as top-row cubes', () => {
     const short = clone(mat);
     short.sections[0].bottom.upgradeSpaces = 1;
@@ -74,7 +80,7 @@ describe('player mats', () => {
 
   it('rejects an upgraded value lower than the starting value', () => {
     const bad = clone(mat);
-    bad.sections[3].top = { action: 'produce', hexes: { base: 3, upgraded: 2 } };
+    bad.sections[3].top = { action: 'produce', hexes: { base: 3, upgraded: 2 }, structure: 'mill' };
     expect(validateMat(bad)).toContainEqual(expect.stringMatching(/section 4 produce: hexes can't get worse when upgraded/));
   });
 });

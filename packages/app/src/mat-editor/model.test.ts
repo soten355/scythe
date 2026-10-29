@@ -20,6 +20,19 @@ describe('mat editor model', () => {
     expect(validateMat(next)).toEqual([]);
   });
 
+  it('gives new top-row actions their standard building bonus, and keeps it with the action on a swap', () => {
+    const mat = newMat('m');
+    const structureOf = (action: string) => mat.sections.find((s) => s.top.action === action)!.top.structure;
+    expect([structureOf('move'), structureOf('produce'), structureOf('trade'), structureOf('bolster')]).toEqual([
+      'mine',
+      'mill',
+      'armory',
+      'monument',
+    ]);
+    const next = setTopAction(mat, 0, 'move');
+    expect(next.sections[0]!.top).toMatchObject({ action: 'move', structure: 'mine' });
+  });
+
   it('swaps bottom-row actions the same way, keeping each one\'s numbers', () => {
     const mat = setField(newMat('m'), 'sections.0.bottom.coins', 3);
     const from = mat.sections[0]!.bottom.action;
