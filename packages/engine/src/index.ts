@@ -5,5 +5,7 @@ export const ENGINE_VERSION = '0.0.0';
 export * from './rng';
 export * from './board';
 export * from './game';
+export * from './state';
+export { RESOURCES, TERRAIN_PRODUCES } from './top-actions';
 export * from './mat';
 export * from './faction';

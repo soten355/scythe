@@ -1,23 +1,37 @@
-// Simulation runner (Node). For now: plays random legal turns and prints
-// them, as a quick look at the turn structure.
+// Simulation runner (Node). For now: plays random legal turns with the real
+// board, Nordic + Rusviet on the Industrial + Engineering mats, and prints
+// them, as a quick look at the actions.
+import { baseBoard, baseFactions, baseMats } from '@scythe/content';
 import { applyAction, ENGINE_VERSION, legalActions, newGame, nextInt, type Action } from '@scythe/engine';
 
-const players = 3;
-const turns = 9;
-let state = newGame({ seed: 1, players });
+const turns = 12;
+let state = newGame({
+  seed: 1,
+  board: baseBoard,
+  players: [
+    { faction: baseFactions[0]!, mat: baseMats[0]! },
+    { faction: baseFactions[1]!, mat: baseMats[1]! },
+  ],
+});
 let rng = state.rng;
 
-const describe = (a: Action) => {
+const describe = (a: Action): string => {
   switch (a.type) {
     case 'chooseSection': return `section ${a.section + 1}`;
-    case 'takeTop': return 'top action';
-    case 'skipTop': return 'skips top';
-    case 'takeBottom': return 'bottom action';
-    case 'skipBottom': return 'skips bottom';
+    case 'moveUnit': return `moves ${a.unit.kind} to ${a.to}`;
+    case 'tradeResource': return `trades for ${a.resource} on ${a.hex}`;
+    case 'produce': return `produces on ${a.hex}`;
+    case 'bolster': return `bolsters ${a.gain}`;
+    case 'pay': return `pays from ${a.hex}`;
+    case 'upgrade': return `upgrades section ${a.top.section + 1} ${a.top.field}`;
+    case 'deploy': return `deploys a mech on ${a.hex}`;
+    case 'build': return `builds a ${a.structure} on ${a.hex}`;
+    case 'enlist': return `enlists for ${a.bonus}`;
+    default: return a.type;
   }
 };
 
-console.log(`engine ${ENGINE_VERSION}: ${players} players, ${turns} random turns\n`);
+console.log(`engine ${ENGINE_VERSION}: ${turns} random turns\n`);
 while (state.turnsTaken < turns) {
   const seat = state.currentPlayer;
   const steps: string[] = [];
@@ -29,5 +43,7 @@ while (state.turnsTaken < turns) {
     steps.push(describe(action));
     state = applyAction(state, action);
   } while (state.currentPlayer === seat);
+  const p = state.players[seat]!;
   console.log(`turn ${state.turnsTaken}: player ${seat + 1} → ${steps.join(', ')}`);
+  console.log(`   coins ${p.coins}, power ${p.power}, popularity ${p.popularity}, workers ${p.workers.length}`);
 }

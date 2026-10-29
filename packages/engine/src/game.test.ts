@@ -1,17 +1,37 @@
 import { describe, expect, it } from 'vitest';
 import { applyAction, isGameOver, legalActions, newGame, replay, type Action, type GameState } from './game';
 import { nextInt, seedRng } from './rng';
-
-const setup = { seed: 1, players: 2 };
+import { MAX_POPULARITY, MAX_WORKERS, unitHexes } from './state';
+import { factionA, factionB, testMatA, testMatB, testSetup as setup } from './test-fixtures';
+import { MAX_POWER } from './faction';
 
 /** Plays a list of actions for whoever's turn it is. */
 const play = (state: GameState, actions: Action[]) => actions.reduce(applyAction, state);
 
 const fullTurn = (section: number): Action[] => [
   { type: 'chooseSection', section },
-  { type: 'takeTop' },
-  { type: 'takeBottom' },
+  { type: 'skipTop' },
+  { type: 'skipBottom' },
 ];
+
+describe('setup', () => {
+  it('starts each player with their mat and faction values and pieces', () => {
+    const [a, b] = newGame(setup).players;
+    expect(a).toMatchObject({ coins: 4, popularity: 2, power: 3, combatCards: 2, character: 'home', workers: ['B1', 'B2'], mechs: [] });
+    expect(b).toMatchObject({ coins: 5, workers: ['D2', 'D3'] });
+  });
+
+  it('lets the lowest mat turn order go first', () => {
+    const swapped = { ...setup, players: [{ faction: factionA, mat: testMatB }, { faction: factionB, mat: testMatA }] };
+    expect(newGame(swapped).currentPlayer).toBe(1);
+  });
+
+  it('rejects player counts outside 1-7 and shared home bases', () => {
+    expect(() => newGame({ ...setup, players: [] })).toThrow();
+    expect(() => newGame({ ...setup, players: Array(8).fill(setup.players[0]) })).toThrow();
+    expect(() => newGame({ ...setup, players: [setup.players[0]!, setup.players[0]!] })).toThrow(/home base/);
+  });
+});
 
 describe('turn structure', () => {
   it('starts with the first player choosing any of the four sections', () => {
@@ -26,14 +46,11 @@ describe('turn structure', () => {
 
   it('offers the top-row action, then the bottom-row action, each skippable', () => {
     let state = play(newGame(setup), [{ type: 'chooseSection', section: 2 }]);
-    expect(legalActions(state, 0)).toEqual([{ type: 'takeTop' }, { type: 'skipTop' }]);
-    state = applyAction(state, { type: 'takeTop' });
-    expect(legalActions(state, 0)).toEqual([{ type: 'takeBottom' }, { type: 'skipBottom' }]);
-  });
-
-  it('allows the bottom-row action without the top-row action', () => {
-    const state = play(newGame(setup), [{ type: 'chooseSection', section: 0 }, { type: 'skipTop' }]);
-    expect(legalActions(state, 0)).toContainEqual({ type: 'takeBottom' });
+    expect(legalActions(state, 0)).toContainEqual({ type: 'gainCoins' });
+    expect(legalActions(state, 0)).toContainEqual({ type: 'skipTop' });
+    state = applyAction(state, { type: 'gainCoins' });
+    expect(state.turn).toEqual({ step: 'bottom', section: 2, paid: 0 });
+    expect(legalActions(state, 0)).toContainEqual({ type: 'skipBottom' });
   });
 
   it('passes the turn to the next player after the bottom row', () => {
@@ -41,12 +58,6 @@ describe('turn structure', () => {
     expect(state.currentPlayer).toBe(1);
     expect(state.turn).toEqual({ step: 'chooseSection' });
     expect(state.players[0]?.lastSection).toBe(1);
-  });
-
-  it('allows choosing a section and skipping both actions', () => {
-    const state = play(newGame(setup), [{ type: 'chooseSection', section: 3 }, { type: 'skipTop' }, { type: 'skipBottom' }]);
-    expect(state.currentPlayer).toBe(1);
-    expect(state.players[0]?.lastSection).toBe(3);
   });
 
   it('forbids choosing the same section as on your previous turn', () => {
@@ -57,18 +68,23 @@ describe('turn structure', () => {
   });
 
   it('goes around the table and back to the first player', () => {
-    let state = newGame({ seed: 1, players: 3 });
-    state = play(state, [...fullTurn(0), ...fullTurn(0), ...fullTurn(0)]);
+    const state = play(newGame(setup), [...fullTurn(0), ...fullTurn(0)]);
     expect(state.currentPlayer).toBe(0);
-    expect(state.turnsTaken).toBe(3);
+    expect(state.turnsTaken).toBe(2);
   });
 
   it('rejects actions that are not legal right now', () => {
     const state = newGame(setup);
-    expect(() => applyAction(state, { type: 'takeTop' })).toThrow(/not legal/);
+    expect(() => applyAction(state, { type: 'skipTop' })).toThrow(/not legal/);
     expect(() => applyAction(state, { type: 'chooseSection', section: 4 })).toThrow(/not legal/);
     const later = play(state, fullTurn(2));
     expect(() => play(later, [...fullTurn(0), { type: 'chooseSection', section: 2 }])).toThrow(/not legal/);
+  });
+
+  it('accepts an action whatever order its fields are written in', () => {
+    const state = play(newGame(setup), [{ type: 'chooseSection', section: 2 }]);
+    const reordered = { to: 'B1', unit: { kind: 'character' }, type: 'moveUnit' } as Action;
+    expect(applyAction(state, reordered).players[0]!.character).toBe('B1');
   });
 
   it('never changes the state it was given', () => {
@@ -78,11 +94,6 @@ describe('turn structure', () => {
     expect(JSON.stringify(state)).toBe(before);
   });
 
-  it('rejects player counts outside 1-7', () => {
-    expect(() => newGame({ seed: 1, players: 0 })).toThrow();
-    expect(() => newGame({ seed: 1, players: 8 })).toThrow();
-  });
-
   it('is not over yet (game end comes in Phase 2)', () => {
     expect(isGameOver(newGame(setup))).toBe(false);
   });
@@ -90,7 +101,7 @@ describe('turn structure', () => {
 
 describe('replay', () => {
   it('rebuilds the same state from setup plus the action log', () => {
-    const log = [...fullTurn(1), { type: 'chooseSection', section: 0 } as Action, { type: 'skipTop' } as Action];
+    const log: Action[] = [...fullTurn(1), { type: 'chooseSection', section: 2 }, { type: 'bolster', gain: 'power' }];
     expect(replay(setup, log)).toEqual(play(newGame(setup), log));
   });
 
@@ -100,16 +111,38 @@ describe('replay', () => {
   });
 });
 
+/** Rule invariants that must hold after every action. */
+function checkInvariants(state: GameState) {
+  const board = state.setup.board;
+  for (const p of state.players) {
+    for (const n of [p.coins, p.power, p.popularity, p.combatCards]) expect(n).toBeGreaterThanOrEqual(0);
+    expect(p.power).toBeLessThanOrEqual(MAX_POWER);
+    expect(p.popularity).toBeLessThanOrEqual(MAX_POPULARITY);
+    expect(p.workers.length).toBeLessThanOrEqual(MAX_WORKERS);
+    expect(p.mechs.length).toBeLessThanOrEqual(4);
+    expect(new Set(p.mechAbilities).size).toBe(p.mechAbilities.length);
+    expect(Object.keys(p.structures).length).toBeLessThanOrEqual(4);
+    expect(p.recruits.length).toBeLessThanOrEqual(4);
+    for (const hex of unitHexes(p)) expect(board.hexes[hex]?.terrain).not.toBe('lake');
+  }
+  // No two players' units share a hex until combat exists.
+  const owners = state.players.map(unitHexes);
+  owners.forEach((a, i) => owners.slice(i + 1).forEach((b) => expect([...a].filter((h) => b.has(h))).toEqual([])));
+  for (const pile of Object.values(state.resources)) {
+    for (const n of Object.values(pile)) expect(n).toBeGreaterThan(0);
+  }
+}
+
 describe('fuzz: random legal games', () => {
-  it('always offers the current player a choice and never repeats a section', () => {
-    for (let game = 0; game < 50; game++) {
+  it('always offers a choice, never repeats a section and keeps every invariant', () => {
+    for (let game = 0; game < 40; game++) {
       let rng = seedRng(game);
       let players: number;
-      [players, rng] = nextInt(rng, 7);
-      let state = newGame({ seed: game, players: players + 1 });
+      [players, rng] = nextInt(rng, 2);
+      let state = newGame({ ...setup, seed: game, players: setup.players.slice(0, players + 1) });
       const lastChosen: (number | null)[] = Array(players + 1).fill(null);
 
-      for (let step = 0; step < 300; step++) {
+      for (let step = 0; step < 400; step++) {
         const seat = state.currentPlayer;
         const options = legalActions(state, seat);
         expect(options.length).toBeGreaterThan(0);
@@ -124,6 +157,7 @@ describe('fuzz: random legal games', () => {
           lastChosen[seat] = action.section;
         }
         state = applyAction(state, action);
+        checkInvariants(state);
       }
     }
   });

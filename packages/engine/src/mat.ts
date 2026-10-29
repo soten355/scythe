@@ -73,7 +73,8 @@ export interface PlayerMat {
   sections: [MatSection, MatSection, MatSection, MatSection];
 }
 
-const upgradeables = (top: TopAction): [string, Upgradeable][] =>
+/** The top-row values an upgrade can improve, as [field, value] pairs. */
+export const upgradeables = (top: TopAction): [string, Upgradeable][] =>
   Object.entries(top).filter((e): e is [string, Upgradeable] => typeof e[1] === 'object');
 
 export function matUpgradeCubes(mat: PlayerMat): { top: number; bottom: number } {

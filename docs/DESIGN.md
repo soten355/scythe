@@ -229,8 +229,8 @@ Each phase ends in something playable on the phone. A phase is done when its che
 - [x] Player mats as data, with a mat editor so new mats can be designed (like the map editor)
 - [x] Factions as data, with a faction editor (home base, power, combat cards, stars, abilities, recruit bonuses)
 - [x] 2 factions and 2 player mats (Nordic + Rusviet; Industrial + Engineering), entered from the physical game
-- [ ] All four top-row and four bottom-row actions, with costs and rewards
-- [ ] Movement, production, workers and resources on hexes
+- [x] All four top-row and four bottom-row actions, with costs and rewards
+- [ ] Movement, production, workers and resources on hexes (still to add: rivers for some units, tunnels and the mine, carrying workers and resources, the mill, the production cost as workers grow)
 - [ ] 2D board, player mat drawer, legal-move highlighting
 - [ ] Installs on iPhone and runs offline
 - [ ] Done when: two humans can play a full turn cycle pass-and-play on the phone
