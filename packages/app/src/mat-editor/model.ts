@@ -31,7 +31,7 @@ export function newMat(id: string): PlayerMat {
     ['produce', 'enlist'],
   ];
   const [a, b, c, d] = pairs.map(([top, bottom]) => ({ top: defaultTop(top), bottom: { ...DEFAULT_BOTTOM[bottom] } }));
-  return { id, name: 'New mat', turnOrder: 1, popularity: 2, coins: 4, sections: [a!, b!, c!, d!] };
+  return { id, name: 'New mat', turnOrder: 1, popularity: 2, coins: 4, objectiveCards: 2, sections: [a!, b!, c!, d!] };
 }
 
 const clone = (mat: PlayerMat): PlayerMat => JSON.parse(JSON.stringify(mat)) as PlayerMat;

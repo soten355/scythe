@@ -9,6 +9,7 @@ const mat: PlayerMat = {
   turnOrder: 1,
   popularity: 2,
   coins: 4,
+  objectiveCards: 2,
   sections: [
     {
       top: { action: 'trade', cost: 1, resources: 2, popularity: { base: 1, upgraded: 2 } },
@@ -63,10 +64,12 @@ describe('player mats', () => {
     bad.sections[0].bottom.cost = 3;
     bad.coins = -1;
     bad.popularity = 1.5;
+    bad.objectiveCards = -2;
     const problems = validateMat(bad);
     expect(problems).toContainEqual(expect.stringMatching(/section 1 upgrade: 4 upgrade spaces but the cost is only 3/));
     expect(problems).toContainEqual(expect.stringMatching(/starting coins must be a whole number of 0 or more/));
     expect(problems).toContainEqual(expect.stringMatching(/starting popularity must be a whole number of 0 or more/));
+    expect(problems).toContainEqual(expect.stringMatching(/objective cards must be a whole number of 0 or more/));
   });
 
   it('rejects an upgraded value lower than the starting value', () => {

@@ -1,4 +1,8 @@
-// Player mats as data. A mat has four sections; each pairs one top-row action
+// Player mats as data. Starting power and combat cards come from the faction
+// mat, not here. The Produce action's extra cost (as workers grow) is the
+// same on every mat, so it is a rule rather than mat data.
+//
+// A mat has four sections; each pairs one top-row action
 // with one bottom-row action. Upgrading moves a cube from a top-row value
 // (improving it from `base` to `upgraded`) onto a bottom-row upgrade space
 // (lowering that action's cost by one).
@@ -56,6 +60,8 @@ export interface PlayerMat {
   turnOrder: number;
   popularity: number;
   coins: number;
+  /** Objective cards drawn at setup. */
+  objectiveCards: number;
   sections: [MatSection, MatSection, MatSection, MatSection];
 }
 
@@ -82,6 +88,7 @@ export function validateMat(mat: PlayerMat): string[] {
   };
   check(mat.popularity, 'starting popularity');
   check(mat.coins, 'starting coins');
+  check(mat.objectiveCards, 'objective cards');
 
   const tops = mat.sections.map((s) => s.top.action);
   if (TOP_ACTIONS.some((a) => tops.filter((t) => t === a).length !== 1)) {

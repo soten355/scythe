@@ -49,7 +49,11 @@ const TOP_FIELDS: Record<TopActionType, { key: string; label: string; upgradeabl
 function load(): EditorState {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) return JSON.parse(saved) as EditorState;
+    if (saved) {
+      const loaded = JSON.parse(saved) as EditorState;
+      // Mats saved before objective cards were added get the usual 2.
+      return { ...loaded, mats: loaded.mats.map((m) => ({ ...m, objectiveCards: m.objectiveCards ?? 2 })) };
+    }
   } catch {
     // Fall through to a fresh start if the saved copy is unreadable.
   }
@@ -128,6 +132,7 @@ function render() {
       <label>Turn order (lower goes first)${num('turnOrder', m.turnOrder)}</label>
       <label>Starting popularity${num('popularity', m.popularity)}</label>
       <label>Starting coins${num('coins', m.coins)}</label>
+      <label>Objective cards${num('objectiveCards', m.objectiveCards)}</label>
     </div>
     <div class="sections">${[0, 1, 2, 3].map(sectionHtml).join('')}</div>
     <div class="status"></div>
