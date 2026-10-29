@@ -24,7 +24,7 @@ export const baseFactions: Faction[] = [
     mechAbilities: [
       { name: 'Riverwalk', description: 'Move across rivers to forests and mountains' },
       { name: 'Seaworthy', description: 'Move to/from lakes and retreat onto adjacent lakes' },
-      { name: 'Artillery', description: 'Before combat if you have 1 power, opponent gets minus 2 power' },
+      { name: 'Artillery', description: 'Before combat, you may pay 1 power to make your opponent lose 2 power' },
       { name: 'Speed', description: 'Move one more hex per movement' },
     ],
     recruitBonuses: standardRecruitBonuses(),
