@@ -20,4 +20,11 @@ describe('base factions', () => {
     expect(byId.nordic).toMatchObject({ homeBase: 'ne', power: 4, combatCards: 1 });
     expect(byId.rusviet).toMatchObject({ homeBase: 'e', power: 3, combatCards: 2 });
   });
+
+  it('has a named faction ability and four named mech abilities each', () => {
+    for (const f of baseFactions) {
+      expect(f.ability.name, f.name).not.toBe('');
+      expect(f.mechAbilities.map((m) => m.name).filter(Boolean), f.name).toHaveLength(4);
+    }
+  });
 });
