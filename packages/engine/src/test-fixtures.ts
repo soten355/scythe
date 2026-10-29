@@ -2,9 +2,9 @@
 // can be tested without depending on the content package.
 //
 //   row A:      home "a" (borders B1, B2)
-//   row B:  B1 farm    B2 forest   B3 mountain  B4 tundra
+//   row B:  B1 farm    B2 forest   B3 mountain  B4 tundra (tunnel)
 //   row C:  C1 village C2 lake     C3 factory   C4 farm
-//   row D:  D1 mountain D2 tundra  D3 village   D4 forest
+//   row D:  D1 mountain (tunnel) D2 tundra  D3 village   D4 forest
 //   row E:      home "b" (borders D2, D3)
 // A river runs between B1 and C1.
 import { buildBoard } from './board';
@@ -15,9 +15,9 @@ import type { PlayerMat } from './mat';
 export const testBoard = buildBoard({
   rows: [
     '--  @a  --  --',
-    'Fa  Fo  Mo  Tu',
+    'Fa  Fo  Mo  TuT',
     'Vi  ~~  FF  Fa',
-    'Mo  Tu  Vi  Fo',
+    'MoT Tu  Vi  Fo',
     '--  --  @b',
   ],
   rivers: ['B1|C1'],

@@ -29,6 +29,13 @@ export type Location = HexId | 'home';
 
 export type UnitRef = { kind: 'character' } | { kind: 'mech' | 'worker'; index: number };
 
+/** What a unit has picked up to carry on its next move: workers (mechs only) and resources. */
+export interface Load {
+  unit: UnitRef;
+  workers: number[];
+  resources: ResourcePile;
+}
+
 /** A top-row value that an upgrade can improve, e.g. section 0's "power". */
 export interface TopUpgrade {
   section: SectionIndex;
@@ -61,7 +68,7 @@ export interface PlayerState {
 export type TurnStep =
   | { step: 'chooseSection' }
   | { step: 'top'; section: SectionIndex }
-  | { step: 'moving'; section: SectionIndex; moved: UnitRef[] }
+  | { step: 'moving'; section: SectionIndex; moved: UnitRef[]; load?: Load }
   | { step: 'trading'; section: SectionIndex; left: number }
   | { step: 'producing'; section: SectionIndex; produced: HexId[] }
   | { step: 'bottom'; section: SectionIndex; paid: number };
@@ -83,7 +90,10 @@ export interface GameState {
 export type Action =
   | { type: 'chooseSection'; section: number }
   | { type: 'skipTop' }
-  // Move: move units one hex each, or gain coins instead.
+  // Move: move units one hex each, or gain coins instead. Before moving, a
+  // unit can pick up resources (and a mech, workers) from its hex, one at a time.
+  | { type: 'carryWorker'; unit: UnitRef; worker: number }
+  | { type: 'carryResource'; unit: UnitRef; resource: Resource }
   | { type: 'moveUnit'; unit: UnitRef; to: HexId }
   | { type: 'endMove' }
   | { type: 'gainCoins' }
