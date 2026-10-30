@@ -82,6 +82,8 @@ export interface Prompt {
   slots?: (Slot | { empty: string })[];
   /** Ends the turn; shown apart from the other buttons (as the main one when nothing else can be done). */
   end?: Button;
+  /** Still picking hexes to pay a bottom-row action's cost from. */
+  paying?: boolean;
   /** The game as it will be once the picks so far go through (resources picked to pay with taken off), to draw meanwhile. */
   preview?: GameState;
   /** While upgrading: what can be picked on the mat. */
@@ -481,7 +483,7 @@ function bottomPrompt(state: GameState, actions: Action[], selection: Selection)
       highlights.add(a.hex);
       tapSelects.set(a.hex, { pay: [...paid, a.hex] });
     }
-    return { ...none, title: title(state), buttons: [], highlights, tapSelects, marked, slots, preview };
+    return { ...none, title: title(state), buttons: [], highlights, tapSelects, marked, slots, preview, paying: true };
   }
 
   // Paid in full. If that ends the turn (nothing to do but take the coins), offer just that.

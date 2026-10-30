@@ -3,8 +3,15 @@
   // resources on each hex. Hexes the player can tap are outlined.
   // Each hex shows its terrain icon in the middle, a tunnel icon at the top
   // and an encounter icon at the bottom (see icons.ts); its ID sits at the upper left.
+  //
+  // The camera (see camera.ts): pinch or use the mouse wheel to zoom (around
+  // the fingers or the pointer), drag to pan, or use the buttons at the bottom
+  // right. The game also guides it (guideTo) each time there's somewhere new
+  // to look, once the pass screen is gone (paused).
   import type { GameState, HexId, Location, Resource } from '@scythe/engine';
-  import { center, corners, points, sharedEdge, SIZE, viewBox } from './geometry';
+  import { untrack } from 'svelte';
+  import { between, fitView, panBy, worldOf, zoomAt, type Limits, type View } from './camera';
+  import { boardArea, center, corners, points, sharedEdge, SIZE, spotsArea, type Point } from './geometry';
   import HexIcon from './HexIcon.svelte';
   import { ENCOUNTER_ICON, TERRAIN_ICONS, TUNNEL_ICON } from './icons';
   import type { Prompt, Selection } from './prompt';
@@ -14,7 +21,17 @@
     prompt,
     onTap,
     onPick,
-  }: { game: GameState; prompt: Prompt; onTap: (at: Location) => void; onPick: (selection: Selection) => void } = $props();
+    guideTo,
+    paused = false,
+  }: {
+    game: GameState;
+    prompt: Prompt;
+    onTap: (at: Location) => void;
+    onPick: (selection: Selection) => void;
+    /** Where to look; the camera moves each time the key changes. */
+    guideTo?: { key: string; spots: Location[] } | null;
+    paused?: boolean;
+  } = $props();
 
   /** A piece of the current player that can be tapped to pick that unit (see Prompt.pieces). */
   const pickable = (at: Location, kind: 'character' | 'mechs' | 'workers') => {
@@ -39,7 +56,139 @@
 
   const board = $derived(game.setup.board);
   const hexes = $derived(Object.values(board.hexes));
-  const box = $derived(viewBox(board));
+  // --- Camera ---
+  const HEX_W = SIZE * Math.sqrt(3);
+  let W = $state(0);
+  let H = $state(0);
+  const aspect = $derived(W && H ? W / H : 1.6);
+  /** Zoom in to about three hexes across at most. */
+  const limits: Limits = $derived({ world: boardArea(board), minW: HEX_W * 3 });
+  /** null until the camera first moves: the whole board. */
+  let view: View | null = $state(null);
+  const shownView = $derived(view ?? fitView(limits.world, aspect, limits));
+  const box = $derived(`${shownView.x} ${shownView.y} ${shownView.w} ${shownView.h}`);
+
+  // Keep the camera's middle and zoom when the map area changes shape.
+  $effect(() => {
+    const a = aspect;
+    untrack(() => {
+      if (view) view = fitView({ x: view.x, y: view.y + view.h / 2 - view.w / a / 2, w: view.w, h: view.w / a }, a, limits);
+    });
+  });
+
+  let anim = 0;
+  /** Glides the camera to `target`. */
+  function glide(target: View, ms = 700) {
+    cancelAnimationFrame(anim);
+    const from = shownView;
+    const t0 = performance.now();
+    const frame = (now: number) => {
+      const t = Math.min(1, (now - t0) / ms);
+      const eased = t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
+      view = between(from, target, eased);
+      if (t < 1) anim = requestAnimationFrame(frame);
+    };
+    anim = requestAnimationFrame(frame);
+  }
+
+  // Guided views: no closer than about five hexes across, so there's context.
+  let guidedKey = '';
+  $effect(() => {
+    const g = guideTo;
+    if (!g || paused || !W || g.key === guidedKey) return;
+    guidedKey = g.key;
+    untrack(() => {
+      const home = board.homeBasePositions[game.setup.players[game.currentPlayer]!.faction.homeBase];
+      const area = spotsArea(board, g.spots, home);
+      if (!area) return;
+      const target = fitView(area, aspect, { ...limits, minW: HEX_W * 5 });
+      // Skip a move too small to notice, so the map doesn't twitch between steps.
+      const now = shownView;
+      const zoomChange = Math.abs(target.w / now.w - 1);
+      const shift = Math.hypot(target.x + target.w / 2 - (now.x + now.w / 2), target.y + target.h / 2 - (now.y + now.h / 2)) / now.w;
+      if (zoomChange > 0.12 || shift > 0.1) glide(target, 550);
+    });
+  });
+
+  /** Zoom buttons: in or out around the middle of the view. */
+  function zoomBy(factor: number) {
+    const v = shownView;
+    glide(zoomAt(v, factor, [v.x + v.w / 2, v.y + v.h / 2], aspect, limits), 300);
+  }
+
+  let svg: SVGSVGElement | undefined = $state();
+  /** The board point under a spot on the screen. */
+  function toWorld(clientX: number, clientY: number): Point {
+    const r = svg!.getBoundingClientRect();
+    return worldOf(shownView, [(clientX - r.left) / r.width, (clientY - r.top) / r.height]);
+  }
+
+  // Wheel or trackpad: zoom around the pointer. (Added by hand so it can stop the page scrolling.)
+  $effect(() => {
+    const el = svg;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      cancelAnimationFrame(anim);
+      const dy = e.deltaY * (e.deltaMode === 1 ? 16 : 1);
+      // A trackpad pinch arrives as a wheel with ctrlKey and small steps.
+      const factor = Math.exp(dy * (e.ctrlKey ? 0.01 : 0.0015));
+      view = zoomAt(shownView, factor, toWorld(e.clientX, e.clientY), aspect, limits);
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  });
+
+  // Fingers and mouse: one drags the map, two pinch. A drag is never a tap.
+  const pointers = new Map<number, Point>();
+  let travelled = 0;
+  let dragged = false;
+  function down(e: PointerEvent) {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    cancelAnimationFrame(anim);
+    pointers.set(e.pointerId, [e.clientX, e.clientY]);
+    if (pointers.size === 1) {
+      travelled = 0;
+      dragged = false;
+    }
+  }
+  function move(e: PointerEvent) {
+    const prev = pointers.get(e.pointerId);
+    if (!prev || !svg) return;
+    const now: Point = [e.clientX, e.clientY];
+    const r = svg.getBoundingClientRect();
+    const perPixel = shownView.w / r.width;
+    if (pointers.size === 1) {
+      travelled += Math.hypot(now[0] - prev[0], now[1] - prev[1]);
+      if (travelled > 8) {
+        dragged = true;
+        view = panBy(shownView, -(now[0] - prev[0]) * perPixel, -(now[1] - prev[1]) * perPixel, limits);
+      }
+    } else if (pointers.size === 2) {
+      const other = [...pointers].find(([id]) => id !== e.pointerId)![1];
+      const before = Math.hypot(prev[0] - other[0], prev[1] - other[1]);
+      const after = Math.hypot(now[0] - other[0], now[1] - other[1]);
+      const midBefore: Point = [(prev[0] + other[0]) / 2, (prev[1] + other[1]) / 2];
+      const midAfter: Point = [(now[0] + other[0]) / 2, (now[1] + other[1]) / 2];
+      dragged = true;
+      if (after > 0) {
+        const zoomed = zoomAt(shownView, before / after, toWorld(...midBefore), aspect, limits);
+        const per = zoomed.w / r.width;
+        view = panBy(zoomed, -(midAfter[0] - midBefore[0]) * per, -(midAfter[1] - midBefore[1]) * per, limits);
+      }
+    }
+    pointers.set(e.pointerId, now);
+  }
+  function up(e: PointerEvent) {
+    pointers.delete(e.pointerId);
+  }
+  /** Swallow the click that ends a drag or pinch, so it doesn't tap a hex. */
+  function clickCapture(e: MouseEvent) {
+    if (!dragged) return;
+    e.stopPropagation();
+    e.preventDefault();
+    dragged = false;
+  }
 
   /** Everything on a hex, grouped by player. */
   type Pieces = { seat: number; color: string; initial: string; character: boolean; mechs: number; workers: number; structure?: string };
@@ -82,7 +231,17 @@
   );
 </script>
 
-<svg viewBox={box} preserveAspectRatio="xMidYMid meet" role="application">
+<svelte:window onpointermove={move} onpointerup={up} onpointercancel={up} />
+
+<div class="map" bind:clientWidth={W} bind:clientHeight={H}>
+<svg
+  bind:this={svg}
+  viewBox={box}
+  preserveAspectRatio="xMidYMid meet"
+  role="application"
+  onpointerdown={down}
+  onclickcapture={clickCapture}
+>
   {#each hexes as h (h.id)}
     {@const c = center(h)}
     {@const lit = prompt.highlights.has(h.id)}
@@ -217,13 +376,48 @@
     {/each}
   </g>
 </svg>
+  <div class="zoom">
+    <button aria-label="Zoom in" onclick={() => zoomBy(0.65)}>+</button>
+    <button aria-label="Zoom out" onclick={() => zoomBy(1.55)}>−</button>
+    <button aria-label="Whole map" onclick={() => glide(fitView(limits.world, aspect, limits), 450)}>⤢</button>
+  </div>
+</div>
 
 <style>
+  .map {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+  }
   svg {
     width: 100%;
     height: 100%;
     display: block;
-    touch-action: manipulation;
+    /* The map handles pinch and drag itself. */
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .zoom {
+    position: absolute;
+    right: 8px;
+    bottom: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .zoom button {
+    width: 38px;
+    height: 38px;
+    border-radius: 8px;
+    border: 1px solid #8a7a5c;
+    background: rgb(36 31 26 / 0.85);
+    color: #efe6d4;
+    font: inherit;
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
   }
   .hex {
     stroke: #2a241e;

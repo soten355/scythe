@@ -9,6 +9,7 @@
   import PlayerBar from './PlayerBar.svelte';
   import InlineIcon from './InlineIcon.svelte';
   import { fade } from 'svelte/transition';
+  import { guide } from './camera';
   import { flyTo } from './fly';
   import { buildPrompt, sectionHeadings, type Button, type Prompt, type Selection } from './prompt';
   import { canSwitchSection, phase, previousSection, sectionChoices } from './turn';
@@ -170,7 +171,7 @@
     <div class="board">
       <!-- Where we are in the story, like a date on the map. -->
       <div class="round"><small>Round</small><b>{round}</b></div>
-      <Board game={shown} {prompt} onTap={tap} onPick={(sel) => (selection = sel)} /></div>
+      <Board game={shown} {prompt} onTap={tap} onPick={(sel) => (selection = sel)} guideTo={guide(game, prompt)} paused={handoff !== null} /></div>
     <aside style:--c={color(game.currentPlayer)}>
       <div class="panel">
         {#if !headings}
@@ -446,6 +447,7 @@
     position: absolute;
     top: 8px;
     right: 10px;
+    z-index: 2;
     pointer-events: none;
     display: flex;
     flex-direction: column;
