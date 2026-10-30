@@ -31,7 +31,8 @@ export function topActions(state: GameState, turn: TopStep): Action[] {
       if (turn.load) return [...carryOptions(state, turn.load.unit, turn.load), ...moveOptions(state, turn.section, turn.moved, turn.load.unit)];
       return [...moveOptions(state, turn.section, turn.moved), { type: 'endMove' }];
     case 'trading':
-      return tradeResourceOptions(player);
+      // Every traded resource goes on the hex the first one went to.
+      return tradeResourceOptions(player).filter((a) => a.type === 'tradeResource' && a.hex === turn.hex);
     case 'producing':
       return [...produceOptions(state, turn.produced), { type: 'endProduce' }];
     case 'top':
@@ -100,7 +101,7 @@ export function applyTop(state: GameState, turn: TopStep, action: Action): GameS
       }
       next = addResources(next, action.hex, action.resource, 1);
       if (left <= 0) return toBottom(next);
-      return { ...next, turn: { step: 'trading', section, left } };
+      return { ...next, turn: { step: 'trading', section, left, hex: action.hex } };
     }
 
     case 'produce': {
@@ -248,7 +249,7 @@ function payProduceCost(state: GameState, seat: number): GameState {
  * How much a hex would produce: one per worker of yours there, plus one if
  * your mill is on it (villages: new workers, up to 8 in all).
  */
-function yieldOf(state: GameState, player: PlayerState, hex: HexId): { what: Resource | 'worker'; amount: number } | null {
+export function yieldOf(state: GameState, player: PlayerState, hex: HexId): { what: Resource | 'worker'; amount: number } | null {
   const what = TERRAIN_PRODUCES[state.setup.board.hexes[hex]?.terrain ?? ''];
   if (!what) return null;
   const producers = workersOn(player, hex) + (player.structures.mill === hex ? 1 : 0);

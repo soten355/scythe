@@ -6,6 +6,7 @@ export * from './rng';
 export * from './board';
 export * from './game';
 export * from './state';
-export { moveTargets, produceCost, RESOURCES, TERRAIN_PRODUCES } from './top-actions';
+export { moveTargets, produceCost, RESOURCES, TERRAIN_PRODUCES, yieldOf as produceYield } from './top-actions';
 export * from './mat';
 export * from './faction';
+export * from './afford';

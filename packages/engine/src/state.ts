@@ -9,6 +9,30 @@ export const SECTIONS: SectionIndex[] = [0, 1, 2, 3];
 export const MAX_POPULARITY = 18;
 export const MAX_WORKERS = 8;
 
+export type StarKind = 'upgrades' | 'mechs' | 'structures' | 'recruits' | 'workers' | 'popularity' | 'power';
+
+/** What earns each star, in the order they're checked. Combat and objective stars arrive with those rules. */
+const STAR_GOALS: [StarKind, (p: PlayerState) => boolean][] = [
+  ['upgrades', (p) => p.upgrades.top.length >= 6],
+  ['mechs', (p) => p.mechs.length >= 4],
+  ['structures', (p) => Object.values(p.structures).filter(Boolean).length >= 4],
+  ['recruits', (p) => p.recruits.length >= 4],
+  ['workers', (p) => p.workers.length >= MAX_WORKERS],
+  ['popularity', (p) => p.popularity >= MAX_POPULARITY],
+  ['power', (p) => p.power >= MAX_POWER],
+];
+
+/** Places a star for each goal this player has newly reached, up to the faction's star count. */
+export function awardStars(state: GameState, seat: number): GameState {
+  const player = state.players[seat]!;
+  const limit = state.setup.players[seat]!.faction.stars;
+  const stars = [...player.stars];
+  for (const [kind, reached] of STAR_GOALS) {
+    if (stars.length < limit && !stars.includes(kind) && reached(player)) stars.push(kind);
+  }
+  return stars.length === player.stars.length ? state : updatePlayer(state, seat, { stars });
+}
+
 /** Records the section used and passes play to the next seat clockwise. */
 export function endTurn(state: GameState): GameState {
   const section = state.turn.step === 'chooseSection' ? null : state.turn.section;

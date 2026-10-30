@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { buildBoard, hasRiver, homeBaseNeighbors, neighbors, type BoardLayout } from './board';
+import { buildBoard, hasRiver, hexIdGrid, homeBaseNeighbors, neighbors, type BoardLayout } from './board';
 
-// A tiny 3-row board:
+// A tiny 3-row board (each row's hexes count from 1, skipping empty slots):
 //   A1 A2 A3
 //     B1 B2 B3      (odd rows sit half a hex to the right)
-//   C1 C2 C3
+//   C1 -- C2
 const tiny: BoardLayout = {
   rows: ['Fa Fo* Mo', 'Tu FF ~~', 'ViT -- Fa'],
-  rivers: ['A1|A2', 'B2|C3'],
+  rivers: ['A1|A2', 'B2|C2'],
   homeBases: { west: ['A1', 'B1'] },
 };
 
@@ -23,12 +23,13 @@ describe('buildBoard', () => {
   });
 
   it('skips empty slots', () => {
-    expect(board.hexes.C2).toBeUndefined();
+    expect(board.hexes.C3).toBeUndefined();
+    expect(board.hexes.C2?.terrain).toBe('farm');
     expect(Object.keys(board.hexes)).toHaveLength(8);
   });
 
   it('finds the six neighbors of a hex, accounting for the row offset', () => {
-    expect([...neighbors(board, 'B2')].sort()).toEqual(['A2', 'A3', 'B1', 'B3', 'C3'].sort());
+    expect([...neighbors(board, 'B2')].sort()).toEqual(['A2', 'A3', 'B1', 'B3', 'C2'].sort());
     expect([...neighbors(board, 'A1')].sort()).toEqual(['A2', 'B1'].sort());
     expect([...neighbors(board, 'C1')].sort()).toEqual(['B1'].sort());
   });
@@ -36,7 +37,7 @@ describe('buildBoard', () => {
   it('reports rivers in both directions, and only where listed', () => {
     expect(hasRiver(board, 'A1', 'A2')).toBe(true);
     expect(hasRiver(board, 'A2', 'A1')).toBe(true);
-    expect(hasRiver(board, 'C3', 'B2')).toBe(true);
+    expect(hasRiver(board, 'C2', 'B2')).toBe(true);
     expect(hasRiver(board, 'A2', 'A3')).toBe(false);
   });
 
@@ -62,13 +63,13 @@ describe('buildBoard with even rows shifted', () => {
 
 describe('home base positions', () => {
   // @w marks where home base "w" sits on the grid; it is not a hex.
-  const board = buildBoard({ rows: ['@w Fa Fo'], rivers: [], homeBases: { w: ['A2'] } });
+  const board = buildBoard({ rows: ['@w Fa Fo'], rivers: [], homeBases: { w: ['A1'] } });
 
   it('records the position without making it a hex', () => {
     expect(board.homeBasePositions.w).toEqual({ q: 1, r: 0 });
-    expect(board.hexes.A1).toBeUndefined();
-    expect(board.hexes.A2?.terrain).toBe('farm');
-    expect([...neighbors(board, 'A2')]).toEqual(['A3']);
+    expect(board.hexes.A1?.terrain).toBe('farm');
+    expect(board.hexes.A3).toBeUndefined();
+    expect([...neighbors(board, 'A1')]).toEqual(['A2']);
   });
 
   it('rejects a home base placed twice', () => {
@@ -86,10 +87,26 @@ describe('buildBoard rejects bad layouts', () => {
     expect(bad({ rivers: ['A1|A3'] })).toThrow(/river A1\|A3/);
   });
   it('river naming a missing hex', () => {
-    expect(bad({ rivers: ['A1|C2'] })).toThrow(/river A1\|C2/);
+    expect(bad({ rivers: ['A1|C3'] })).toThrow(/river A1\|C3/);
   });
   it('home base next to a lake or a missing hex', () => {
     expect(bad({ homeBases: { east: ['B3'] } })).toThrow(/home base east/);
     expect(bad({ homeBases: { east: ['Z9'] } })).toThrow(/home base east/);
+  });
+});
+
+describe('hex IDs', () => {
+  it('letter rows from the first row with a hex, and count each row from its first hex', () => {
+    // A top row of home bases only, and rows starting with empty slots.
+    const rows = ['--  @n  --', '--  Fa  Fo', '@w  Mo  --  Tu', '--  --  @s'];
+    expect(hexIdGrid(rows)).toEqual([
+      [null, null, null],
+      [null, 'A1', 'A2'],
+      [null, 'B1', null, 'B2'],
+      [null, null, null],
+    ]);
+    const board = buildBoard({ rows, rivers: ['A1|B1'], homeBases: { n: ['A1', 'A2'], w: ['B1'] } });
+    expect(Object.keys(board.hexes).sort()).toEqual(['A1', 'A2', 'B1', 'B2']);
+    expect(board.hexes.B2?.terrain).toBe('tundra');
   });
 });

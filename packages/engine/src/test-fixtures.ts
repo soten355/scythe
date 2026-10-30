@@ -1,12 +1,12 @@
 // A small board, two factions and two mats for engine tests, so the engine
 // can be tested without depending on the content package.
 //
-//   row A:      home "a" (borders B1, B2)
-//   row B:  B1 farm    B2 forest   B3 mountain  B4 tundra (tunnel)
-//   row C:  C1 village C2 lake     C3 factory   C4 farm
-//   row D:  D1 mountain (tunnel) D2 tundra  D3 village   D4 forest
-//   row E:      home "b" (borders D2, D3)
-// A river runs between B1 and C1.
+//   (top):      home "a" (borders A1, A2)
+//   row A:  A1 farm    A2 forest   A3 mountain  A4 tundra (tunnel)
+//   row B:  B1 village B2 lake     B3 factory   B4 farm
+//   row C:  C1 mountain (tunnel) C2 tundra  C3 village   C4 forest
+//   (bottom):   home "b" (borders C2, C3)
+// A river runs between A1 and B1.
 import { buildBoard } from './board';
 import type { Faction } from './faction';
 import type { GameSetup } from './game';
@@ -20,8 +20,8 @@ export const testBoard = buildBoard({
     'MoT Tu  Vi  Fo',
     '--  --  @b',
   ],
-  rivers: ['B1|C1'],
-  homeBases: { a: ['B1', 'B2'], b: ['D2', 'D3'] },
+  rivers: ['A1|B1'],
+  homeBases: { a: ['A1', 'A2'], b: ['C2', 'C3'] },
 });
 
 const ability = (name: string) => ({ name, description: '' });

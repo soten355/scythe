@@ -8,7 +8,7 @@
 import type { HexId } from './board';
 import type { Action, GameState, PlayerState, SectionIndex, TurnStep } from './game';
 import { STRUCTURES, upgradeables, type BottomActionType, type RecruitBonus } from './mat';
-import { addResources, bottomCost, SECTIONS, controlledHexes, current, endTurn, gain, structureOn, updatePlayer } from './state';
+import { addResources, bottomCost, SECTIONS, controlledHexes, current, gain, structureOn, updatePlayer } from './state';
 
 type BottomStep = Extract<TurnStep, { step: 'bottom' }>;
 
@@ -32,6 +32,9 @@ export function bottomActions(state: GameState, turn: BottomStep): Action[] {
   return effects.length ? effects : [{ type: 'takeBottom' }];
 }
 
+/** The bottom-row action is done: the player now ends the turn with End turn. */
+const finish = (state: GameState, section: SectionIndex): GameState => ({ ...state, turn: { step: 'end', section } });
+
 export function applyBottom(state: GameState, turn: BottomStep, action: Action): GameState {
   const { seat, mat } = current(state);
   const kind = mat.sections[turn.section].bottom.action;
@@ -41,7 +44,7 @@ export function applyBottom(state: GameState, turn: BottomStep, action: Action):
     const paid = turn.paid + 1;
     const next: GameState = { ...addResources(state, action.hex, resource, -1), turn: { ...turn, paid } };
     const done = paid >= bottomCost(state.players[seat]!, mat, turn.section).amount;
-    if (done && effectOptions(next, kind).length === 0) return endTurn(rewards(next, turn.section));
+    if (done && effectOptions(next, kind).length === 0) return finish(rewards(next, turn.section), turn.section);
     return next;
   }
 
@@ -50,28 +53,31 @@ export function applyBottom(state: GameState, turn: BottomStep, action: Action):
   const player = next.players[seat]!;
   switch (action.type) {
     case 'takeBottom':
-      return endTurn(next);
+      return finish(next, turn.section);
     case 'upgrade':
-      return endTurn(
+      return finish(
         updatePlayer(next, seat, {
           upgrades: { top: [...player.upgrades.top, action.top], bottom: [...player.upgrades.bottom, action.bottom] },
         }),
+        turn.section,
       );
     case 'deploy':
-      return endTurn(
+      return finish(
         updatePlayer(next, seat, { mechs: [...player.mechs, action.hex], mechAbilities: [...player.mechAbilities, action.ability] }),
+        turn.section,
       );
     case 'build':
-      return endTurn(updatePlayer(next, seat, { structures: { ...player.structures, [action.structure]: action.hex } }));
+      return finish(updatePlayer(next, seat, { structures: { ...player.structures, [action.structure]: action.hex } }), turn.section);
     case 'enlist': {
       const { faction } = current(next);
       const amount = faction.recruitBonuses.find((r) => r.bonus === action.bonus)?.amount ?? 0;
-      return endTurn(
+      return finish(
         updatePlayer(next, seat, {
           ...gain(player, { [BONUS_FIELD[action.bonus]]: amount }),
           recruits: [...player.recruits, action.section],
           recruitBonusesTaken: [...player.recruitBonusesTaken, action.bonus],
         }),
+        turn.section,
       );
     }
     default:

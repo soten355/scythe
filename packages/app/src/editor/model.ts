@@ -1,7 +1,7 @@
 // Data model for the map editor. The editor works on a padded grid of slots
 // ("row,col", 0-based); toLayout trims empty edges and produces the same
 // BoardLayout text format the content files use.
-import type { BoardLayout } from '@scythe/engine';
+import { hexIdGrid, type BoardLayout } from '@scythe/engine';
 
 export type TerrainCode = 'Fa' | 'Fo' | 'Mo' | 'Tu' | 'Vi' | '~~' | 'FF';
 export type SlotKey = string;
@@ -28,7 +28,6 @@ export interface EditorMap {
 
 export const HOME_IDS = ['nw', 'ne', 'e', 'se', 's', 'sw', 'w'];
 
-const ROW_LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
 export const key = (row: number, col: number): SlotKey => `${row},${col}`;
 export const parseKey = (k: SlotKey): [number, number] => {
@@ -59,6 +58,7 @@ export function fromLayout(layout: BoardLayout): EditorMap {
   const cells: Record<SlotKey, Cell> = {};
   const homeSpots: Record<string, SlotKey> = {};
   const byLabel: Record<string, SlotKey> = {};
+  const ids = hexIdGrid(layout.rows);
   let cols = 0;
   layout.rows.forEach((row, r) => {
     const tokens = row.trim().split(/\s+/);
@@ -75,7 +75,7 @@ export function fromLayout(layout: BoardLayout): EditorMap {
         tunnel: token.slice(2).includes('T'),
         encounter: token.slice(2).includes('*'),
       };
-      byLabel[`${ROW_LETTERS[r]}${c + 1}`] = k;
+      byLabel[ids[r]![c]!] = k;
     });
   });
   const slot = (label: string): SlotKey => {
@@ -163,17 +163,16 @@ function bounds(map: EditorMap) {
   };
 }
 
-/** The ID a slot will have after export, e.g. "C4"; null for empty slots. */
+/** The ID a slot will have after export, e.g. "C4"; null for empty slots. Same rule as the engine. */
 export function labelOf(map: EditorMap, k: SlotKey): string | null {
   const b = bounds(map);
   if (!b || !map.cells[k]) return null;
   const [r, c] = parseKey(k);
-  return `${ROW_LETTERS[r - b.minRow]}${c - b.minCol + 1}`;
+  return hexIdGrid(layoutRows(map, b))[r - b.minRow]?.[c - b.minCol] ?? null;
 }
 
-export function toLayout(map: EditorMap): BoardLayout {
-  const b = bounds(map);
-  if (!b) return { rows: [], rivers: [], homeBases: {} };
+/** The exported rows of terrain codes, from the top-left of everything placed. */
+function layoutRows(map: EditorMap, b: NonNullable<ReturnType<typeof bounds>>): string[] {
   const rows: string[] = [];
   for (let r = b.minRow; r <= b.maxRow; r++) {
     const tokens: string[] = [];
@@ -186,7 +185,18 @@ export function toLayout(map: EditorMap): BoardLayout {
     while (tokens.at(-1) === '--') tokens.pop();
     rows.push(tokens.join(' '));
   }
-  const label = (k: SlotKey) => labelOf(map, k);
+  return rows;
+}
+
+export function toLayout(map: EditorMap): BoardLayout {
+  const b = bounds(map);
+  if (!b) return { rows: [], rivers: [], homeBases: {} };
+  const rows = layoutRows(map, b);
+  const ids = hexIdGrid(rows);
+  const label = (k: SlotKey) => {
+    const [r, c] = parseKey(k);
+    return map.cells[k] ? (ids[r - b.minRow]?.[c - b.minCol] ?? null) : null;
+  };
   const rivers = map.rivers
     .map((e) => e.split('|').map(label))
     .filter((pair): pair is [string, string] => pair.every((l) => l !== null))
@@ -205,9 +215,12 @@ export function toLayout(map: EditorMap): BoardLayout {
 /** Text in the same shape as the layout object in the content files. */
 export function formatLayout(layout: BoardLayout): string {
   const q = (s: string) => `'${s}'`;
+  const ids = hexIdGrid(layout.rows);
   const rows = layout.rows.map((row, i) => {
     const padded = row.split(' ').map((t) => t.padEnd(3)).join(' ').trimEnd();
-    return `    /* ${ROW_LETTERS[i]} */ ${q(padded)},`;
+    // The row's letter, as in its hex IDs; blank for a row with only home bases.
+    const letter = ids[i]!.find((id) => id)?.[0] ?? ' ';
+    return `    /* ${letter} */ ${q(padded)},`;
   });
   const rivers: string[] = [];
   for (let i = 0; i < layout.rivers.length; i += 6) {

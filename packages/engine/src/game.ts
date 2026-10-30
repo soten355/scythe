@@ -2,14 +2,16 @@
 //
 // A turn: choose a section of your player mat (not the one you used last
 // turn), then optionally take its top-row action, then optionally its
-// bottom-row action, in that order. Then the next player goes.
+// bottom-row action, in that order. After a bottom-row action the player
+// ends the turn themselves (so it can still be undone); skipping the bottom
+// row ends it at once. Then the next player goes.
 //
 // Each action is broken into small steps (move this unit, pay this resource),
 // each its own Action. The rules for each top- and bottom-row action live in
 // top-actions.ts and bottom-actions.ts.
 import type { Board, HexId } from './board';
 import { bottomActions, applyBottom } from './bottom-actions';
-import { endTurn, SECTIONS } from './state';
+import { awardStars, endTurn, SECTIONS, type StarKind } from './state';
 import type { Faction } from './faction';
 import type { PlayerMat, RecruitBonus, Resource, Structure } from './mat';
 import { seedRng, type RngState } from './rng';
@@ -62,6 +64,8 @@ export interface PlayerState {
   recruits: SectionIndex[];
   /** One-time recruit bonuses already used. */
   recruitBonusesTaken: RecruitBonus[];
+  /** Stars placed so far, in the order earned (at most one of each kind, and the faction's star count in all). */
+  stars: StarKind[];
 }
 
 /** Where the current player is within their turn. */
@@ -69,9 +73,11 @@ export type TurnStep =
   | { step: 'chooseSection' }
   | { step: 'top'; section: SectionIndex }
   | { step: 'moving'; section: SectionIndex; moved: UnitRef[]; load?: Load }
-  | { step: 'trading'; section: SectionIndex; left: number }
+  | { step: 'trading'; section: SectionIndex; left: number; hex: HexId }
   | { step: 'producing'; section: SectionIndex; produced: HexId[] }
-  | { step: 'bottom'; section: SectionIndex; paid: number };
+  | { step: 'bottom'; section: SectionIndex; paid: number }
+  /** The bottom-row action is done; only End turn is left. */
+  | { step: 'end'; section: SectionIndex };
 
 export type ResourcePile = Partial<Record<Resource, number>>;
 
@@ -113,7 +119,8 @@ export type Action =
   | { type: 'build'; structure: Structure; hex: HexId }
   | { type: 'enlist'; section: SectionIndex; bonus: RecruitBonus }
   /** Take the bottom-row action for its coins alone (only when it costs nothing and nothing else is possible). */
-  | { type: 'takeBottom' };
+  | { type: 'takeBottom' }
+  | { type: 'endTurn' };
 
 export function newGame(setup: GameSetup): GameState {
   const n = setup.players.length;
@@ -139,6 +146,7 @@ export function newGame(setup: GameSetup): GameState {
     upgrades: { top: [], bottom: [] },
     recruits: [],
     recruitBonusesTaken: [],
+    stars: [],
   }));
 
   const first = setup.players.reduce((best, p, i) => (p.mat.turnOrder < setup.players[best]!.mat.turnOrder ? i : best), 0);
@@ -169,6 +177,8 @@ export function legalActions(state: GameState, seat: number): Action[] {
       return topActions(state, turn);
     case 'bottom':
       return [...bottomActions(state, turn), ...(turn.paid === 0 ? [{ type: 'skipBottom' } as const] : [])];
+    case 'end':
+      return [{ type: 'endTurn' }];
   }
 }
 
@@ -186,6 +196,11 @@ export function applyAction(state: GameState, action: Action): GameState {
   if (!legalActions(state, state.currentPlayer).some((a) => canonical(a) === key)) {
     throw new Error(`action ${JSON.stringify(action)} is not legal now`);
   }
+  // Whatever the action, the player who took it may have earned stars.
+  return awardStars(step(state, action), state.currentPlayer);
+}
+
+function step(state: GameState, action: Action): GameState {
   const turn = state.turn;
   switch (turn.step) {
     case 'chooseSection':
@@ -200,6 +215,8 @@ export function applyAction(state: GameState, action: Action): GameState {
     case 'bottom':
       if (action.type === 'skipBottom') return endTurn(state);
       return applyBottom(state, turn, action);
+    case 'end':
+      return endTurn(state);
   }
 }
 

@@ -3,6 +3,7 @@
 // framework (the UI framework hasn't been chosen yet).
 import { baseBoardLayout } from '@scythe/content';
 import { buildBoard } from '@scythe/engine';
+import { ask } from '../shared/editor-utils';
 import './editor.css';
 import {
   addCol,
@@ -303,7 +304,7 @@ function render() {
 
 // ---- input -------------------------------------------------------------------
 
-toolsEl.addEventListener('click', (e) => {
+toolsEl.addEventListener('click', async (e) => {
   const btn = (e.target as HTMLElement).closest('button');
   if (!btn) return;
   if (btn.dataset.tool) {
@@ -319,10 +320,10 @@ toolsEl.addEventListener('click', (e) => {
     case 'undo': return undo();
     case 'export': return openExport();
     case 'reset':
-      if (confirm('Replace your edits with the original draft map?')) commit(draftMap());
+      if (await ask('Replace your edits with the original draft map?')) commit(draftMap());
       return;
     case 'clear':
-      if (confirm('Remove every hex, river and home base?')) {
+      if (await ask('Remove every hex, river and home base?')) {
         commit({ ...map, cells: {}, rivers: [], homes: Object.fromEntries(HOME_IDS.map((id) => [id, []])), homeSpots: {} });
       }
       return;

@@ -1,9 +1,17 @@
 <script lang="ts">
-  // Top bar: each player's coins, power, popularity, combat cards, workers and
-  // the resources on hexes they control. The current player is outlined.
+  // Top bar: the current player's coins, power, popularity, combat cards,
+  // workers and the resources on hexes they control. Everyone else shrinks to
+  // their name; everyone's stars always show.
   import { controlledHexes, RESOURCES, type GameState } from '@scythe/engine';
+  import { cubicInOut } from 'svelte/easing';
+  import { slide } from 'svelte/transition';
 
   let { game }: { game: GameState } = $props();
+
+  const STAR_NAMES: Record<string, string> = {
+    upgrades: 'all upgrades', mechs: 'all mechs', structures: 'all structures', recruits: 'all recruits',
+    workers: 'all workers', popularity: 'top popularity', power: 'top power',
+  };
 
   const rows = $derived(
     game.players.map((p, seat) => {
@@ -18,16 +26,22 @@
 
 <div class="bar">
   {#each rows as { p, seat, faction, totals } (seat)}
-    <div class="player" class:current={seat === game.currentPlayer} style:--c={faction.color}>
+    {@const current = seat === game.currentPlayer}
+    <div class="player" class:current style:--c={faction.color}>
       <span class="name">{faction.name}</span>
-      <span title="coins">◉ {p.coins}</span>
-      <span title="power">⚡ {p.power}</span>
-      <span title="popularity">♥ {p.popularity}</span>
-      <span title="combat cards">▭ {p.combatCards}</span>
-      <span title="workers">👷 {p.workers.length}</span>
-      <span class="res" title="oil, metal, wood, food on hexes you control">
-        oil {totals.oil} · metal {totals.metal} · wood {totals.wood} · food {totals.food}
-      </span>
+      <span class="stars" title={p.stars.length ? `Stars: ${p.stars.map((k) => STAR_NAMES[k]).join(', ')}` : 'No stars yet'}>⭐ {p.stars.length}</span>
+      {#if current}
+        <span class="details" transition:slide={{ axis: 'x', duration: 450, easing: cubicInOut }}>
+          <span title="coins">◉ {p.coins}</span>
+          <span title="power">⚡ {p.power}</span>
+          <span title="popularity">♥ {p.popularity}</span>
+          <span title="combat cards">▭ {p.combatCards}</span>
+          <span title="workers">👷 {p.workers.length}</span>
+          <span class="res" title="oil, metal, wood, food on hexes you control">
+            oil {totals.oil} · metal {totals.metal} · wood {totals.wood} · food {totals.food}
+          </span>
+        </span>
+      {/if}
     </div>
   {/each}
 </div>
@@ -57,6 +71,16 @@
     font-weight: 700;
     color: var(--c);
     filter: brightness(1.4);
+  }
+  .details {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+  .stars {
+    font-weight: 700;
   }
   .res {
     opacity: 0.75;

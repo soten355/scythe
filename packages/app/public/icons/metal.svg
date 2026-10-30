@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- A metal ingot: a bar seen from slightly above. -->
+  <polygon points="6,44 58,44 50,30 14,30" fill="#6f7882" stroke="#2b2f34" stroke-width="2" stroke-linejoin="round"/>
+  <polygon points="14,30 50,30 46,22 18,22" fill="#c9d0d7" stroke="#2b2f34" stroke-width="2" stroke-linejoin="round"/>
+  <polygon points="6,44 58,44 58,48 6,48" fill="#4c535b" stroke="#2b2f34" stroke-width="2" stroke-linejoin="round"/>
+  <line x1="21" y1="25" x2="38" y2="25" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity="0.8"/>
+</svg>

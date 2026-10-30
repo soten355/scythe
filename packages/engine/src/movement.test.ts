@@ -1,5 +1,5 @@
 // Scenario tests for movement and production details, on the small test
-// board (see test-fixtures.ts). B4 and D1 are tunnels; a river runs B1|C1.
+// board (see test-fixtures.ts). A4 and C1 are tunnels; a river runs A1|B1.
 // Player 0 uses mat A: section 1 is Produce (2 hexes), section 2 is Move (2 units).
 import { describe, expect, it } from 'vitest';
 import { applyAction, legalActions, newGame, type Action, type GameState, type PlayerState, type ResourcePile } from './game';
@@ -25,59 +25,59 @@ const destinations = (state: GameState, unit: object) =>
 
 describe('tunnels and the mine', () => {
   it('lets a unit on a tunnel move to any other tunnel', () => {
-    const state = play(game({ workers: ['B4', 'B2'] }), choose(2));
-    expect(destinations(state, worker(0))).toEqual(['B3', 'C4', 'D1']);
+    const state = play(game({ workers: ['A4', 'A2'] }), choose(2));
+    expect(destinations(state, worker(0))).toEqual(['A3', 'B4', 'C1']);
   });
 
   it('treats your mine as a tunnel, for your units only', () => {
-    const state = play(game({ workers: ['B4', 'B2'], structures: { mine: 'B2' } }), choose(2));
-    expect(destinations(state, worker(1))).toEqual(['B1', 'B3', 'B4', 'C3', 'D1']);
-    expect(destinations(state, worker(0))).toContain('B2');
-    // Player 1's mine on D4 does nothing for player 0.
-    const theirs = play(game({ workers: ['B4', 'B2'] }, {}, { structures: { mine: 'D4' } }), choose(2));
-    expect(destinations(theirs, worker(0))).not.toContain('D4');
+    const state = play(game({ workers: ['A4', 'A2'], structures: { mine: 'A2' } }), choose(2));
+    expect(destinations(state, worker(1))).toEqual(['A1', 'A3', 'A4', 'B3', 'C1']);
+    expect(destinations(state, worker(0))).toContain('A2');
+    // Player 1's mine on C4 does nothing for player 0.
+    const theirs = play(game({ workers: ['A4', 'A2'] }, {}, { structures: { mine: 'C4' } }), choose(2));
+    expect(destinations(theirs, worker(0))).not.toContain('C4');
   });
 
   it("can't tunnel onto another player's units", () => {
-    const state = play(game({ workers: ['B4', 'B2'] }, {}, { workers: ['D1', 'D2'] }), choose(2));
-    expect(destinations(state, worker(0))).toEqual(['B3', 'C4']);
+    const state = play(game({ workers: ['A4', 'A2'] }, {}, { workers: ['C1', 'C2'] }), choose(2));
+    expect(destinations(state, worker(0))).toEqual(['A3', 'B4']);
   });
 });
 
 describe('carrying', () => {
   it('lets a unit pick up resources from its hex and take them along', () => {
-    let state = play(game({}, { B1: { food: 3, wood: 1 } }), choose(2));
+    let state = play(game({}, { A1: { food: 3, wood: 1 } }), choose(2));
     state = play(state, { type: 'carryResource', unit: worker(0), resource: 'food' }, { type: 'carryResource', unit: worker(0), resource: 'food' });
     // While loading, only that unit can load more or move.
     expect(legalActions(state, 0)).toEqual([
       { type: 'carryResource', unit: worker(0), resource: 'wood' },
       { type: 'carryResource', unit: worker(0), resource: 'food' },
-      { type: 'moveUnit', unit: worker(0), to: 'B2' },
+      { type: 'moveUnit', unit: worker(0), to: 'A2' },
     ]);
-    state = play(state, { type: 'moveUnit', unit: worker(0), to: 'B2' });
-    expect(state.resources).toEqual({ B1: { food: 1, wood: 1 }, B2: { food: 2 } });
+    state = play(state, { type: 'moveUnit', unit: worker(0), to: 'A2' });
+    expect(state.resources).toEqual({ A1: { food: 1, wood: 1 }, A2: { food: 2 } });
     expect(state.turn).toMatchObject({ step: 'moving', moved: [worker(0)] });
   });
 
   it("can't pick up more than is there", () => {
-    const state = play(game({}, { B1: { food: 1 } }), choose(2), { type: 'carryResource', unit: worker(0), resource: 'food' });
+    const state = play(game({}, { A1: { food: 1 } }), choose(2), { type: 'carryResource', unit: worker(0), resource: 'food' });
     expect(legalActions(state, 0).filter((a) => a.type === 'carryResource')).toEqual([]);
   });
 
   it('lets a mech carry workers from its hex; they move with it and can still move themselves', () => {
-    let state = play(game({ mechs: ['B2'], workers: ['B1', 'B2', 'B2'] }), choose(2));
+    let state = play(game({ mechs: ['A2'], workers: ['A1', 'A2', 'A2'] }), choose(2));
     expect(legalActions(state, 0).filter((a) => a.type === 'carryWorker')).toEqual([
       { type: 'carryWorker', unit: mech(0), worker: 1 },
       { type: 'carryWorker', unit: mech(0), worker: 2 },
     ]);
     state = play(state, { type: 'carryWorker', unit: mech(0), worker: 1 }, { type: 'carryWorker', unit: mech(0), worker: 2 },
-      { type: 'moveUnit', unit: mech(0), to: 'B3' });
-    expect(p0(state)).toMatchObject({ mechs: ['B3'], workers: ['B1', 'B3', 'B3'] });
-    expect(destinations(state, worker(1))).toEqual(['B2', 'B4', 'C3', 'C4']);
+      { type: 'moveUnit', unit: mech(0), to: 'A3' });
+    expect(p0(state)).toMatchObject({ mechs: ['A3'], workers: ['A1', 'A3', 'A3'] });
+    expect(destinations(state, worker(1))).toEqual(['A2', 'A4', 'B3', 'B4']);
   });
 
   it('only mechs carry workers, and nothing is carried from home', () => {
-    const state = play(game({ character: 'B2' }, { B2: { oil: 1 } }), choose(2));
+    const state = play(game({ character: 'A2' }, { A2: { oil: 1 } }), choose(2));
     const carries = legalActions(state, 0).filter((a) => a.type === 'carryWorker' || a.type === 'carryResource');
     expect(carries).toEqual([
       { type: 'carryResource', unit: { kind: 'character' }, resource: 'oil' },
@@ -88,28 +88,28 @@ describe('carrying', () => {
 
 describe('the mill', () => {
   it('produces as one more worker on its hex', () => {
-    const state = play(game({ structures: { mill: 'B1' } }), choose(1), { type: 'produce', hex: 'B1' });
-    expect(state.resources).toEqual({ B1: { food: 2 } });
+    const state = play(game({ structures: { mill: 'A1' } }), choose(1), { type: 'produce', hex: 'A1' });
+    expect(state.resources).toEqual({ A1: { food: 2 } });
   });
 
   it('produces on its hex even with no workers there', () => {
-    const state = play(game({ structures: { mill: 'B3' } }), choose(1), { type: 'produce', hex: 'B3' });
-    expect(state.resources).toEqual({ B3: { metal: 1 } });
+    const state = play(game({ structures: { mill: 'A3' } }), choose(1), { type: 'produce', hex: 'A3' });
+    expect(state.resources).toEqual({ A3: { metal: 1 } });
   });
 
   it('makes one more worker on a village', () => {
-    const state = play(game({ workers: ['C1', 'B2'], structures: { mill: 'C1' } }), choose(1), { type: 'produce', hex: 'C1' });
-    expect(p0(state).workers).toEqual(['C1', 'B2', 'C1', 'C1']);
+    const state = play(game({ workers: ['B1', 'A2'], structures: { mill: 'B1' } }), choose(1), { type: 'produce', hex: 'B1' });
+    expect(p0(state).workers).toEqual(['B1', 'A2', 'B1', 'B1']);
   });
 
   it("doesn't produce while another player's unit stands on it", () => {
-    const state = play(game({ structures: { mill: 'B3' } }, {}, { workers: ['B3', 'D2'] }), choose(1));
-    expect(legalActions(state, 0)).not.toContainEqual({ type: 'produce', hex: 'B3' });
+    const state = play(game({ structures: { mill: 'A3' } }, {}, { workers: ['A3', 'C2'] }), choose(1));
+    expect(legalActions(state, 0)).not.toContainEqual({ type: 'produce', hex: 'A3' });
   });
 });
 
 describe('the cost of producing', () => {
-  const workers = (n: number) => Array<string>(n).fill('B1');
+  const workers = (n: number) => Array<string>(n).fill('A1');
 
   it('rises with workers on the board: power at 4, popularity at 6, a coin at 8', () => {
     const cost = (n: number) => produceCost({ ...p0(game()), workers: workers(n) });
@@ -122,10 +122,10 @@ describe('the cost of producing', () => {
   });
 
   it('is paid once per Produce action, not per hex', () => {
-    const state = play(game({ workers: ['B1', 'B1', 'B2', 'B2', 'B2', 'B2'] }), choose(1),
-      { type: 'produce', hex: 'B1' }, { type: 'produce', hex: 'B2' });
+    const state = play(game({ workers: ['A1', 'A1', 'A2', 'A2', 'A2', 'A2'] }), choose(1),
+      { type: 'produce', hex: 'A1' }, { type: 'produce', hex: 'A2' });
     expect(p0(state)).toMatchObject({ power: 3 - 1, popularity: 2 - 1, coins: 4 });
-    expect(state.resources).toEqual({ B1: { food: 2 }, B2: { wood: 4 } });
+    expect(state.resources).toEqual({ A1: { food: 2 }, A2: { wood: 4 } });
   });
 
   it("can't produce without paying it", () => {

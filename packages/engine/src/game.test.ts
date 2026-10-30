@@ -17,8 +17,8 @@ const fullTurn = (section: number): Action[] => [
 describe('setup', () => {
   it('starts each player with their mat and faction values and pieces', () => {
     const [a, b] = newGame(setup).players;
-    expect(a).toMatchObject({ coins: 4, popularity: 2, power: 3, combatCards: 2, character: 'home', workers: ['B1', 'B2'], mechs: [] });
-    expect(b).toMatchObject({ coins: 5, workers: ['D2', 'D3'] });
+    expect(a).toMatchObject({ coins: 4, popularity: 2, power: 3, combatCards: 2, character: 'home', workers: ['A1', 'A2'], mechs: [] });
+    expect(b).toMatchObject({ coins: 5, workers: ['C2', 'C3'] });
   });
 
   it('lets the lowest mat turn order go first', () => {
@@ -83,8 +83,8 @@ describe('turn structure', () => {
 
   it('accepts an action whatever order its fields are written in', () => {
     const state = play(newGame(setup), [{ type: 'chooseSection', section: 2 }]);
-    const reordered = { to: 'B1', unit: { kind: 'character' }, type: 'moveUnit' } as Action;
-    expect(applyAction(state, reordered).players[0]!.character).toBe('B1');
+    const reordered = { to: 'A1', unit: { kind: 'character' }, type: 'moveUnit' } as Action;
+    expect(applyAction(state, reordered).players[0]!.character).toBe('A1');
   });
 
   it('never changes the state it was given', () => {

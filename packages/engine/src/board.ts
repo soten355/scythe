@@ -1,8 +1,9 @@
 // Board geometry: hexes, terrain, rivers, tunnels and home bases.
 //
 // A map is written as a BoardLayout: one string per row, top to bottom, with
-// a two-letter terrain code per hex. Rows are lettered A, B, C... and hexes
-// are numbered from 1 left to right, so hex IDs read like "C4". Odd rows
+// a two-letter terrain code per hex. Rows with hexes are lettered A, B, C...
+// from the top, and each row's hexes are numbered from 1 left to right
+// (skipping empty slots and home bases), so hex IDs read like "C4". Odd rows
 // (B, D, F...) sit half a hex to the right of the row above, unless
 // shiftEvenRows is set, in which case rows A, C, E... do.
 //
@@ -61,14 +62,32 @@ const AXIAL_DIRECTIONS: [number, number][] = [
   [1, 0], [-1, 0], [0, 1], [0, -1], [1, -1], [-1, 1],
 ];
 
+const isHexToken = (token: string) => token !== '' && token !== '--' && !token.startsWith('@');
+
+/**
+ * The hex ID of each token in a layout's rows (null for empty slots and home
+ * bases). Rows without hexes get no letter, so the top-left hex is A1.
+ */
+export function hexIdGrid(rows: string[]): (HexId | null)[][] {
+  let letter = 0;
+  return rows.map((row) => {
+    const tokens = row.trim().split(/\s+/);
+    if (!tokens.some(isHexToken)) return tokens.map(() => null);
+    const name = ROW_LETTERS[letter++];
+    let n = 0;
+    return tokens.map((t) => (isHexToken(t) ? `${name}${++n}` : null));
+  });
+}
+
 export function buildBoard(layout: BoardLayout): Board {
   const hexes: Record<HexId, Hex> = {};
   const homeBasePositions: Board['homeBasePositions'] = {};
+  const ids = hexIdGrid(layout.rows);
 
   layout.rows.forEach((row, r) => {
     row.trim().split(/\s+/).forEach((token, i) => {
-      if (token === '--') return;
-      const id = `${ROW_LETTERS[r]}${i + 1}`;
+      if (token === '--' || token === '') return;
+      const id = ids[r]![i]!;
       // Offset to axial conversion ("odd-r" or "even-r" layout).
       const q = i + 1 - (layout.shiftEvenRows ? (r + (r & 1)) / 2 : (r - (r & 1)) / 2);
       if (token.startsWith('@')) {

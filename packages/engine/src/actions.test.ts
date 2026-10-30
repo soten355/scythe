@@ -27,36 +27,36 @@ describe('Move', () => {
   it('moves units one hex each, not onto lakes or across rivers', () => {
     const state = play(game(), choose(2));
     const moves = legalActions(state, 0).filter((a) => a.type === 'moveUnit');
-    // Character from home to B1 or B2; worker on B1 only to B2 (C1 across a river, C2 a lake);
-    // worker on B2 to B1, B3 or the Factory (C3).
+    // Character from home to A1 or A2; worker on A1 only to A2 (B1 across a river, B2 a lake);
+    // worker on A2 to A1, A3 or the Factory (B3).
     expect(moves).toEqual(
       expect.arrayContaining([
-        { type: 'moveUnit', unit: { kind: 'character' }, to: 'B1' },
-        { type: 'moveUnit', unit: { kind: 'worker', index: 0 }, to: 'B2' },
-        { type: 'moveUnit', unit: { kind: 'worker', index: 1 }, to: 'C3' },
+        { type: 'moveUnit', unit: { kind: 'character' }, to: 'A1' },
+        { type: 'moveUnit', unit: { kind: 'worker', index: 0 }, to: 'A2' },
+        { type: 'moveUnit', unit: { kind: 'worker', index: 1 }, to: 'B3' },
       ]),
     );
     expect(moves).toHaveLength(2 + 1 + 3);
   });
 
   it('moves up to 2 units, each once, then goes to the bottom row', () => {
-    let state = play(game(), choose(2), { type: 'moveUnit', unit: { kind: 'worker', index: 1 }, to: 'B3' });
+    let state = play(game(), choose(2), { type: 'moveUnit', unit: { kind: 'worker', index: 1 }, to: 'A3' });
     expect(state.turn.step).toBe('moving');
     expect(legalActions(state, 0).some((a) => a.type === 'moveUnit' && a.unit.kind === 'worker' && a.unit.index === 1)).toBe(false);
-    state = play(state, { type: 'moveUnit', unit: { kind: 'character' }, to: 'B2' });
-    expect(p0(state)).toMatchObject({ character: 'B2', workers: ['B1', 'B3'] });
+    state = play(state, { type: 'moveUnit', unit: { kind: 'character' }, to: 'A2' });
+    expect(p0(state)).toMatchObject({ character: 'A2', workers: ['A1', 'A3'] });
     expect(state.turn.step).toBe('bottom');
   });
 
   it('can stop after moving fewer units', () => {
-    const state = play(game(), choose(2), { type: 'moveUnit', unit: { kind: 'character' }, to: 'B1' }, { type: 'endMove' });
+    const state = play(game(), choose(2), { type: 'moveUnit', unit: { kind: 'character' }, to: 'A1' }, { type: 'endMove' });
     expect(state.turn.step).toBe('bottom');
   });
 
   it("can't move onto another player's units (until combat exists)", () => {
-    const state = play(game({ workers: ['B1', 'B2'] }, {}, 0), choose(2));
-    const blocked = { ...state, players: [p0(state), { ...state.players[1]!, workers: ['B3'] }] };
-    expect(legalActions(blocked, 0)).not.toContainEqual({ type: 'moveUnit', unit: { kind: 'worker', index: 1 }, to: 'B3' });
+    const state = play(game({ workers: ['A1', 'A2'] }, {}, 0), choose(2));
+    const blocked = { ...state, players: [p0(state), { ...state.players[1]!, workers: ['A3'] }] };
+    expect(legalActions(blocked, 0)).not.toContainEqual({ type: 'moveUnit', unit: { kind: 'worker', index: 1 }, to: 'A3' });
   });
 
   it('moves 3 units and gains 2 coins once upgraded', () => {
@@ -67,15 +67,17 @@ describe('Move', () => {
 });
 
 describe('Trade', () => {
-  it('pays 1 coin for 2 resources of any kind, placed on hexes with your workers', () => {
+  it('pays 1 coin for 2 resources of any kind, both placed on one hex with your worker', () => {
     let state = play(game(), choose(3));
-    expect(legalActions(state, 0)).toContainEqual({ type: 'tradeResource', resource: 'oil', hex: 'B1' });
-    expect(legalActions(state, 0)).not.toContainEqual({ type: 'tradeResource', resource: 'oil', hex: 'B3' });
-    state = play(state, { type: 'tradeResource', resource: 'oil', hex: 'B1' });
-    expect(state.turn).toMatchObject({ step: 'trading', left: 1 });
+    expect(legalActions(state, 0)).toContainEqual({ type: 'tradeResource', resource: 'oil', hex: 'A1' });
+    expect(legalActions(state, 0)).not.toContainEqual({ type: 'tradeResource', resource: 'oil', hex: 'A3' });
+    state = play(state, { type: 'tradeResource', resource: 'oil', hex: 'A1' });
+    expect(state.turn).toMatchObject({ step: 'trading', left: 1, hex: 'A1' });
     expect(types(state)).not.toContain('skipBottom');
-    state = play(state, { type: 'tradeResource', resource: 'food', hex: 'B2' });
-    expect(state.resources).toEqual({ B1: { oil: 1 }, B2: { food: 1 } });
+    // The second resource must go on the same hex.
+    expect(legalActions(state, 0)).not.toContainEqual({ type: 'tradeResource', resource: 'food', hex: 'A2' });
+    state = play(state, { type: 'tradeResource', resource: 'food', hex: 'A1' });
+    expect(state.resources).toEqual({ A1: { oil: 1, food: 1 } });
     expect(p0(state).coins).toBe(3);
     expect(state.turn.step).toBe('bottom');
   });
@@ -89,11 +91,11 @@ describe('Trade', () => {
   });
 
   it('gives 1 power with the armory built', () => {
-    const state = game({ structures: { armory: 'B1' } });
+    const state = game({ structures: { armory: 'A1' } });
     expect(p0(play(state, choose(3), { type: 'tradePopularity' })).power).toBe(3 + 1);
-    const traded = play(state, choose(3), { type: 'tradeResource', resource: 'oil', hex: 'B1' }, { type: 'tradeResource', resource: 'oil', hex: 'B1' });
+    const traded = play(state, choose(3), { type: 'tradeResource', resource: 'oil', hex: 'A1' }, { type: 'tradeResource', resource: 'oil', hex: 'A1' });
     expect(p0(traded).power).toBe(3 + 1);
-    expect(traded.resources).toEqual({ B1: { oil: 2 } });
+    expect(traded.resources).toEqual({ A1: { oil: 2 } });
   });
 
   it('caps popularity at 18', () => {
@@ -103,27 +105,27 @@ describe('Trade', () => {
 
 describe('Produce', () => {
   it('produces one resource per worker on up to 2 hexes', () => {
-    const state = play(game({ workers: ['B1', 'B2', 'B2', 'B3'] }), choose(1), { type: 'produce', hex: 'B2' }, { type: 'produce', hex: 'B1' });
-    expect(state.resources).toEqual({ B1: { food: 1 }, B2: { wood: 2 } });
+    const state = play(game({ workers: ['A1', 'A2', 'A2', 'A3'] }), choose(1), { type: 'produce', hex: 'A2' }, { type: 'produce', hex: 'A1' });
+    expect(state.resources).toEqual({ A1: { food: 1 }, A2: { wood: 2 } });
     expect(state.turn.step).toBe('bottom');
   });
 
   it("doesn't produce on the same hex twice, and can stop early", () => {
-    let state = play(game(), choose(1), { type: 'produce', hex: 'B1' });
-    expect(legalActions(state, 0)).toEqual([{ type: 'produce', hex: 'B2' }, { type: 'endProduce' }]);
+    let state = play(game(), choose(1), { type: 'produce', hex: 'A1' });
+    expect(legalActions(state, 0)).toEqual([{ type: 'produce', hex: 'A2' }, { type: 'endProduce' }]);
     state = play(state, { type: 'endProduce' });
-    expect(state.resources).toEqual({ B1: { food: 1 } });
+    expect(state.resources).toEqual({ A1: { food: 1 } });
   });
 
   it('makes new workers on a village, up to 8 in all', () => {
-    let state = play(game({ workers: ['C1', 'C1'] }), choose(1), { type: 'produce', hex: 'C1' });
-    expect(p0(state).workers).toEqual(['C1', 'C1', 'C1', 'C1']);
-    state = play(game({ workers: ['C1', 'C1', 'B1', 'B1', 'B1', 'B1', 'B1'] }), choose(1), { type: 'produce', hex: 'C1' });
+    let state = play(game({ workers: ['B1', 'B1'] }), choose(1), { type: 'produce', hex: 'B1' });
+    expect(p0(state).workers).toEqual(['B1', 'B1', 'B1', 'B1']);
+    state = play(game({ workers: ['B1', 'B1', 'A1', 'A1', 'A1', 'A1', 'A1'] }), choose(1), { type: 'produce', hex: 'B1' });
     expect(p0(state).workers).toHaveLength(8);
   });
 
   it('has nothing to produce on the Factory', () => {
-    expect(legalActions(play(game({ workers: ['C3'] }), choose(1)), 0)).toEqual([{ type: 'skipTop' }]);
+    expect(legalActions(play(game({ workers: ['B3'] }), choose(1)), 0)).toEqual([{ type: 'skipTop' }]);
   });
 });
 
@@ -134,7 +136,7 @@ describe('Bolster', () => {
   });
 
   it('gives 1 popularity with the monument built', () => {
-    expect(p0(play(game({ structures: { monument: 'B1' } }), choose(0), { type: 'bolster', gain: 'power' })).popularity).toBe(3);
+    expect(p0(play(game({ structures: { monument: 'A1' } }), choose(0), { type: 'bolster', gain: 'power' })).popularity).toBe(3);
   });
 
   it('caps power at 16', () => {
@@ -150,40 +152,57 @@ describe('paying for bottom-row actions', () => {
   const upgradeTurn = (state: GameState) => play(state, choose(0), { type: 'skipTop' });
 
   it('takes resources one at a time from hexes you control', () => {
-    let state = upgradeTurn(game({}, { B1: { oil: 2 }, B2: { oil: 1, food: 3 }, B3: { oil: 5 } }));
-    // B3 has no unit of yours, so its oil can't be spent.
-    expect(legalActions(state, 0)).toEqual([{ type: 'pay', hex: 'B1' }, { type: 'pay', hex: 'B2' }, { type: 'skipBottom' }]);
-    state = play(state, { type: 'pay', hex: 'B1' });
+    let state = upgradeTurn(game({}, { A1: { oil: 2 }, A2: { oil: 1, food: 3 }, A3: { oil: 5 } }));
+    // A3 has no unit of yours, so its oil can't be spent.
+    expect(legalActions(state, 0)).toEqual([{ type: 'pay', hex: 'A1' }, { type: 'pay', hex: 'A2' }, { type: 'skipBottom' }]);
+    state = play(state, { type: 'pay', hex: 'A1' });
     expect(types(state)).not.toContain('skipBottom');
-    state = play(state, { type: 'pay', hex: 'B2' }, { type: 'pay', hex: 'B1' });
-    expect(state.resources).toEqual({ B2: { food: 3 }, B3: { oil: 5 } });
+    state = play(state, { type: 'pay', hex: 'A2' }, { type: 'pay', hex: 'A1' });
+    expect(state.resources).toEqual({ A2: { food: 3 }, A3: { oil: 5 } });
     expect(types(state).every((t) => t === 'upgrade')).toBe(true);
   });
 
   it("can't start unless you can pay it all", () => {
-    expect(legalActions(upgradeTurn(game({}, { B1: { oil: 2 } })), 0)).toEqual([{ type: 'skipBottom' }]);
+    expect(legalActions(upgradeTurn(game({}, { A1: { oil: 2 } })), 0)).toEqual([{ type: 'skipBottom' }]);
   });
 
   it('can spend resources on a hex with your structure and no units', () => {
-    const state = upgradeTurn(game({ structures: { mine: 'B3' } }, { B3: { oil: 3 } }));
-    expect(legalActions(state, 0)).toContainEqual({ type: 'pay', hex: 'B3' });
+    const state = upgradeTurn(game({ structures: { mine: 'A3' } }, { A3: { oil: 3 } }));
+    expect(legalActions(state, 0)).toContainEqual({ type: 'pay', hex: 'A3' });
   });
 
   it('can be paid just for the coins when there is nothing left to do', () => {
     const state = play(
-      game({ mechs: ['B1', 'B1', 'B1', 'B1'], mechAbilities: [0, 1, 2, 3] }, { B1: { metal: 3 } }),
-      choose(1), { type: 'skipTop' }, { type: 'pay', hex: 'B1' }, { type: 'pay', hex: 'B1' }, { type: 'pay', hex: 'B1' },
+      game({ mechs: ['A1', 'A1', 'A1', 'A1'], mechAbilities: [0, 1, 2, 3] }, { A1: { metal: 3 } }),
+      choose(1), { type: 'skipTop' }, { type: 'pay', hex: 'A1' }, { type: 'pay', hex: 'A1' }, { type: 'pay', hex: 'A1' },
     );
-    expect(state.currentPlayer).toBe(1);
     expect(p0(state).coins).toBe(4 + 2);
+    expect(legalActions(state, 0)).toEqual([{ type: 'endTurn' }]);
   });
 });
 
-/** Player 0's bottom row action, paid from 4 of the right resource on B1. */
+describe('ending the turn', () => {
+  it('waits for End turn after a bottom-row action, so it can still be undone', () => {
+    const state = play(bottom(1, 'metal'), { type: 'deploy', hex: 'A2', ability: 2 });
+    expect(state.currentPlayer).toBe(0);
+    expect(state.turn).toEqual({ step: 'end', section: 1 });
+    expect(legalActions(state, 0)).toEqual([{ type: 'endTurn' }]);
+    const next = play(state, { type: 'endTurn' });
+    expect(next.currentPlayer).toBe(1);
+    expect(p0(next).lastSection).toBe(1);
+    expect(next.turnsTaken).toBe(1);
+  });
+
+  it('ends at once when the bottom-row action is skipped', () => {
+    expect(play(game(), choose(2), { type: 'gainCoins' }, { type: 'skipBottom' }).currentPlayer).toBe(1);
+  });
+});
+
+/** Player 0's bottom row action, paid from 4 of the right resource on A1. */
 function bottom(section: number, resource: string, patch: Partial<PlayerState> = {}): GameState {
   const cost = bottomCost({ ...p0(game()), ...patch } as PlayerState, testMatA, section as 0);
-  const pay = Array.from({ length: cost.amount }, (): Action => ({ type: 'pay', hex: 'B1' }));
-  return play(game(patch, { B1: { [resource]: 4 } }), choose(section), { type: 'skipTop' }, ...pay);
+  const pay = Array.from({ length: cost.amount }, (): Action => ({ type: 'pay', hex: 'A1' }));
+  return play(game(patch, { A1: { [resource]: 4 } }), choose(section), { type: 'skipTop' }, ...pay);
 }
 
 describe('Upgrade', () => {
@@ -193,7 +212,6 @@ describe('Upgrade', () => {
     expect(topValue(p, testMatA, 0, 'power')).toBe(3);
     expect(bottomCost(p, testMatA, 3).amount).toBe(3);
     expect(p.coins).toBe(4 + 3);
-    expect(state.currentPlayer).toBe(1);
   });
 
   it('offers every top-row value and bottom-row space with room left', () => {
@@ -207,27 +225,27 @@ describe('Deploy', () => {
   it('places a mech on a hex with your worker and unlocks the chosen ability', () => {
     const state = bottom(1, 'metal');
     expect(legalActions(state, 0)).toHaveLength(2 * 4);
-    const p = p0(play(state, { type: 'deploy', hex: 'B2', ability: 2 }));
-    expect(p).toMatchObject({ mechs: ['B2'], mechAbilities: [2], coins: 4 + 2 });
+    const p = p0(play(state, { type: 'deploy', hex: 'A2', ability: 2 }));
+    expect(p).toMatchObject({ mechs: ['A2'], mechAbilities: [2], coins: 4 + 2 });
   });
 
   it("doesn't offer an ability already unlocked", () => {
-    const state = bottom(1, 'metal', { mechs: ['B1'], mechAbilities: [0] });
+    const state = bottom(1, 'metal', { mechs: ['A1'], mechAbilities: [0] });
     expect(legalActions(state, 0).some((a) => a.type === 'deploy' && a.ability === 0)).toBe(false);
   });
 });
 
 describe('Build', () => {
   it('places a structure on a hex with your worker, and its bonus applies from then on', () => {
-    let state = play(bottom(2, 'wood'), { type: 'build', structure: 'monument', hex: 'B2' });
-    expect(p0(state)).toMatchObject({ structures: { monument: 'B2' }, coins: 4 + 1 });
-    state = play(state, choose(2), { type: 'skipTop' }, { type: 'skipBottom' }, choose(0), { type: 'bolster', gain: 'power' });
+    let state = play(bottom(2, 'wood'), { type: 'build', structure: 'monument', hex: 'A2' });
+    expect(p0(state)).toMatchObject({ structures: { monument: 'A2' }, coins: 4 + 1 });
+    state = play(state, { type: 'endTurn' }, choose(2), { type: 'skipTop' }, { type: 'skipBottom' }, choose(0), { type: 'bolster', gain: 'power' });
     expect(p0(state).popularity).toBe(3);
   });
 
   it('not on the Factory, a lake, or a hex that already has a structure', () => {
-    const state = bottom(2, 'wood', { workers: ['B1', 'C3', 'B2'], structures: { mill: 'B2' } });
-    expect(new Set(legalActions(state, 0).map((a) => (a as { hex: string }).hex))).toEqual(new Set(['B1']));
+    const state = bottom(2, 'wood', { workers: ['A1', 'B3', 'A2'], structures: { mill: 'A2' } });
+    expect(new Set(legalActions(state, 0).map((a) => (a as { hex: string }).hex))).toEqual(new Set(['A1']));
     // Three structures left to build.
     expect(legalActions(state, 0)).toHaveLength(3);
   });
@@ -243,13 +261,13 @@ describe('Enlist', () => {
 
   it('gives the ongoing bonus when you or a neighbor take that bottom-row action', () => {
     // A recruit on mat A's Deploy section pays 1 coin.
-    let state = game({ recruits: [1] }, { B1: { metal: 3 }, D2: { metal: 4 } });
-    state = play(state, choose(1), { type: 'skipTop' }, { type: 'pay', hex: 'B1' }, { type: 'pay', hex: 'B1' }, { type: 'pay', hex: 'B1' },
-      { type: 'deploy', hex: 'B1', ability: 0 });
+    let state = game({ recruits: [1] }, { A1: { metal: 3 }, C2: { metal: 4 } });
+    state = play(state, choose(1), { type: 'skipTop' }, { type: 'pay', hex: 'A1' }, { type: 'pay', hex: 'A1' }, { type: 'pay', hex: 'A1' },
+      { type: 'deploy', hex: 'A1', ability: 0 }, { type: 'endTurn' });
     expect(p0(state).coins).toBe(4 + 2 + 1);
     // Player 1 deploys (their section 1): player 0 gets 1 more coin.
-    const pay: Action = { type: 'pay', hex: 'D2' };
-    state = play(state, choose(1), { type: 'skipTop' }, pay, pay, pay, pay, { type: 'deploy', hex: 'D2', ability: 0 });
+    const pay: Action = { type: 'pay', hex: 'C2' };
+    state = play(state, choose(1), { type: 'skipTop' }, pay, pay, pay, pay, { type: 'deploy', hex: 'C2', ability: 0 });
     expect(p0(state).coins).toBe(4 + 2 + 1 + 1);
   });
 
@@ -257,5 +275,31 @@ describe('Enlist', () => {
     const p = p0(play(bottom(3, 'food'), { type: 'enlist', section: 3, bonus: 'coins' }));
     expect(p.coins).toBe(4 + 2);
     expect(p.combatCards).toBe(2);
+  });
+});
+
+describe('stars', () => {
+  it('earns a star for deploying the fourth mech', () => {
+    const before = bottom(1, 'metal', { mechs: ['A1', 'A1', 'A1'], mechAbilities: [0, 1, 2] });
+    expect(p0(before).stars).toEqual([]);
+    expect(p0(play(before, { type: 'deploy', hex: 'A2', ability: 3 })).stars).toEqual(['mechs']);
+  });
+
+  it('earns one for reaching 16 power, only once', () => {
+    let state = play(game({ power: 14 }), choose(0), { type: 'bolster', gain: 'power' });
+    expect(p0(state).stars).toEqual(['power']);
+    // Already earned: bolstering again at 16 adds nothing.
+    state = play(game({ power: 16, stars: ['power'] }), choose(0), { type: 'bolster', gain: 'power' });
+    expect(p0(state).stars).toEqual(['power']);
+  });
+
+  it('earns one for the fourth recruit and one for top popularity, each once', () => {
+    const state = bottom(3, 'food', { recruits: [0, 1, 2], recruitBonusesTaken: ['power', 'coins', 'combatCard'], popularity: 16 });
+    expect(p0(play(state, { type: 'enlist', section: 3, bonus: 'popularity' })).stars).toEqual(['recruits', 'popularity']);
+  });
+
+  it("doesn't count another player's achievements", () => {
+    const state = play(game({ power: 16 }, {}, 1), choose(0), { type: 'bolster', gain: 'power' });
+    expect(state.players.map((p) => p.stars)).toEqual([[], []]);
   });
 });

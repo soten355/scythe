@@ -1,11 +1,26 @@
 <script lang="ts">
   // The 2D board: terrain, rivers, home bases, everyone's pieces and the
   // resources on each hex. Hexes the player can tap are outlined.
+  // Each hex shows its terrain icon in the middle, a tunnel icon at the top
+  // and an encounter icon at the bottom (see icons.ts); its ID sits at the upper left.
   import type { GameState, HexId, Location, Resource } from '@scythe/engine';
   import { center, corners, points, sharedEdge, SIZE, viewBox } from './geometry';
-  import type { Prompt } from './prompt';
+  import HexIcon from './HexIcon.svelte';
+  import { ENCOUNTER_ICON, TERRAIN_ICONS, TUNNEL_ICON } from './icons';
+  import type { Prompt, Selection } from './prompt';
 
-  let { game, prompt, onTap }: { game: GameState; prompt: Prompt; onTap: (at: Location) => void } = $props();
+  let {
+    game,
+    prompt,
+    onTap,
+    onPick,
+  }: { game: GameState; prompt: Prompt; onTap: (at: Location) => void; onPick: (selection: Selection) => void } = $props();
+
+  /** A piece of the current player that can be tapped to pick that unit (see Prompt.pieces). */
+  const pickable = (at: Location, kind: 'character' | 'mechs' | 'workers') => {
+    const k = `${at}|${{ character: 'character', mechs: 'mech', workers: 'worker' }[kind]}`;
+    return { key: k, select: prompt.pieces?.get(k), selected: prompt.selectedPiece === k };
+  };
 
   const FILL: Record<string, string> = {
     farm: '#d9c46a',
@@ -18,13 +33,16 @@
   };
   const RESOURCE_COLOR: Record<Resource, string> = { oil: '#1b1b1b', metal: '#9aa3ad', wood: '#7a4a24', food: '#f0d54a' };
   const STRUCTURE_LETTER = { mine: 'Mi', mill: 'Ml', armory: 'Ar', monument: 'Mo' };
+  /** How far left of a hex's centre its pieces sit, and the gap between them. */
+  const PIECES_LEFT = 6;
+  const PIECE_STEP = 14;
 
   const board = $derived(game.setup.board);
   const hexes = $derived(Object.values(board.hexes));
   const box = $derived(viewBox(board));
 
   /** Everything on a hex, grouped by player. */
-  type Pieces = { color: string; initial: string; character: boolean; mechs: number; workers: number; structure?: string };
+  type Pieces = { seat: number; color: string; initial: string; character: boolean; mechs: number; workers: number; structure?: string };
   const piecesOn = $derived.by(() => {
     const on = new Map<HexId, Pieces[]>();
     game.players.forEach((p, i) => {
@@ -32,7 +50,7 @@
       const add = (hex: HexId, patch: Partial<Pieces>) => {
         const list = on.get(hex) ?? [];
         let mine = list.find((x) => x.color === f.color);
-        if (!mine) list.push((mine = { color: f.color, initial: f.name[0] ?? '?', character: false, mechs: 0, workers: 0 }));
+        if (!mine) list.push((mine = { seat: i, color: f.color, initial: f.name[0] ?? '?', character: false, mechs: 0, workers: 0 }));
         Object.assign(mine, patch, {
           mechs: mine.mechs + (patch.mechs ?? 0),
           workers: mine.workers + (patch.workers ?? 0),
@@ -68,18 +86,22 @@
   {#each hexes as h (h.id)}
     {@const c = center(h)}
     {@const lit = prompt.highlights.has(h.id)}
+    {@const tappable = lit || prompt.tapSelects.has(h.id)}
     <polygon
       points={points(corners(c))}
       fill={FILL[h.terrain]}
-      class:lit
-      class:selected={prompt.selected === h.id}
       class="hex"
-      onclick={() => lit && onTap(h.id)}
+      class:tappable
+      onclick={() => tappable && onTap(h.id)}
       role="button"
       tabindex="-1"
       onkeydown={() => {}}
     />
-    <text x={c[0]} y={c[1] - SIZE * 0.6} class="id">{h.id}{h.tunnel ? ' ⌂' : ''}</text>
+    {@const icon = TERRAIN_ICONS[h.terrain]}
+    {#if icon}<HexIcon {icon} x={c[0]} y={c[1]} size={SIZE * 0.65} faded />{/if}
+    {#if h.tunnel}<HexIcon icon={TUNNEL_ICON} x={c[0]} y={c[1] - SIZE * 0.62} size={SIZE * 0.36} />{/if}
+    {#if h.encounter}<HexIcon icon={ENCOUNTER_ICON} x={c[0]} y={c[1] + SIZE * 0.62} size={SIZE * 0.36} />{/if}
+    <text x={c[0] - SIZE * 0.5} y={c[1] - SIZE * 0.45} class="id">{h.id}</text>
   {/each}
 
   {#each board.rivers as [a, b] (a + b)}
@@ -87,11 +109,25 @@
     <line x1={p[0]} y1={p[1]} x2={q[0]} y2={q[1]} class="river" />
   {/each}
 
+  <!-- Outlines of tappable and selected hexes go over the rivers so they show in full. -->
+  {#each hexes as h (h.id)}
+    {@const lit = prompt.highlights.has(h.id)}
+    {@const selected = prompt.selected === h.id || !!prompt.marked?.has(h.id)}
+    {#if lit || selected}
+      <polygon points={points(corners(center(h)))} class="outline" class:lit class:selected />
+    {/if}
+  {/each}
+
   {#each homes as home (home.id)}
     {#each home.borders as b, i (i)}
       <line x1={home.c[0]} y1={home.c[1]} x2={b[0]} y2={b[1]} class="home-link" />
     {/each}
     {@const lit = home.mine && prompt.highlights.has('home')}
+    {@const tappable = home.mine && (lit || prompt.tapSelects.has('home'))}
+    {#if home.mine && home.faction}
+      <!-- The current player's home base glows in their colour. -->
+      <circle cx={home.c[0]} cy={home.c[1]} r={SIZE * 0.55} fill="none" stroke={home.faction.color} class="home-glow" />
+    {/if}
     <circle
       cx={home.c[0]}
       cy={home.c[1]}
@@ -100,13 +136,30 @@
       class="home"
       class:lit
       class:selected={home.mine && prompt.selected === 'home'}
-      onclick={() => lit && onTap('home')}
+      class:tappable
+      onclick={() => tappable && onTap('home')}
       role="button"
       tabindex="-1"
       onkeydown={() => {}}
     />
     {#if home.characterHome}
-      <circle cx={home.c[0]} cy={home.c[1]} r="7" class="character passive" fill="#fff" />
+      {@const pick = home.mine ? pickable('home', 'character') : { key: '', select: undefined, selected: false }}
+      {@const sel = pick.select}
+      <circle
+        cx={home.c[0]}
+        cy={home.c[1]}
+        r="7"
+        class="character"
+        data-piece={pick.key || undefined}
+        class:passive={!sel}
+        class:pickable={sel}
+        class:picked={pick.selected}
+        fill="#fff"
+        onclick={(e) => sel && (e.stopPropagation(), onPick(sel))}
+        role="button"
+        tabindex="-1"
+        onkeydown={() => {}}
+      />
       <text x={home.c[0]} y={home.c[1] + 3.5} class="piece-text dark">{home.faction?.name[0]}</text>
     {/if}
   {/each}
@@ -118,29 +171,48 @@
       {@const groups = piecesOn.get(h.id) ?? []}
       {#each groups as g, gi (g.color)}
         {@const y = c[1] - 4 + gi * 14}
-        {@const x0 = c[0] - 16}
-        {#if g.structure}
-          <rect x={x0 - 4} y={y - 6} width="12" height="12" fill={g.color} class="structure" />
-          <text x={x0 + 2} y={y + 3} class="piece-text small">{g.structure}</text>
-        {/if}
-        {#if g.character}
-          <circle cx={x0 + 14} cy={y} r="6.5" fill={g.color} class="character" />
-          <text x={x0 + 14} y={y + 3} class="piece-text">{g.initial}</text>
-        {/if}
-        {#if g.mechs}
-          <rect x={x0 + 22} y={y - 6} width="12" height="12" rx="2" fill={g.color} class="mech" />
-          <text x={x0 + 28} y={y + 3} class="piece-text">{g.mechs}</text>
-        {/if}
-        {#if g.workers}
-          <circle cx={x0 + 41} cy={y} r="5.5" fill={g.color} class="worker" />
-          <text x={x0 + 41} y={y + 3} class="piece-text">{g.workers}</text>
-        {/if}
+        {@const kinds = (['structure', 'character', 'mechs', 'workers'] as const).filter((k) => g[k])}
+        <!-- Packed side by side, centred a little left of the middle of the hex. -->
+        {#each kinds as kind, i (kind)}
+          {@const x = c[0] - PIECES_LEFT + (i - (kinds.length - 1) / 2) * PIECE_STEP}
+          {@const pick = kind !== 'structure' && g.seat === game.currentPlayer ? pickable(h.id, kind) : { key: '', select: undefined, selected: false }}
+          {@const sel = pick.select}
+          {#if sel || pick.selected}
+            <!-- Your own unit that can move: tap the piece itself to pick it. -->
+            <circle
+              cx={x}
+              cy={y}
+              r="8.5"
+              class="pick-ring"
+              data-piece={pick.key || undefined}
+              class:pickable={sel}
+              class:picked={pick.selected}
+              onclick={() => sel && onPick(sel)}
+              role="button"
+              tabindex="-1"
+              onkeydown={() => {}}
+            />
+          {/if}
+          {#if kind === 'structure'}
+            <rect x={x - 6} y={y - 6} width="12" height="12" fill={g.color} class="structure" />
+            <text {x} y={y + 2} class="piece-text small">{g.structure}</text>
+          {:else if kind === 'character'}
+            <circle cx={x} cy={y} r="6.5" fill={g.color} class="character" />
+            <text {x} y={y + 3} class="piece-text">{g.initial}</text>
+          {:else if kind === 'mechs'}
+            <rect x={x - 6} y={y - 6} width="12" height="12" rx="2" fill={g.color} class="mech" />
+            <text {x} y={y + 3} class="piece-text">{g.mechs}</text>
+          {:else}
+            <circle cx={x} cy={y} r="5.5" fill={g.color} class="worker" />
+            <text {x} y={y + 3} class="piece-text">{g.workers}</text>
+          {/if}
+        {/each}
       {/each}
       {@const pile = Object.entries(game.resources[h.id] ?? {}) as [Resource, number][]}
       {#each pile as [res, n], i (res)}
         {@const x = c[0] - (pile.length - 1) * 7 + i * 14}
-        <circle cx={x} cy={c[1] + SIZE * 0.55} r="6" fill={RESOURCE_COLOR[res]} class="resource" />
-        <text x={x} y={c[1] + SIZE * 0.55 + 3} class="piece-text" class:dark={res === 'food' || res === 'metal'}>{n}</text>
+        <circle cx={x} cy={c[1] + SIZE * 0.3} r="6" fill={RESOURCE_COLOR[res]} class="resource" />
+        <text x={x} y={c[1] + SIZE * 0.3 + 3} class="piece-text" class:dark={res === 'food' || res === 'metal'}>{n}</text>
       {/each}
     {/each}
   </g>
@@ -164,14 +236,33 @@
   .passive {
     pointer-events: none;
   }
-  .hex.lit,
+  .hex.tappable,
+  .home.tappable {
+    cursor: pointer;
+  }
+  .home-glow {
+    stroke-width: 10;
+    pointer-events: none;
+    filter: blur(3px);
+    animation: home-glow 1.6s ease-in-out infinite;
+  }
+  @keyframes home-glow {
+    50% {
+      stroke-opacity: 0.25;
+    }
+  }
+  .outline {
+    fill: none;
+    pointer-events: none;
+  }
+  .outline.lit,
   .home.lit {
     stroke: #fff6c8;
     stroke-width: 2.5;
     cursor: pointer;
     animation: pulse 1.4s ease-in-out infinite;
   }
-  .hex.selected,
+  .outline.selected,
   .home.selected {
     stroke: #ffd23f;
     stroke-width: 4;
@@ -200,12 +291,41 @@
   .id {
     font-size: 7px;
     text-anchor: middle;
+    dominant-baseline: central;
     fill: #1e1a16;
     opacity: 0.6;
     pointer-events: none;
   }
   .overlay {
     pointer-events: none;
+  }
+  /* A ring behind each of your pieces that can move; the piece is tapped through to it. */
+  .pick-ring {
+    fill: rgba(255, 246, 200, 0.15);
+    stroke: #fff6c8;
+    stroke-width: 1.5;
+    pointer-events: all;
+    cursor: pointer;
+    animation: pulse 1.4s ease-in-out infinite;
+  }
+  .pick-ring.picked {
+    fill: rgba(255, 210, 63, 0.3);
+    stroke: #ffd23f;
+    stroke-width: 2.5;
+    animation: none;
+  }
+  .pick-ring.picked:not(.pickable) {
+    pointer-events: none;
+    cursor: default;
+  }
+  .character.pickable {
+    cursor: pointer;
+    stroke: #fff6c8;
+    stroke-width: 2;
+  }
+  .character.picked {
+    stroke: #ffd23f;
+    stroke-width: 3;
   }
   .character,
   .mech,
