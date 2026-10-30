@@ -1,4 +1,4 @@
-// Helpers shared by the editors: export popup, HTML escaping, path updates.
+// Helpers shared by the editors: export popup, yes/no questions, HTML escaping, path updates.
 
 let dialog: HTMLDialogElement | null = null;
 
@@ -31,6 +31,29 @@ export function showExport(title: string, note: string, text: string) {
   dialog.querySelector('textarea')!.value = text;
   dialog.querySelector<HTMLElement>('[data-act="copy"]')!.textContent = 'Copy';
   dialog.showModal();
+}
+
+let question: HTMLDialogElement | null = null;
+
+/** Asks a yes/no question in the page (not a browser pop-up). Resolves true on Yes. */
+export function ask(message: string): Promise<boolean> {
+  if (!question) {
+    question = document.createElement('dialog');
+    question.style.width = 'min(360px, 90vw)';
+    question.innerHTML = `
+      <p style="margin-top:0"></p>
+      <div class="row"><button data-act="no">No</button><button data-act="yes">Yes</button></div>`;
+    question.addEventListener('click', (e) => {
+      const act = (e.target as HTMLElement).closest('button')?.dataset.act;
+      if (act) question!.close(act);
+    });
+    document.body.append(question);
+  }
+  const d = question;
+  d.querySelector('p')!.textContent = message;
+  d.returnValue = '';
+  d.showModal();
+  return new Promise((resolve) => d.addEventListener('close', () => resolve(d.returnValue === 'yes'), { once: true }));
 }
 
 /** Escapes text for use inside HTML attributes and content. */

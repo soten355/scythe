@@ -4,7 +4,7 @@ import { baseBoard, baseFactions } from '@scythe/content';
 import { MAX_POWER, RECRUIT_BONUSES, validateFaction, type Faction, type RecruitBonus } from '@scythe/engine';
 import '../shared/forms.css';
 import './faction-editor.css';
-import { esc, setPath, showExport } from '../shared/editor-utils';
+import { ask, esc, setPath, showExport } from '../shared/editor-utils';
 import { formatFactions, homeBaseClashes, newFaction } from './model';
 
 const STORAGE_KEY = 'scythe-faction-editor';
@@ -152,7 +152,7 @@ root.addEventListener('change', (e) => {
   }
 });
 
-root.addEventListener('click', (e) => {
+root.addEventListener('click', async (e) => {
   const btn = (e.target as HTMLElement).closest('button');
   switch (btn?.dataset.act) {
     case 'new': {
@@ -166,7 +166,7 @@ root.addEventListener('click', (e) => {
       break;
     }
     case 'delete':
-      if (!confirm(`Delete "${faction().name}"?`)) return;
+      if (!(await ask(`Delete "${faction().name}"?`))) return;
       state.factions.splice(state.selected, 1);
       if (state.factions.length === 0) state.factions.push(newFaction('faction-1', 'nw'));
       state = { factions: state.factions, selected: Math.min(state.selected, state.factions.length - 1) };

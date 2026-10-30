@@ -14,7 +14,7 @@ import {
   type BottomActionType,
 } from '@scythe/engine';
 import '../shared/forms.css';
-import { esc, showExport } from '../shared/editor-utils';
+import { ask, esc, showExport } from '../shared/editor-utils';
 import { defaultTop, formatMats, newMat, setBottomAction, setField, setTopAction } from './model';
 
 const STORAGE_KEY = 'scythe-mat-editor';
@@ -193,7 +193,7 @@ root.addEventListener('change', (e) => {
   }
 });
 
-root.addEventListener('click', (e) => {
+root.addEventListener('click', async (e) => {
   const btn = (e.target as HTMLElement).closest('button');
   switch (btn?.dataset.act) {
     case 'new':
@@ -205,7 +205,7 @@ root.addEventListener('click', (e) => {
       break;
     }
     case 'delete':
-      if (!confirm(`Delete "${mat().name}"?`)) return;
+      if (!(await ask(`Delete "${mat().name}"?`))) return;
       state.mats.splice(state.selected, 1);
       if (state.mats.length === 0) state.mats.push(newMat('mat-1'));
       state = { mats: state.mats, selected: Math.min(state.selected, state.mats.length - 1) };
