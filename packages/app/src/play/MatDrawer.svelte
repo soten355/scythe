@@ -1,18 +1,18 @@
 <script lang="ts">
-  // The current player's mat. Collapsed it shows the four sections; tap
-  // "Mat" to open the details (values, costs, upgrades, recruits, structures).
+  // The current player's mat. Collapsed it shows each section's two action
+  // names; tap "Mat" to open the values and costs too. The top action's
+  // structure bonus and the bottom action's recruit bonus are icons on the
+  // right: grey until the structure is built or a recruit placed there.
   // The sections you may choose are tappable: at the start of a turn, and
   // until your first action (to switch). While upgrading, the drawer opens
   // fully and the top-row values and bottom-row costs that can be upgraded
-  // glow; tap one of each. While enlisting, the open recruit spots glow with
-  // the ongoing bonus they give; tap one. Neither greys out last turn's section.
-  // Each section's recruit bonus is an icon at its bottom right: grey until a
-  // recruit is placed there. An action you can't pay for is struck out, with
-  // what you still need beside it.
+  // glow; tap one of each. While enlisting, the open recruit spots glow; tap
+  // one. Neither greys out last turn's section. An action you can't pay for
+  // is struck out, with what you still need below it.
   import { slide } from 'svelte/transition';
   import { cubicInOut, cubicOut } from 'svelte/easing';
-  import { bottomCost, produceCost, shortfall, topValue, upgradeables, type Action, type GameState, type SectionIndex } from '@scythe/engine';
-  import { BONUS_ICONS } from './icons';
+  import { bottomCost, shortfall, topValue, upgradeables, type Action, type GameState, type SectionIndex } from '@scythe/engine';
+  import { BONUS_ICONS, STRUCTURE_ICONS } from './icons';
   import InlineIcon from './InlineIcon.svelte';
   import { needText, type Prompt, type Selection } from './prompt';
 
@@ -48,12 +48,19 @@
     upgrade: 'Upgrade', deploy: 'Deploy', build: 'Build', enlist: 'Enlist',
   };
   const BONUSES: Record<string, string> = { power: 'power', coins: 'coins', popularity: 'popularity', combatCard: 'combat card' };
+  /** What each structure adds to its top-row action. */
+  const STRUCTURE_BONUS: Record<string, string> = {
+    mine: 'Mine: works as a tunnel for your moves',
+    mill: 'Mill: its hex produces one extra',
+    armory: 'Armory: +1 power when you trade',
+    monument: 'Monument: +1 popularity when you bolster',
+  };
   const FIELDS: Record<string, string> = {
     units: 'units', coins: 'coins', popularity: 'popularity', hexes: 'hexes', power: 'power', combatCards: 'cards',
   };
 
   const seat = $derived(game.currentPlayer);
-  const { faction, mat } = $derived(game.setup.players[seat]!);
+  const { mat } = $derived(game.setup.players[seat]!);
   const player = $derived(game.players[seat]!);
   const active = $derived(game.turn.step === 'chooseSection' ? null : game.turn.section);
 
@@ -74,7 +81,6 @@
         })),
         pick: upgrade?.bottoms.find((b) => b.section === section),
         cost,
-        cubes: player.upgrades.bottom.filter((b) => b === section).length,
         recruit: player.recruits.includes(section),
         spot: enlist?.find((e) => e.section === section),
         need: shortfall(game, seat, section),
@@ -82,51 +88,61 @@
       };
     }),
   );
-  const produce = $derived(produceCost(player));
 </script>
 
 {#snippet content(x: (typeof sections)[number])}
-  <div class="top">
-    <b class:struck={x.need.top.length}>{NAMES[x.s.top.action]}</b>
-    {#if x.need.top.length}<span class="need">need {needText(x.need.top)}</span>{/if}
-    {#if 'cost' in x.s.top}<span class="dim">pay {x.s.top.cost}◉</span>{/if}
-    {#each x.values as v (v.f)}
-      {@const text = `${v.value} ${FIELDS[v.f]}${v.value < v.max ? '' : '★'}`}
-      {#if v.pick}
-        {@const pick = v.pick}
-        <button class="chip" class:chosen={pick.chosen} onclick={() => onSelect(pick.select)}>{text}</button>
-      {:else}
-        <span>{text}</span>
-      {/if}
-    {/each}
-  </div>
-  <div class="bottom">
-    <b class:struck={x.need.bottom.length}>{NAMES[x.s.bottom.action]}</b>
-    {#if x.need.bottom.length}<span class="need">need {needText(x.need.bottom)}</span>{/if}
-    {#if x.pick}
-      {@const pick = x.pick}
-      <button class="chip" class:chosen={pick.chosen} onclick={() => onSelect(pick.select)}>{x.cost.amount} {x.cost.resource}</button>
-    {:else}
-      <span>{x.cost.amount} {x.cost.resource}</span>
-    {/if}
-    <span class="dim">+{x.s.bottom.coins}◉</span>
-    {#if x.spot}
-      {@const spot = x.spot}
-      <button class="chip recruit" title="Recruit here: +1 {BONUSES[x.s.bottom.recruitBonus]}" class:chosen={spot.chosen} onclick={() => onSelect(spot.select)}
-        ><InlineIcon icon={BONUS_ICONS[x.s.bottom.recruitBonus]} /></button
+  {@const structure = x.s.top.structure}
+  {@const bonus = x.s.bottom.recruitBonus}
+  <div class="half">
+    <div class="head">
+      <b class:struck={x.need.top.length}>{NAMES[x.s.top.action]}</b>
+      <span class="badge" class:locked={!x.built} title="{STRUCTURE_BONUS[structure]}{x.built ? '' : ' (build the ' + structure + ' to unlock)'}"
+        ><InlineIcon icon={STRUCTURE_ICONS[structure]} /></span
       >
-    {:else}
-      <span class="recruit" class:locked={!x.recruit} title="Recruit bonus: +1 {BONUSES[x.s.bottom.recruitBonus]}{x.recruit ? '' : ' (no recruit yet)'}"
-        ><InlineIcon icon={BONUS_ICONS[x.s.bottom.recruitBonus]} /></span
-      >
-    {/if}
-  </div>
-  {#if shown}
-    <div class="details" in:slide={opening} out:slide={closing}>
-      <div>Structure: {x.s.top.structure}{x.built ? ` (built on ${x.built})` : ''}</div>
-      <div>Upgrades here: {x.cubes} of {x.s.bottom.upgradeSpaces}</div>
     </div>
-  {/if}
+    {#if shown}
+      <div class="info" in:slide={opening} out:slide={closing}>
+        {#if x.need.top.length}<span class="need">need {needText(x.need.top)}</span>{/if}
+        {#if 'cost' in x.s.top}<span class="dim">pay {x.s.top.cost}◉</span>{/if}
+        {#each x.values as v (v.f)}
+          {@const text = `${v.value} ${FIELDS[v.f]}${v.value < v.max ? '' : '★'}`}
+          {#if v.pick}
+            {@const pick = v.pick}
+            <button class="chip" class:chosen={pick.chosen} onclick={() => onSelect(pick.select)}>{text}</button>
+          {:else}
+            <span>{text}</span>
+          {/if}
+        {/each}
+      </div>
+    {/if}
+  </div>
+  <div class="half bottom">
+    <div class="head">
+      <b class:struck={x.need.bottom.length}>{NAMES[x.s.bottom.action]}</b>
+      {#if x.spot}
+        {@const spot = x.spot}
+        <button class="chip badge" title="Recruit here: +1 {BONUSES[bonus]} each time" class:chosen={spot.chosen} onclick={() => onSelect(spot.select)}
+          ><InlineIcon icon={BONUS_ICONS[bonus]} /></button
+        >
+      {:else}
+        <span class="badge" class:locked={!x.recruit} title="Recruit bonus: +1 {BONUSES[bonus]}{x.recruit ? '' : ' (no recruit yet)'}"
+          ><InlineIcon icon={BONUS_ICONS[bonus]} /></span
+        >
+      {/if}
+    </div>
+    {#if shown}
+      <div class="info" in:slide={opening} out:slide={closing}>
+        {#if x.need.bottom.length}<span class="need">need {needText(x.need.bottom)}</span>{/if}
+        {#if x.pick}
+          {@const pick = x.pick}
+          <button class="chip" class:chosen={pick.chosen} onclick={() => onSelect(pick.select)}>{x.cost.amount} {x.cost.resource}</button>
+        {:else}
+          <span>{x.cost.amount} {x.cost.resource}</span>
+        {/if}
+        <span class="dim">+{x.s.bottom.coins}◉</span>
+      </div>
+    {/if}
+  </div>
 {/snippet}
 
 <div class="drawer" class:open={shown}>
@@ -146,17 +162,6 @@
       {/if}
     {/each}
   </div>
-  {#if shown}
-    <div class="extra" in:slide={opening} out:slide={closing}>
-      <span><b>{faction.name}</b> · {mat.name} mat</span>
-      <span>Mechs: {player.mechAbilities.map((a) => faction.mechAbilities[a]?.name).join(', ') || 'none'}</span>
-      <span>
-        Producing costs:
-        {[produce.power && '1 power', produce.popularity && '1 popularity', produce.coins && '1 coin'].filter(Boolean).join(' + ') || 'nothing'}
-      </span>
-      <span>One-time recruit bonuses used: {player.recruitBonusesTaken.map((b) => BONUSES[b]).join(', ') || 'none'}</span>
-    </div>
-  {/if}
 </div>
 
 <style>
@@ -221,11 +226,16 @@
   .section.last {
     opacity: 0.45;
   }
-  .top,
-  .bottom {
+  .head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .info {
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
+    padding-top: 1px;
   }
   .bottom {
     margin-top: 2px;
@@ -243,26 +253,16 @@
   .need {
     color: #ff9a7a;
   }
-  /* The recruit bonus sits at the bottom right of the section. */
-  .recruit {
+  /* Each half's bonus (structure on top, recruit below) sits at its right. */
+  .badge {
     margin-left: auto;
     font-size: 13px;
   }
-  .recruit.locked {
+  .badge.locked {
     filter: grayscale(1);
     opacity: 0.35;
   }
-  .chip.recruit {
+  .chip.badge {
     padding: 0 5px;
-  }
-  .details {
-    margin-top: 4px;
-    opacity: 0.8;
-  }
-  .extra {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 14px;
-    padding: 2px 8px 6px;
   }
 </style>
