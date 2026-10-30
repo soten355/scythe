@@ -1,6 +1,6 @@
 <script lang="ts">
   // Top bar: the current player's coins, power, popularity, combat cards,
-  // workers and the resources on hexes they control. Everyone else shrinks to
+  // mechs, workers and the resources on hexes they control. Everyone else shrinks to
   // their name; everyone's stars always show.
   import { controlledHexes, RESOURCES, type GameState } from '@scythe/engine';
   import { cubicInOut } from 'svelte/easing';
@@ -36,6 +36,7 @@
           <span title="power">⚡ {p.power}</span>
           <span title="popularity">♥ {p.popularity}</span>
           <span title="combat cards">▭ {p.combatCards}</span>
+          <span title="mechs deployed (of 4)">🤖 {p.mechs.length}</span>
           <span title="workers">👷 {p.workers.length}</span>
           <span class="res" title="oil, metal, wood, food on hexes you control">
             oil {totals.oil} · metal {totals.metal} · wood {totals.wood} · food {totals.food}
