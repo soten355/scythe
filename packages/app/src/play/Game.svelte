@@ -188,10 +188,11 @@
     else selection = { hex: at };
   }
 
-  /** A pop-up gain (a recruit's bonus): its icons fly to your spot in the top bar, then play moves on. */
+  /** A pop-up choice; for a gain (a recruit's bonus), its icons fly to your spot in the top bar first. */
   let flying = $state(false);
   async function pick(option: NonNullable<Prompt['choice']>['options'][number], from: HTMLElement) {
     if (flying) return;
+    if (!option.amount) return void (selection = option.select);
     flying = true;
     const icon = from.querySelector('.big');
     const target = document.querySelector('.player.current');
@@ -346,7 +347,7 @@
     </aside>
   </main>
 
-  <MatDrawer {game} {choices} {previous} bind:open={matOpen} onChoose={choose} upgrade={prompt.upgrade} enlist={prompt.enlist} onSelect={(sel) => (selection = sel)} />
+  <MatDrawer {game} {choices} {previous} bind:open={matOpen} onChoose={choose} upgrade={prompt.upgrade} onSelect={(sel) => (selection = sel)} />
 
   {#if handoff !== null}
     {@const { from, to } = handoff}

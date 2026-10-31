@@ -6,8 +6,7 @@
   // The sections you may choose are tappable: at the start of a turn, and
   // until your first action (to switch). While upgrading, the drawer opens
   // fully and the top-row values and bottom-row costs that can be upgraded
-  // glow; tap one of each. While enlisting, the open recruit spots glow; tap
-  // one. Neither greys out last turn's section. An action you can't pay for
+  // glow; tap one of each. That doesn't grey out last turn's section. An action you can't pay for
   // is struck out, with what you still need below it.
   import { slide } from 'svelte/transition';
   import { cubicInOut, cubicOut } from 'svelte/easing';
@@ -23,7 +22,6 @@
     open = $bindable(),
     onChoose,
     upgrade,
-    enlist,
     onSelect,
   }: {
     game: GameState;
@@ -33,11 +31,10 @@
     open: boolean;
     onChoose: (a: Action) => void;
     upgrade?: Prompt['upgrade'];
-    enlist?: Prompt['enlist'];
     onSelect: (selection: Selection) => void;
   } = $props();
-  /** Picking an upgrade or a recruit spot: the mat stays open and nothing is greyed out. */
-  const picking = $derived(!!upgrade || !!enlist);
+  /** Picking an upgrade: the mat stays open and nothing is greyed out. */
+  const picking = $derived(!!upgrade);
   const shown = $derived(open || picking);
   // Opening is quick; closing takes its time so it's easy to follow.
   const opening = { duration: 260, easing: cubicOut };
@@ -82,7 +79,6 @@
         pick: upgrade?.bottoms.find((b) => b.section === section),
         cost,
         recruit: player.recruits.includes(section),
-        spot: enlist?.find((e) => e.section === section),
         need: shortfall(game, seat, section),
         built: player.structures[s.top.structure],
       };
@@ -119,16 +115,9 @@
   <div class="half bottom">
     <div class="head">
       <b class:struck={x.need.bottom.length}>{NAMES[x.s.bottom.action]}</b>
-      {#if x.spot}
-        {@const spot = x.spot}
-        <button class="chip badge" data-recruit={x.section} title="Recruit here: +1 {BONUSES[bonus]} each time" class:chosen={spot.chosen} onclick={() => onSelect(spot.select)}
-          ><InlineIcon icon={BONUS_ICONS[bonus]} /></button
-        >
-      {:else}
-        <span class="badge" data-recruit={x.section} class:locked={!x.recruit} title="Recruit bonus: +1 {BONUSES[bonus]}{x.recruit ? '' : ' (no recruit yet)'}"
-          ><InlineIcon icon={BONUS_ICONS[bonus]} /></span
-        >
-      {/if}
+      <span class="badge" data-recruit={x.section} class:locked={!x.recruit} title="Recruit bonus: +1 {BONUSES[bonus]}{x.recruit ? '' : ' (no recruit yet)'}"
+        ><InlineIcon icon={BONUS_ICONS[bonus]} /></span
+      >
     </div>
     {#if shown}
       <div class="info" in:slide={opening} out:slide={closing}>
@@ -261,8 +250,5 @@
   .badge.locked {
     filter: grayscale(1);
     opacity: 0.35;
-  }
-  .chip.badge {
-    padding: 0 5px;
   }
 </style>

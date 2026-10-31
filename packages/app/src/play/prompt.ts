@@ -119,10 +119,8 @@ export interface Prompt {
     tops: { top: TopUpgrade; chosen: boolean; select: Selection }[];
     bottoms: { section: SectionIndex; chosen: boolean; select: Selection }[];
   };
-  /** While enlisting: the recruit spots that can be picked on the mat, with their ongoing bonus. */
-  enlist?: { section: SectionIndex; bonus: RecruitBonus; chosen: boolean; select: Selection }[];
-  /** A choice to make in a pop-up (the recruit's one-time bonus); cancel goes back. */
-  choice?: { message: string; options: { label: string; icon: Icon; amount: number; select: Selection }[]; cancel: Selection };
+  /** A choice to make in a pop-up (a recruit's spot, then its one-time bonus); cancel goes back. `amount`: icons that fly to the top bar. */
+  choice?: { message: string; options: { label: string; icon: Icon; amount?: number; select: Selection }[]; cancel: Selection };
   /**
    * The current player's pieces that can be tapped to pick that unit, keyed
    * "hex|kind" (workers on one hex are one piece), and the one picked.
@@ -351,7 +349,7 @@ export function title(state: GameState): string {
         upgrade: 'tap a glowing top-row value and a glowing bottom-row cost on your mat',
         deploy: "tap a glowing worker's hex, then choose a mech",
         build: "choose a structure, then tap a glowing worker's hex",
-        enlist: 'tap a glowing recruit spot on your mat',
+        enlist: 'choose a recruit spot, then a one-time bonus',
       }[bottom.action];
       return `${who} · ${name}: ${what}`;
     }
@@ -799,7 +797,6 @@ function bottomPrompt(state: GameState, actions: Action[], selection: Selection)
   const tapSelects = new Map<Location, Selection>();
   let selected: Location | undefined;
   let upgrade: Prompt['upgrade'];
-  let enlist: Prompt['enlist'];
   let choice: Prompt['choice'];
 
   if (bottom.action === 'upgrade') {
@@ -825,31 +822,39 @@ function bottomPrompt(state: GameState, actions: Action[], selection: Selection)
         : { empty: 'Tap a glowing bottom-row cost on your mat' },
     );
   } else if (bottom.action === 'enlist') {
-    // Pick a recruit spot on the mat, then its one-time bonus in a pop-up.
+    // A pop-up asks for the recruit spot, then another for its one-time bonus.
     const recruits = options as Extract<Effect, { type: 'enlist' }>[];
     const spot = selection.recruit;
     const { faction } = state.setup.players[state.currentPlayer]!;
-    enlist = [...new Set(recruits.map((a) => a.section))].map((section) => ({
-      section,
-      bonus: mat.sections[section]!.bottom.recruitBonus,
-      chosen: section === spot,
-      select: keep(section === spot ? {} : { recruit: section }),
-    }));
     chosen = recruits.find((a) => a.section === spot && sameAction(a, selection.effect));
     const amount = (bonus: RecruitBonus) => faction.recruitBonuses.find((r) => r.bonus === bonus)?.amount ?? 0;
     const now = (bonus: RecruitBonus) => `+${amount(bonus)} ${BONUS_NAMES[bonus]}`;
-    if (spot !== undefined && !chosen) {
+    const ongoing = (section: SectionIndex) => {
+      const b = mat.sections[section]!.bottom;
+      return `${BOTTOM_NAMES[b.action]}: +1 ${ONE_BONUS[b.recruitBonus]} each time`;
+    };
+    if (spot === undefined) {
+      choice = {
+        message: 'Choose where your recruit goes:',
+        options: [...new Set(recruits.map((a) => a.section))].map((section) => ({
+          label: ongoing(section),
+          icon: BONUS_ICONS[mat.sections[section]!.bottom.recruitBonus],
+          select: keep({ recruit: section }),
+        })),
+        // Back un-picks the last payment.
+        cancel: { pay: paid.slice(0, -1) },
+      };
+    } else if (!chosen) {
       choice = {
         message: `Recruit on ${BOTTOM_NAMES[mat.sections[spot]!.bottom.action]}. Choose your one-time bonus:`,
         options: recruits.filter((a) => a.section === spot).map((a) => ({ label: now(a.bonus), icon: BONUS_ICONS[a.bonus], amount: amount(a.bonus), select: keep({ recruit: spot, effect: a }) })),
         cancel: keep({}),
       };
     }
-    const ongoing = spot !== undefined && mat.sections[spot]!.bottom;
     slots.push(
-      ongoing
-        ? { text: `Recruit on ${BOTTOM_NAMES[ongoing.action]}: +1 ${ONE_BONUS[ongoing.recruitBonus]} each time`, icon: BONUS_ICONS[ongoing.recruitBonus], remove: keep({}) }
-        : { empty: 'Tap a glowing recruit spot on your mat' },
+      spot !== undefined
+        ? { text: `Recruit on ${ongoing(spot)}`, icon: BONUS_ICONS[mat.sections[spot]!.bottom.recruitBonus], remove: keep({}) }
+        : { empty: 'Choose a recruit spot' },
       chosen
         ? { text: `Now: ${now(chosen.bonus)}`, icon: BONUS_ICONS[chosen.bonus], remove: keep({ recruit: spot }) }
         : { empty: 'Then choose a one-time bonus' },
@@ -898,7 +903,7 @@ function bottomPrompt(state: GameState, actions: Action[], selection: Selection)
   const buttons: Button[] = choices.map((b) => ({ ...b, ...(chosen && !b.chosen && { dim: true }) }));
   if (chosen) buttons.push({ label: name, actions: [...pays, chosen], primary: true });
   // Paid in full, so the paying hexes stop standing out: they'd hide where the mech or structure goes.
-  return { ...none, title: title(after), buttons, highlights, tapSelects, selected, slots, upgrade, enlist, choice, preview };
+  return { ...none, title: title(after), buttons, highlights, tapSelects, selected, slots, upgrade, choice, preview };
 }
 
 /**

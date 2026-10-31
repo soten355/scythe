@@ -284,17 +284,23 @@ describe('enlisting', () => {
   const enlisting = () => ({ ...play(start(), { type: 'chooseSection', section: 3 }, { type: 'tradePopularity' }), resources: { A4: { food: 4 } } });
   const pay = ['A4', 'A4', 'A4', 'A4'];
 
-  it('lights up the recruit spots on the mat, with their ongoing bonus', () => {
+  it('asks for the recruit spot in a pop-up, with its ongoing bonus', () => {
     const p = prompt(enlisting(), { pay });
-    expect(p.enlist?.map((e) => e.section)).toEqual([0, 1, 2, 3]);
-    expect(p.enlist?.[0]).toMatchObject({ bonus: 'power', chosen: false, select: { pay, recruit: 0 } });
-    expect(p.slots?.slice(-2)).toEqual([{ empty: 'Tap a glowing recruit spot on your mat' }, { empty: 'Then choose a one-time bonus' }]);
-    expect(p.choice).toBeUndefined();
+    expect(p.choice?.options.map((o) => o.label)).toEqual([
+      'Upgrade: +1 power each time',
+      'Deploy: +1 coin each time',
+      'Build: +1 popularity each time',
+      'Enlist: +1 combat card each time',
+    ]);
+    expect(p.choice?.options[1]).toMatchObject({ icon: { text: expect.any(String) }, select: { pay, recruit: 1 } });
+    expect(p.choice?.options[1]?.amount).toBeUndefined();
+    // Back un-picks the last payment.
+    expect(p.choice?.cancel).toEqual({ pay: pay.slice(0, -1) });
+    expect(p.slots?.slice(-2)).toEqual([{ empty: 'Choose a recruit spot' }, { empty: 'Then choose a one-time bonus' }]);
   });
 
   it('asks for the one-time bonus once a spot is picked, then enlists with one button', () => {
     const p = prompt(enlisting(), { pay, recruit: 1 });
-    expect(p.enlist?.find((e) => e.chosen)?.section).toBe(1);
     expect(p.choice?.options.map((o) => o.label)).toEqual(['+2 power', '+2 coins', '+2 popularity', '+2 combat cards']);
     expect(p.choice?.cancel).toEqual({ pay });
     const effect = p.choice!.options[2]!.select.effect;
