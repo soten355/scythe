@@ -51,7 +51,7 @@
   /** What each structure adds to its top-row action. */
   const STRUCTURE_BONUS: Record<string, string> = {
     mine: 'Mine: works as a tunnel for your moves',
-    mill: 'Mill: its hex produces one extra',
+    mill: 'Mill: an extra hex to produce on, as one more worker',
     armory: 'Armory: +1 power when you trade',
     monument: 'Monument: +1 popularity when you bolster',
   };

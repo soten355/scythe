@@ -102,6 +102,21 @@ describe('the mill', () => {
     expect(p0(state).workers).toEqual(['B1', 'A2', 'B1', 'B1']);
   });
 
+  it("is an extra hex: it doesn't use up one of the hexes you may produce on", () => {
+    // Workers on A1 and A2 use both hexes; the mill's A3 still produces.
+    const state = play(game({ structures: { mill: 'A3' } }), choose(1), { type: 'produce', hex: 'A1' }, { type: 'produce', hex: 'A2' });
+    expect(legalActions(state, 0)).toContainEqual({ type: 'produce', hex: 'A3' });
+    const done = play(state, { type: 'produce', hex: 'A3' });
+    expect(done.resources).toEqual({ A1: { food: 1 }, A2: { wood: 1 }, A3: { metal: 1 } });
+    expect(done.turn.step).not.toBe('producing');
+  });
+
+  it('is an extra hex when it shares a hex with your workers, too', () => {
+    // Producing the mill's A1 first still leaves two more hexes.
+    const state = play(game({ workers: ['A1', 'A2', 'C1'], structures: { mill: 'A1' } }), choose(1), { type: 'produce', hex: 'A1' }, { type: 'produce', hex: 'A2' });
+    expect(legalActions(state, 0)).toContainEqual({ type: 'produce', hex: 'C1' });
+  });
+
   it("doesn't produce while another player's unit stands on it", () => {
     const state = play(game({ structures: { mill: 'A3' } }, {}, { workers: ['A3', 'C2'] }), choose(1));
     expect(legalActions(state, 0)).not.toContainEqual({ type: 'produce', hex: 'A3' });

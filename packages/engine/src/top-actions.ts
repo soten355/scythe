@@ -34,7 +34,7 @@ export function topActions(state: GameState, turn: TopStep): Action[] {
       // Every traded resource goes on the hex the first one went to.
       return tradeResourceOptions(player).filter((a) => a.type === 'tradeResource' && a.hex === turn.hex);
     case 'producing':
-      return [...produceOptions(state, turn.produced), { type: 'endProduce' }];
+      return [...produceOptions(state, turn.section, turn.produced), { type: 'endProduce' }];
     case 'top':
       switch (top.action) {
         case 'move':
@@ -43,7 +43,7 @@ export function topActions(state: GameState, turn: TopStep): Action[] {
           if (player.coins < top.cost) return [];
           return [...tradeResourceOptions(player), { type: 'tradePopularity' }];
         case 'produce':
-          return canPayProduceCost(player) ? produceOptions(state, []) : [];
+          return canPayProduceCost(player) ? produceOptions(state, turn.section, []) : [];
         case 'bolster':
           if (player.coins < top.cost) return [];
           return [
@@ -108,7 +108,7 @@ export function applyTop(state: GameState, turn: TopStep, action: Action): GameS
       const produced = [...(turn.step === 'producing' ? turn.produced : []), action.hex];
       const paid = turn.step === 'producing' ? state : payProduceCost(state, seat);
       const next = produce(paid, seat, action.hex);
-      if (produced.length >= value('hexes')) return toBottom(next);
+      if (produceOptions(next, section, produced).length === 0) return toBottom(next);
       return { ...next, turn: { step: 'producing', section, produced } };
     }
     case 'endProduce':
@@ -257,14 +257,20 @@ export function yieldOf(state: GameState, player: PlayerState, hex: HexId): { wh
   return amount > 0 ? { what, amount } : null;
 }
 
-/** Hexes with your workers, and your mill's hex if you control it, that would produce something. */
-function produceOptions(state: GameState, produced: HexId[]): Action[] {
-  const { seat, player } = current(state);
+/**
+ * Hexes with your workers, and your mill's hex if you control it, that would
+ * produce something. The mill's hex is an extra one: it doesn't count toward
+ * the section's hex limit, so once that's used up only the mill's hex is left.
+ */
+function produceOptions(state: GameState, section: SectionIndex, produced: HexId[]): Action[] {
+  const { seat, player, mat } = current(state);
   const hexes = new Set(player.workers);
   const mill = player.structures.mill;
   if (mill && controlledHexes(state, seat).has(mill)) hexes.add(mill);
+  const limitReached = produced.filter((hex) => hex !== mill).length >= topValue(player, mat, section, 'hexes');
   return [...hexes]
     .filter((hex) => !produced.includes(hex) && yieldOf(state, player, hex))
+    .filter((hex) => !limitReached || hex === mill)
     .map((hex) => ({ type: 'produce', hex }));
 }
 
