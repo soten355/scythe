@@ -154,12 +154,15 @@ describe('producing', () => {
     expect(applyAll(producing(), go.actions).turn.step).toBe('bottom');
   });
 
-  it('stops offering more hexes once every slot is filled', () => {
-    const p = prompt(producing(), { produce: ['A5', 'A4'] });
-    expect([...p.highlights].sort()).toEqual(['A4', 'A5']);
-    expect([...p.tapSelects.keys()].sort()).toEqual(['A4', 'A5']);
+  it('keeps every hex tappable once the slots are full, swapping out the oldest pick', () => {
+    const state = producing();
+    const three: GameState = { ...state, players: [{ ...state.players[0]!, workers: ['A4', 'A5', 'A2'] }, state.players[1]!] };
+    const p = prompt(three, { produce: ['A5', 'A4'] });
+    expect([...p.highlights].sort()).toEqual(['A2', 'A4', 'A5']);
+    expect(p.tapSelects.get('A2')).toEqual({ produce: ['A4', 'A2'] });
+    expect(p.tapSelects.get('A5')).toEqual({ produce: ['A4'] });
     const go = p.buttons.find((b) => b.label === 'Produce')!;
-    const after = applyAll(producing(), go.actions);
+    const after = applyAll(three, go.actions);
     expect(after.resources).toEqual({ A5: { oil: 1 }, A4: { wood: 1 } });
     expect(after.turn.step).toBe('bottom');
   });

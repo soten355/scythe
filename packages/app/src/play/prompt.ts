@@ -676,13 +676,13 @@ function producePrompt(state: GameState, actions: Action[], picked: HexId[]): Pr
   const slots = topValue(player, mat, turn.section, 'hexes') - (state.turn.step === 'producing' ? state.turn.produced.length : 0);
   const full = picked.length >= slots;
 
+  // Every legal hex stays tappable: a picked one un-picks; once the slots are full, a new one swaps out the oldest pick.
   const highlights = new Set<Location>();
   const tapSelects = new Map<Location, Selection>();
   for (const hex of options) {
     const isPicked = picked.includes(hex);
-    if (full && !isPicked) continue;
     highlights.add(hex);
-    tapSelects.set(hex, { produce: isPicked ? picked.filter((h) => h !== hex) : [...picked, hex] });
+    tapSelects.set(hex, { produce: isPicked ? picked.filter((h) => h !== hex) : [...(full ? picked.slice(1) : picked), hex] });
   }
 
   // Produce each picked hex in turn; one can stop counting if an earlier one used up the room for workers.
