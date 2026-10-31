@@ -72,8 +72,8 @@ should check it against the rulebook; tick it once confirmed.
 - [ ] Verify: Speed lets a unit move one more hex; moving onto any enemy
       unit ends its move. On the way it may drop off and pick up workers and
       resources (owner's play-test note).
-- [ ] Verify: Township links any village you control with the Factory, both
-      ways, for the character and mechs.
+- [x] Township links any village you control with the Factory, both ways,
+      for workers only, not the character or mechs. (Owner.)
 - [ ] Verify: Artillery is decided before anyone dials: the attacker first,
       then the defender. The other side can't drop below 0 power.
 - [ ] Verify: People's Army's extra card needs a worker of yours on the

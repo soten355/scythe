@@ -213,12 +213,18 @@ describe('speed', () => {
 });
 
 describe('villages and the Factory', () => {
-  it('links a village you control to the Factory and back', () => {
-    let state = play(game({ mechs: [township] }, { character: 'B1' }), choose(2));
-    expect(targets(state, character)).toContain('B3');
-    // From the Factory to any village you control (B1, with your worker), even far away.
-    state = play(game({ mechs: [township] }, { character: 'B3', workers: ['B1'] }), choose(2));
-    expect(targets(state, character)).toContain('B1');
+  it('links a village you control to the Factory and back, for workers', () => {
+    let state = play(game({ mechs: [township] }, { character: 'B1', workers: ['B1'] }), choose(2));
+    expect(targets(state, worker(0))).toContain('B3');
+    // From the Factory to any village you control (B1, with your other worker), even far away.
+    state = play(game({ mechs: [township] }, { workers: ['B3', 'B1'] }), choose(2));
+    expect(targets(state, worker(0))).toContain('B1');
+  });
+
+  it("doesn't link them for the character or mechs (owner's ruling)", () => {
+    const state = play(game({ mechs: [township] }, { character: 'B1', mechs: ['B1'], workers: ['B1'] }), choose(2));
+    expect(targets(state, character)).not.toContain('B3');
+    expect(targets(state, mech(0))).not.toContain('B3');
   });
 });
 

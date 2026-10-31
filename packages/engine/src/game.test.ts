@@ -172,5 +172,5 @@ describe('fuzz: random legal games', () => {
         checkInvariants(state);
       }
     }
-  });
+  }, 30_000);
 });

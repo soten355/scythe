@@ -3,7 +3,7 @@
 // Characters and mechs may move onto other players' units; once the move is
 // over, combat.ts sends enemy workers home and runs the fights. Abilities
 // (abilities.ts) let units cross rivers, use lakes, link villages to the
-// Factory and move extra hexes. A unit with extra hexes moves one hex per
+// Factory (for workers) and move extra hexes. A unit with extra hexes moves one hex per
 // action and may drop off and pick up workers and resources on the way.
 import { hasRiver, neighbors, type HexId } from './board';
 import type { Action, GameState, Load, Location, PlayerState, SectionIndex, TurnStep, UnitRef } from './game';
@@ -190,7 +190,8 @@ export function moveTargets(state: GameState, seat: number, at: Location, kind: 
     const tunnels = Object.values(board.hexes).filter((h) => h.tunnel).map((h) => h.id);
     if (player.structures.mine) tunnels.push(player.structures.mine);
     if (tunnels.includes(at)) targets.push(...tunnels.filter((t) => t !== at));
-    if (fighter && rules.some((r) => r.kind === 'villagesToFactory')) {
+    // Township moves workers only (owner's ruling).
+    if (!fighter && rules.some((r) => r.kind === 'villagesToFactory')) {
       const factories = Object.values(board.hexes).filter((h) => h.terrain === 'factory').map((h) => h.id);
       if (terrain(at) === 'village') targets.push(...factories);
       if (terrain(at) === 'factory') targets.push(...[...controlledHexes(state, seat)].filter((h) => terrain(h) === 'village'));

@@ -56,7 +56,7 @@ export const baseFactions: Faction[] = [
         description: 'Move across rivers to farms and villages',
         rule: { kind: 'crossRivers', units: 'characterAndMechs', onto: ['farm', 'village'] },
       },
-      { name: 'Township', description: 'Move between any village you control and the Factory', rule: { kind: 'villagesToFactory' } },
+      { name: 'Township', description: 'Workers move between any village you control and the Factory', rule: { kind: 'villagesToFactory' } },
       {
         name: "People's Army",
         description: 'In combat where you have at least 1 worker, you may play 1 more combat card',
