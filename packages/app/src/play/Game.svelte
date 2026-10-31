@@ -33,6 +33,16 @@
   const start = () => newGame(setup);
 
   let history: GameState[] = $state.raw([start()]);
+  // Local dev server only (never in the built app): lets a test browser set up a position, e.g. a fight.
+  if (import.meta.env.DEV) {
+    Object.assign(globalThis, {
+      __scythe: {
+        state: () => history[history.length - 1],
+        load: (state: GameState) => ((history = [state]), (turnStart = 0), (selection = {})),
+        applyAction,
+      },
+    });
+  }
   /**
    * Index in history where the current player's turn began, or where play
    * last passed to another seat or a fight was revealed: undo stops there.
@@ -410,7 +420,8 @@
         <p>{q.message}</p>
         <div class="choices">
           <button class="quiet" onclick={() => (asking = null)}>No</button>
-          <button class="primary" onclick={() => ((asking = null), q.yes())}>Yes</button>
+          <!-- Take what Yes does before closing: `q` follows `asking`, so it's gone once that's cleared. -->
+          <button class="primary" onclick={() => { const yes = q.yes; asking = null; yes(); }}>Yes</button>
         </div>
       </div>
     </div>
