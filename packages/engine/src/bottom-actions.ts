@@ -33,7 +33,10 @@ export function bottomActions(state: GameState, turn: BottomStep): Action[] {
 }
 
 /** The bottom-row action is done: the player now ends the turn with End turn. */
-const finish = (state: GameState, section: SectionIndex): GameState => ({ ...state, turn: { step: 'end', section } });
+const finish = (state: GameState, turn: BottomStep): GameState => ({
+  ...state,
+  turn: { step: 'end', section: turn.section, ...(turn.skippedTop && { skippedTop: true }) },
+});
 
 export function applyBottom(state: GameState, turn: BottomStep, action: Action): GameState {
   const { seat, mat } = current(state);
@@ -44,7 +47,7 @@ export function applyBottom(state: GameState, turn: BottomStep, action: Action):
     const paid = turn.paid + 1;
     const next: GameState = { ...addResources(state, action.hex, resource, -1), turn: { ...turn, paid } };
     const done = paid >= bottomCost(state.players[seat]!, mat, turn.section).amount;
-    if (done && effectOptions(next, kind).length === 0) return finish(rewards(next, turn.section), turn.section);
+    if (done && effectOptions(next, kind).length === 0) return finish(rewards(next, turn.section), turn);
     return next;
   }
 
@@ -53,21 +56,21 @@ export function applyBottom(state: GameState, turn: BottomStep, action: Action):
   const player = next.players[seat]!;
   switch (action.type) {
     case 'takeBottom':
-      return finish(next, turn.section);
+      return finish(next, turn);
     case 'upgrade':
       return finish(
         updatePlayer(next, seat, {
           upgrades: { top: [...player.upgrades.top, action.top], bottom: [...player.upgrades.bottom, action.bottom] },
         }),
-        turn.section,
+        turn,
       );
     case 'deploy':
       return finish(
         updatePlayer(next, seat, { mechs: [...player.mechs, action.hex], mechAbilities: [...player.mechAbilities, action.ability] }),
-        turn.section,
+        turn,
       );
     case 'build':
-      return finish(updatePlayer(next, seat, { structures: { ...player.structures, [action.structure]: action.hex } }), turn.section);
+      return finish(updatePlayer(next, seat, { structures: { ...player.structures, [action.structure]: action.hex } }), turn);
     case 'enlist': {
       const { faction } = current(next);
       const amount = faction.recruitBonuses.find((r) => r.bonus === action.bonus)?.amount ?? 0;
@@ -75,7 +78,7 @@ export function applyBottom(state: GameState, turn: BottomStep, action: Action):
         recruits: [...player.recruits, action.section],
         recruitBonusesTaken: [...player.recruitBonusesTaken, action.bonus],
       });
-      return finish(giveBonus(enlisted, seat, action.bonus, amount), turn.section);
+      return finish(giveBonus(enlisted, seat, action.bonus, amount), turn);
     }
     default:
       throw new Error(`unreachable: ${action.type} during the bottom row`);

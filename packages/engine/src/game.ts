@@ -89,9 +89,10 @@ export type TurnStep =
    * where their character and mechs go (when they have a choice).
    */
   | { step: 'combat'; section: SectionIndex; left: HexId[]; fight: Fight | null; retreat?: Retreat }
-  | { step: 'bottom'; section: SectionIndex; paid: number }
+  /** `skippedTop`: the top-row action was skipped this turn (so the side panel doesn't tick it). */
+  | { step: 'bottom'; section: SectionIndex; paid: number; skippedTop?: true }
   /** The bottom-row action is done; only End turn is left. */
-  | { step: 'end'; section: SectionIndex };
+  | { step: 'end'; section: SectionIndex; skippedTop?: true };
 
 /** One side of a fight: the cards added so far, and the power dialed once they've chosen (null until then). */
 export interface CombatSide {
@@ -271,7 +272,7 @@ function step(state: GameState, action: Action): GameState {
     case 'chooseSection':
       return { ...state, turn: { step: 'top', section: (action as { section: SectionIndex }).section } };
     case 'top':
-      if (action.type === 'skipTop') return { ...state, turn: { step: 'bottom', section: turn.section, paid: 0 } };
+      if (action.type === 'skipTop') return { ...state, turn: { step: 'bottom', section: turn.section, paid: 0, skippedTop: true } };
       return applyTop(state, turn, action);
     case 'moving':
     case 'trading':

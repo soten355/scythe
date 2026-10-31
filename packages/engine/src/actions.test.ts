@@ -187,12 +187,17 @@ describe('ending the turn', () => {
   it('waits for End turn after a bottom-row action, so it can still be undone', () => {
     const state = play(bottom(1, 'metal'), { type: 'deploy', hex: 'A2', ability: 2 });
     expect(state.currentPlayer).toBe(0);
-    expect(state.turn).toEqual({ step: 'end', section: 1 });
+    expect(state.turn).toEqual({ step: 'end', section: 1, skippedTop: true });
     expect(legalActions(state, 0)).toEqual([{ type: 'endTurn' }]);
     const next = play(state, { type: 'endTurn' });
     expect(next.currentPlayer).toBe(1);
     expect(p0(next).lastSection).toBe(1);
     expect(next.turnsTaken).toBe(1);
+  });
+
+  it('remembers a skipped top-row action until the turn ends', () => {
+    expect(play(game(), choose(2), { type: 'skipTop' }).turn).toEqual({ step: 'bottom', section: 2, paid: 0, skippedTop: true });
+    expect(play(game(), choose(2), { type: 'gainCoins' }).turn).toEqual({ step: 'bottom', section: 2, paid: 0 });
   });
 
   it('ends at once when the bottom-row action is skipped', () => {
