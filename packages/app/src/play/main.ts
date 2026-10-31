@@ -1,8 +1,9 @@
+// play.html (older links and home-screen icons) opens the same app as index.html.
 import { mount } from 'svelte';
 import { registerSW } from 'virtual:pwa-register';
 import '../style.css';
-import Game from './Game.svelte';
+import App from '../App.svelte';
 
 registerSW({ immediate: true });
 
-mount(Game, { target: document.querySelector('#app')! });
+mount(App, { target: document.querySelector('#app')! });

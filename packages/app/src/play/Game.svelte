@@ -1,9 +1,8 @@
 <script lang="ts">
-  // Pass-and-play game: Nordic on Industrial against Rusviet on Engineering.
+  // Pass-and-play game, from the setup chosen on the new game screen.
   // The game is its setup plus every state reached so far, so undo just steps
   // back (within your own turn). Not saved yet: autosave arrives in Phase 2.
-  import { baseBoard, baseFactions, baseMats } from '@scythe/content';
-  import { activeSeat, applyAction, legalActions, newGame, type Action, type CombatResult, type GameState, type Location } from '@scythe/engine';
+  import { activeSeat, applyAction, legalActions, newGame, type Action, type CombatResult, type GameSetup, type GameState, type Location } from '@scythe/engine';
   import Board from './Board.svelte';
   import MatDrawer from './MatDrawer.svelte';
   import PlayerBar from './PlayerBar.svelte';
@@ -18,16 +17,20 @@
   import { loadSettings } from './settings';
   import { travelOf, type Travel } from './travel';
 
-  const start = () =>
-    newGame({
-      // The app may use the clock to pick a seed; the engine never does.
-      seed: Math.floor(Math.random() * 2 ** 31),
-      board: baseBoard,
-      players: [
-        { faction: baseFactions.find((f) => f.id === 'nordic')!, mat: baseMats.find((m) => m.id === 'mat-1')! },
-        { faction: baseFactions.find((f) => f.id === 'rusviet')!, mat: baseMats.find((m) => m.id === 'mat-2')! },
-      ],
-    });
+  let {
+    setup,
+    onNewGame,
+    onMenu,
+  }: {
+    setup: GameSetup;
+    /** Go to the new game screen (after "are you sure?"). */
+    onNewGame: () => void;
+    /** Back to the opening menu; this game stays to continue. */
+    onMenu: () => void;
+  } = $props();
+
+  // The setup never changes for a game: a new game is a new Game.
+  const start = () => newGame(setup);
 
   let history: GameState[] = $state.raw([start()]);
   /**
@@ -212,14 +215,8 @@
 
   let menuOpen = $state(false);
 
-  function restart(sure = false) {
-    if (!sure) return ask('Start a new game? This one is not saved.', () => restart(true));
-    history = [start()];
-    turnStart = 0;
-    selection = {};
-    handoff = null;
-    revealed = null;
-    matOpen = true;
+  function restart() {
+    ask('Start a new game? This one is not saved.', onNewGame);
   }
 
   const name = (seat: number) => game.setup.players[seat]!.faction.name;
@@ -354,7 +351,7 @@
     <button class="menu-backdrop" aria-label="Close menu" onclick={() => (menuOpen = false)}></button>
     <nav class="menu-list" transition:fade={{ duration: 120 }}>
       <button onclick={() => ((menuOpen = false), restart())}>New game</button>
-      <a href={import.meta.env.BASE_URL}>Main menu</a>
+      <button onclick={() => ((menuOpen = false), onMenu())}>Main menu</button>
     </nav>
   {/if}
 
