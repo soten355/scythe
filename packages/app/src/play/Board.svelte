@@ -18,6 +18,7 @@
   import { between, fitView, panBy, worldOf, zoomAt, type Limits, type View } from './camera';
   import { boardArea, center, corners, points, sharedEdge, SIZE, spotsArea, type Point } from './geometry';
   import HexIcon from './HexIcon.svelte';
+  import { LABEL_Y, MECH, MEEPLE } from './shapes';
   import { ENCOUNTER_ICON, TERRAIN_ICONS, TUNNEL_ICON } from './icons';
   import type { Prompt, Selection } from './prompt';
 
@@ -270,9 +271,10 @@
   let cargoBefore: { game: GameState; cargo: Prompt['cargo'] } | null = null;
   const readSpots = (): Spots =>
     new Map(
-      [...(svg?.querySelectorAll<SVGCircleElement>('[data-spot]') ?? [])].map((el) => [
+      [...(svg?.querySelectorAll<SVGElement>('[data-spot]') ?? [])].map((el) => [
         el.dataset.spot!,
-        { x: Number(el.getAttribute('cx')), y: Number(el.getAttribute('cy')), fill: el.getAttribute('fill') ?? '#fff' },
+        // Circles have a centre; shapes (a worker's meeple) say where theirs is.
+        { x: Number(el.getAttribute('cx') ?? el.dataset.x), y: Number(el.getAttribute('cy') ?? el.dataset.y), fill: el.getAttribute('fill') ?? '#fff' },
       ]),
     );
   /** How many of each thing (workers, each resource) a load holds. */
@@ -439,13 +441,13 @@
     <text {x} y={y + 2} class="piece-text small">{g.structure}</text>
   {:else if kind === 'character'}
     <circle cx={x} cy={y} r="6.5" fill={g.color} class="character" />
-    <text {x} y={y + 3} class="piece-text">{g.initial}</text>
+    <text {x} y={y + LABEL_Y.character} class="piece-text">{g.initial}</text>
   {:else if kind === 'mechs'}
-    <rect x={x - 6} y={y - 6} width="12" height="12" rx="2" fill={g.color} class="mech" />
-    <text {x} y={y + 3} class="piece-text">{g.initial}</text>
+    <path d={MECH} transform="translate({x} {y})" fill={g.color} class="mech" />
+    <text {x} y={y + LABEL_Y.mech} class="piece-text small">{g.initial}</text>
   {:else}
-    <circle cx={x} cy={y} r="5.5" fill={g.color} class="worker" data-spot={g.seat === game.currentPlayer ? `worker|${at}` : undefined} />
-    <text {x} y={y + 3} class="piece-text">{g.workers}</text>
+    <path d={MEEPLE} transform="translate({x} {y})" fill={g.color} class="worker" data-spot={g.seat === game.currentPlayer ? `worker|${at}` : undefined} data-x={x} data-y={y} />
+    <text {x} y={y + LABEL_Y.worker} class="piece-text small">{g.workers}</text>
   {/if}
 {/snippet}
 
@@ -602,11 +604,15 @@
         ]}
         <g class="travel" use:walk={moving}>
           {#if moving.kind === 'mechs'}
-            <rect x={end[0] - 6} y={end[1] - 6} width="12" height="12" rx="2" fill={f.color} class="mech" />
+            <path d={MECH} transform="translate({end[0]} {end[1]})" fill={f.color} class="mech" />
+            <text x={end[0]} y={end[1] + LABEL_Y.mech} class="piece-text small">{f.name[0]}</text>
+          {:else if moving.kind === 'workers'}
+            <path d={MEEPLE} transform="translate({end[0]} {end[1]})" fill={f.color} class="worker" />
+            <text x={end[0]} y={end[1] + LABEL_Y.worker} class="piece-text small">1</text>
           {:else}
-            <circle cx={end[0]} cy={end[1]} r={moving.kind === 'workers' ? 5.5 : 6.5} fill={f.color} class={moving.kind === 'workers' ? 'worker' : 'character'} />
+            <circle cx={end[0]} cy={end[1]} r="6.5" fill={f.color} class="character" />
+            <text x={end[0]} y={end[1] + LABEL_Y.character} class="piece-text">{f.name[0]}</text>
           {/if}
-          <text x={end[0]} y={end[1] + 3} class="piece-text">{moving.kind === 'workers' ? 1 : f.name[0]}</text>
           {#each chips as chip, ci (ci)}
             {@const cx = end[0] + (ci - (chips.length - 1) / 2) * 10}
             <circle {cx} cy={end[1] - 13} r="4.5" fill={chip.fill} class="cargo" />
@@ -783,6 +789,7 @@
   .resource {
     stroke: #1e1a16;
     stroke-width: 1;
+    stroke-linejoin: round;
   }
   .structure {
     stroke: #fff;
