@@ -10,7 +10,8 @@
   import InlineIcon from './InlineIcon.svelte';
   import { fade } from 'svelte/transition';
   import { guide } from './camera';
-  import { flyTo } from './fly';
+  import { flyTo, pinTo } from './fly';
+  import { RECRUIT_ICON, STAR_ICON, type Icon } from './icons';
   import { buildPrompt, combatSummary, sectionHeadings, type Button, type Prompt, type Selection } from './prompt';
   import { canSwitchSection, phase, previousSection, sectionChoices } from './turn';
   import { loadSettings } from './settings';
@@ -37,6 +38,23 @@
   /** Seat being handed the device (and who just played, and why if mid-turn); the board is hidden until they tap. */
   let handoff: { from: number; to: number; note?: string } | null = $state(null);
   const settings = loadSettings();
+  /**
+   * Big moments to show (a recruit placed, a star earned), in order: each
+   * icon is pinned over the map, then flies to where it belongs. They wait
+   * for any pass screen or fight reveal to be closed.
+   */
+  let moments: { icon: Icon; target: string }[] = $state([]);
+  let showingMoment = $state(false);
+  let boardArea: HTMLElement | undefined = $state();
+  $effect(() => {
+    if (showingMoment || handoff || revealed || !moments.length || !boardArea) return;
+    const [m, ...rest] = moments;
+    showingMoment = true;
+    pinTo(m!.icon, boardArea, document.querySelector(m!.target)).finally(() => {
+      moments = rest;
+      showingMoment = false;
+    });
+  });
   /** The last unit to move, for the map to animate. */
   let travel: Travel | null = $state(null);
   let travels = 0;
@@ -69,6 +87,12 @@
     const next = actions.reduce(applyAction, game);
     history = [...history, next];
     travel = travelOf(before, next, actions, ++travels) ?? travel;
+    const enlist = actions.find((a) => a.type === 'enlist');
+    const added: typeof moments = enlist ? [{ icon: RECRUIT_ICON, target: `[data-recruit="${enlist.section}"]` }] : [];
+    next.players.forEach((p, seat) => {
+      for (let i = before.players[seat]!.stars.length; i < p.stars.length; i++) added.push({ icon: STAR_ICON, target: `[data-stars="${seat}"]` });
+    });
+    if (added.length) moments = [...moments, ...added];
     selection = {};
     const nextSeat = activeSeat(next);
     if (next.currentPlayer !== before.currentPlayer) {
@@ -274,7 +298,7 @@
   </header>
 
   <main>
-    <div class="board">
+    <div class="board" bind:this={boardArea}>
       <!-- Where we are in the story, like a date on the map. -->
       <div class="round"><small>Round</small><b>{round}</b></div>
       <Board game={shown} {prompt} onTap={tap} onPick={(sel) => (selection = sel)} guideTo={guide(game, prompt)} paused={handoff !== null} {travel} moveMs={settings.moveMs} /></div>

@@ -48,3 +48,9 @@ export const STRUCTURE_ICONS: Record<Structure, Icon> = {
   armory: BONUS_ICONS.power, // +1 power when trading
   monument: BONUS_ICONS.popularity, // +1 popularity when bolstering
 };
+
+/** A recruit (placed by Enlist), flown onto the mat when it's placed. */
+export const RECRUIT_ICON: Icon = { text: '🎖️' };
+
+/** A star, flown to the top bar when one is earned. */
+export const STAR_ICON: Icon = { text: '⭐' };

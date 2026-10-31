@@ -29,7 +29,7 @@
     {@const current = seat === game.currentPlayer}
     <div class="player" class:current style:--c={faction.color}>
       <span class="name">{faction.name}</span>
-      <span class="stars" title={p.stars.length ? `Stars: ${p.stars.map((k) => STAR_NAMES[k]).join(', ')}` : 'No stars yet'}>⭐ {p.stars.length}</span>
+      <span class="stars" data-stars={seat} title={p.stars.length ? `Stars: ${p.stars.map((k) => STAR_NAMES[k]).join(', ')}` : 'No stars yet'}>⭐ {p.stars.length}</span>
       {#if current}
         <span class="details" transition:slide={{ axis: 'x', duration: 450, easing: cubicInOut }}>
           <span title="coins">◉ {p.coins}</span>

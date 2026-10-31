@@ -121,11 +121,11 @@
       <b class:struck={x.need.bottom.length}>{NAMES[x.s.bottom.action]}</b>
       {#if x.spot}
         {@const spot = x.spot}
-        <button class="chip badge" title="Recruit here: +1 {BONUSES[bonus]} each time" class:chosen={spot.chosen} onclick={() => onSelect(spot.select)}
+        <button class="chip badge" data-recruit={x.section} title="Recruit here: +1 {BONUSES[bonus]} each time" class:chosen={spot.chosen} onclick={() => onSelect(spot.select)}
           ><InlineIcon icon={BONUS_ICONS[bonus]} /></button
         >
       {:else}
-        <span class="badge" class:locked={!x.recruit} title="Recruit bonus: +1 {BONUSES[bonus]}{x.recruit ? '' : ' (no recruit yet)'}"
+        <span class="badge" data-recruit={x.section} class:locked={!x.recruit} title="Recruit bonus: +1 {BONUSES[bonus]}{x.recruit ? '' : ' (no recruit yet)'}"
           ><InlineIcon icon={BONUS_ICONS[bonus]} /></span
         >
       {/if}
