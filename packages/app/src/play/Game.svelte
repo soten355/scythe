@@ -73,6 +73,37 @@
     node.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }
 
+  let panel: HTMLElement | undefined = $state();
+  let currentStep: HTMLElement | undefined = $state();
+  /** Changes when a new step appears (not when you just pick things within a step). */
+  const stepKey = $derived(`${history.length}|${prompt.title}`);
+  /** Changes when new choices appear within a step (tapping a hex, picking a resource...). */
+  const choicesKey = $derived(prompt.buttons.map((b) => b.label).join('|'));
+  let lastStep = '';
+  /**
+   * Keep what to do next in view in the side panel, which is short on a
+   * phone: a new step shows from its question down; new choices within a
+   * step scroll into view.
+   */
+  $effect(() => {
+    const key = stepKey;
+    void choicesKey;
+    if (!panel || !currentStep) return;
+    const target = key === lastStep ? currentStep.querySelector('.buttons') : currentStep;
+    lastStep = key;
+    if (target) showInPanel(panel, target);
+  });
+
+  /** Scroll so all of `el` shows if it fits, otherwise its top. */
+  function showInPanel(panel: HTMLElement, el: Element) {
+    const box = panel.getBoundingClientRect();
+    const r = el.getBoundingClientRect();
+    let by = 0;
+    if (r.height > box.height || r.top < box.top) by = r.top - box.top;
+    else if (r.bottom > box.bottom) by = r.bottom - box.bottom;
+    if (by) panel.scrollBy({ top: by, behavior: 'smooth' });
+  }
+
   function press(b: Button, sure = false) {
     if (b.confirm && !sure) return ask(b.confirm, () => press(b, true));
     if (b.action?.type === 'chooseSection') choose(b.action);
@@ -124,9 +155,11 @@
 </script>
 
 {#snippet current()}
-  <p class="title">{prompt.title}</p>
-  {@render slots()}
-  {@render buttons()}
+  <div bind:this={currentStep}>
+    <p class="title">{prompt.title}</p>
+    {@render slots()}
+    {@render buttons()}
+  </div>
 {/snippet}
 
 {#snippet slots()}
@@ -173,7 +206,7 @@
       <div class="round"><small>Round</small><b>{round}</b></div>
       <Board game={shown} {prompt} onTap={tap} onPick={(sel) => (selection = sel)} guideTo={guide(game, prompt)} paused={handoff !== null} /></div>
     <aside style:--c={color(game.currentPlayer)}>
-      <div class="panel">
+      <div class="panel" bind:this={panel}>
         {#if !headings}
           {@render current()}
         {:else}
