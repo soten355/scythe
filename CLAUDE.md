@@ -61,5 +61,6 @@ invariants. Write tests before rule code.
   but doesn't write code.
 
 ## Current phase
-Phase 0 (setup) — done. Next: Phase 1, engine core and hot-seat 2D board
-with 2 factions.
+Phases 0 (setup) and 1 (engine core, hot-seat 2D board with 2 factions) —
+done; the board keeps evolving with play-testing. Next: Phase 2, full rules
+and all content.

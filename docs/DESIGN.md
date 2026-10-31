@@ -231,15 +231,16 @@ Each phase ends in something playable on the phone. A phase is done when its che
 - [x] 2 factions and 2 player mats (Nordic + Rusviet; Industrial + Engineering), entered from the physical game
 - [x] All four top-row and four bottom-row actions, with costs and rewards
 - [x] Movement, production, workers and resources on hexes (crossing rivers and lakes, Speed and combat on moving come with mech and faction abilities in Phase 2)
-- [x] 2D board, player mat drawer, legal-move highlighting (pinch-zoom and pan still to add)
-- [ ] Installs on iPhone and runs offline
-- [ ] Done when: two humans can play a full turn cycle pass-and-play on the phone
+- [x] 2D board, player mat drawer, legal-move highlighting, zoom and a camera that follows the turn (the board keeps evolving with play-testing)
+- [x] Installs on iPhone and runs offline
+- [x] Done when: two humans can play a full turn cycle pass-and-play on the phone
 
 **Phase 2: Full rules and all content**
 
 - [ ] Combat (power dial, combat cards), retreats, popularity loss
 - [ ] Mechs and all mech abilities; faction abilities
   - Note from play-testing: a mech moving more than one hex (Speed) can drop off and pick up any number of workers and resources at each hex along the way, then keep moving.
+  - Note from play-testing: drop-offs along the way should use the same pick-up slots in the side panel, with the map updating live as things are dropped off.
 - [ ] Stars, triumph track, game end and final scoring
 - [ ] Encounters, the Factory, objectives, structure bonus tiles
 - [ ] All 5 base factions and 5 mats; Invaders from Afar factions and mats
