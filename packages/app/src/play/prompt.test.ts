@@ -67,6 +67,53 @@ describe('the prompt', () => {
     expect(p.tapActions.size).toBeGreaterThan(0);
   });
 
+  describe('picking things up to carry', () => {
+    // Nordic's mech on A4 with a worker and 2 oil there, moving.
+    const mechOnA4 = () => {
+      const s = start();
+      const p0 = { ...s.players[0]!, mechs: ['A4'] };
+      return play({ ...s, players: [p0, s.players[1]!], resources: { A4: { oil: 2 } } }, { type: 'chooseSection', section: 2 });
+    };
+    const mech = { kind: 'mech' as const, index: 0 };
+    const sel = (carry?: { workers: number[]; resources: ('oil' | 'food')[] }) => ({ hex: 'A4', unit: mech, ...(carry && { carry }) });
+
+    it('offers Pick up all first, then each thing on its own', () => {
+      const p = prompt(mechOnA4(), sel());
+      expect(p.buttons.map((b) => b.label)).toEqual(['Pick up all', 'Pick up a worker', 'Pick up 1 oil', 'Back']);
+      expect(p.buttons[0]!.select).toEqual(sel({ workers: [0], resources: ['oil', 'oil'] }));
+    });
+
+    it('lists each thing picked up in a slot that puts it back down', () => {
+      const p = prompt(mechOnA4(), sel({ workers: [0], resources: ['oil', 'oil'] }));
+      expect(p.buttons.map((b) => b.label)).toEqual(['Back']);
+      expect(p.slots?.map((s) => ('text' in s ? s.text : s.empty))).toEqual(['Worker', '1 oil', '1 oil']);
+      expect((p.slots![1] as { remove: object }).remove).toEqual(sel({ workers: [0], resources: ['oil'] }));
+      const less = prompt(mechOnA4(), sel({ workers: [], resources: ['oil'] }));
+      expect(less.buttons.map((b) => b.label)).toEqual(['Pick up all', 'Pick up a worker', 'Pick up 1 oil', 'Back']);
+    });
+
+    it("tells the map what's carried, so it comes off the hex", () => {
+      const p = prompt(mechOnA4(), sel({ workers: [0], resources: ['oil'] }));
+      expect(p.cargo).toEqual({ at: 'A4', workers: [0], resources: { oil: 1 } });
+      expect(prompt(mechOnA4(), sel()).cargo).toBeUndefined();
+    });
+
+    it('picks everything up and moves in one go when a hex is tapped', () => {
+      const state = mechOnA4();
+      const p = prompt(state, sel({ workers: [0], resources: ['oil', 'oil'] }));
+      const [to, move] = [...p.tapActions][0]!;
+      const after = play(state, ...p.tapFirst!, move);
+      expect(after.players[0]!.mechs).toEqual([to]);
+      expect(after.players[0]!.workers[0]).toBe(to);
+      expect(after.resources[to]).toEqual({ oil: 2 });
+    });
+
+    it("ignores picks that aren't there any more", () => {
+      const p = prompt(mechOnA4(), sel({ workers: [0, 1], resources: ['oil', 'oil', 'oil', 'food'] }));
+      expect(p.cargo).toEqual({ at: 'A4', workers: [0], resources: { oil: 2 } });
+    });
+  });
+
   it('keeps the trading hex selected for the second resource', () => {
     const state = play(start(), { type: 'chooseSection', section: 3 }, { type: 'tradeResource', resource: 'oil', hex: 'A4' });
     const p = prompt(state);

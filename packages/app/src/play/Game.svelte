@@ -115,7 +115,7 @@
   function tap(at: Location) {
     const action = prompt.tapActions.get(at);
     const select = prompt.tapSelects.get(at);
-    if (action) act(action);
+    if (action) act(...(prompt.tapFirst ?? []), action);
     else if (select) selection = select;
     else selection = { hex: at };
   }

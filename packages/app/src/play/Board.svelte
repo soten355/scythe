@@ -210,7 +210,9 @@
       };
       if (p.character !== 'home') add(p.character, { character: true });
       for (const m of p.mechs) add(m, { mechs: 1 });
-      for (const w of p.workers) add(w, { workers: 1 });
+      // Workers the selected mech has picked up ride on it instead (see cargo below).
+      const carried = i === game.currentPlayer ? (prompt.cargo?.workers ?? []) : [];
+      p.workers.forEach((w, wi) => carried.includes(wi) || add(w, { workers: 1 }));
       for (const [s, hex] of Object.entries(p.structures)) if (hex) add(hex, { structure: STRUCTURE_LETTER[s as keyof typeof STRUCTURE_LETTER] });
     });
     return on;
@@ -352,7 +354,8 @@
     {#each hexes as h (h.id)}
       {@const c = center(h)}
       {@const groups = piecesOn.get(h.id) ?? []}
-      {#each placePieces(groups, c) as { g, kind, x, y }, i (i)}
+      {@const placed = placePieces(groups, c)}
+      {#each placed as { g, kind, x, y }, i (i)}
           {@const pick = kind !== 'structure' && g.seat === game.currentPlayer ? pickable(h.id, kind) : { key: '', select: undefined, selected: false }}
           {@const sel = pick.select}
           {#if sel || pick.selected}
@@ -385,7 +388,26 @@
             <text {x} y={y + 3} class="piece-text">{g.workers}</text>
           {/if}
       {/each}
-      {@const pile = Object.entries(game.resources[h.id] ?? {}) as [Resource, number][]}
+      {@const cargo = prompt.cargo?.at === h.id ? prompt.cargo : undefined}
+      {#if cargo}
+        <!-- What the selected unit has picked up, in a row just above it. -->
+        {@const on = placed.find((p) => p.g.seat === game.currentPlayer && p.kind !== 'structure' && pickable(h.id, p.kind).selected)}
+        {@const chips = [
+          ...(cargo.workers.length ? [{ fill: on?.g.color ?? '#fff', n: cargo.workers.length, dark: false }] : []),
+          ...(Object.entries(cargo.resources) as [Resource, number][]).map(([r, n]) => ({ fill: RESOURCE_COLOR[r], n, dark: r === 'food' || r === 'metal' })),
+        ]}
+        {#if on}
+          {#each chips as chip, ci (ci)}
+            {@const cx = on.x + (ci - (chips.length - 1) / 2) * 10}
+            <circle {cx} cy={on.y - 13} r="4.5" fill={chip.fill} class="cargo" />
+            <text x={cx} y={on.y - 11} class="piece-text small" class:dark={chip.dark}>{chip.n}</text>
+          {/each}
+        {/if}
+      {/if}
+      <!-- Resources picked up by the selected unit are off the hex for now. -->
+      {@const pile = (Object.entries(game.resources[h.id] ?? {}) as [Resource, number][])
+        .map(([r, n]): [Resource, number] => [r, n - (cargo?.resources[r] ?? 0)])
+        .filter(([, n]) => n > 0)}
       {#each pile as [res, n], i (res)}
         {@const x = c[0] - (pile.length - 1) * 7 + i * 14}
         <circle cx={x} cy={c[1] + SIZE * 0.3} r="6" fill={RESOURCE_COLOR[res]} class="resource" />
@@ -538,6 +560,10 @@
   .character.picked {
     stroke: #ffd23f;
     stroke-width: 3;
+  }
+  .cargo {
+    stroke: #ffd23f;
+    stroke-width: 1;
   }
   .character,
   .mech,

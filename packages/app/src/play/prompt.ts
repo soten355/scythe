@@ -6,7 +6,9 @@
 //   1. Nothing selected: highlight every hex that has something to do.
 //   2. A hex selected: buttons for what can happen there, including picking
 //      one of your units on it to move. A unit selected: highlight where it
-//      can go; tap a hex to move it there.
+//      can go; tap a hex to move it there. Before that it can pick things
+//      up (Pick up all, or one at a time, each in a slot that puts it back);
+//      they go with it when it moves.
 // Producing and bottom-row actions are different: you pick everything first
 // (hexes to produce on or pay from fill slots in the side panel, and any slot
 // can be removed), then one button (Produce, Deploy, Build, Upgrade, Enlist)
@@ -26,6 +28,7 @@ import {
   type Need,
   type RecruitBonus,
   type Resource,
+  type ResourcePile,
   type SectionIndex,
   type TopUpgrade,
   type UnitRef,
@@ -47,6 +50,13 @@ export interface Selection {
   upgrade?: { top?: TopUpgrade; bottom?: SectionIndex };
   /** The bottom-row section picked on the mat for a recruit. */
   recruit?: SectionIndex;
+  /** What the selected unit picks up before it moves: workers (by index) and resources, in the order picked. */
+  carry?: Carry;
+}
+
+export interface Carry {
+  workers: number[];
+  resources: Resource[];
 }
 
 export interface Button {
@@ -71,8 +81,12 @@ export interface Prompt {
   buttons: Button[];
   /** Hexes (or "home") the player can tap. */
   highlights: Set<Location>;
-  /** Tapping one of these hexes applies the action. */
+  /** Tapping one of these hexes applies the action (after `tapFirst`). */
   tapActions: Map<Location, Action>;
+  /** Applied just before a tapped action, as one step: the selected unit picking things up before it moves. */
+  tapFirst?: Action[];
+  /** What the selected unit has picked up so far; the map draws it on the unit instead of its hex. */
+  cargo?: { at: Location; workers: number[]; resources: ResourcePile };
   /** Tapping one of these hexes changes the selection. */
   tapSelects: Map<Location, Selection>;
   selected?: Location;
@@ -303,14 +317,13 @@ export function buildPrompt(state: GameState, actions: Action[], selection: Sele
   // A unit is selected: tap a destination; buttons to pick things up.
   if (unit) {
     for (const a of actions) {
-      if (!unitOf(a) || !sameUnit(unitOf(a)!, unit)) continue;
-      if (a.type === 'moveUnit') {
+      if (a.type === 'moveUnit' && sameUnit(a.unit, unit)) {
         highlights.add(a.to);
         tapActions.set(a.to, a);
-      } else {
-        buttons.push({ label: label(state, a), action: a });
       }
     }
+    const carry = carryPrompt(state, actions, unit, selection);
+    buttons.push(...carry.buttons);
     if (!forced) buttons.push({ label: 'Back', select: {}, quiet: true });
     return {
       title: `${title(state)} — ${UNIT_NAMES[unit.kind]} on ${unitLocation(state, unit)}`,
@@ -319,6 +332,7 @@ export function buildPrompt(state: GameState, actions: Action[], selection: Sele
       tapActions,
       tapSelects,
       selected: unitLocation(state, unit),
+      ...(carry.slots.length && { slots: carry.slots, tapFirst: carry.run, cargo: carry.cargo }),
       // Tapping a hex moves there; tapping another piece switches to it.
       ...(!forced && { pieces: piecesToPick(state, actions) }),
       selectedPiece: pieceKey(unitLocation(state, unit), unit.kind),
@@ -357,6 +371,62 @@ export function buildPrompt(state: GameState, actions: Action[], selection: Sele
     buttons.push({ label: label(state, a), action: a, quiet });
   }
   return { title: title(state), buttons, highlights, tapActions, tapSelects, pieces: piecesToPick(state, actions) };
+}
+
+/**
+ * Picking things up before a unit moves: Pick up all, or one thing at a
+ * time; each thing picked fills a slot that puts it back down. Nothing
+ * happens until the unit moves, when the pick-ups and the move go through as
+ * one step.
+ */
+function carryPrompt(state: GameState, actions: Action[], unit: UnitRef, selection: Selection) {
+  const at = unitLocation(state, unit);
+  const turn = state.turn;
+  const load = turn.step === 'moving' && turn.load && sameUnit(turn.load.unit, unit) ? turn.load : undefined;
+  // Everything here this unit could still pick up.
+  const workers: number[] = [];
+  const resources: Resource[] = [];
+  for (const a of actions) {
+    if (a.type === 'carryWorker' && sameUnit(a.unit, unit)) workers.push(a.worker);
+    if (a.type === 'carryResource' && sameUnit(a.unit, unit)) {
+      const n = (state.resources[at]?.[a.resource] ?? 0) - (load?.resources[a.resource] ?? 0);
+      for (let i = 0; i < n; i++) resources.push(a.resource);
+    }
+  }
+  // The picks, less any that aren't there any more.
+  const picked: Carry = { workers: (selection.carry?.workers ?? []).filter((w) => workers.includes(w)), resources: [] };
+  const left = [...resources];
+  for (const r of selection.carry?.resources ?? []) {
+    const i = left.indexOf(r);
+    if (i >= 0) picked.resources.push(...left.splice(i, 1));
+  }
+  const leftWorkers = workers.filter((w) => !picked.workers.includes(w));
+  const pick = (carry: Carry): Selection => ({ ...selection, carry });
+
+  const buttons: Button[] = [];
+  if (leftWorkers.length + left.length > 1) buttons.push({ label: 'Pick up all', select: pick({ workers, resources }) });
+  if (leftWorkers.length) buttons.push({ label: 'Pick up a worker', select: pick({ ...picked, workers: [...picked.workers, leftWorkers[0]!] }) });
+  for (const r of new Set(left)) buttons.push({ label: `Pick up 1 ${r}`, select: pick({ ...picked, resources: [...picked.resources, r] }) });
+
+  const slots: Slot[] = [
+    ...picked.workers.map((w) => ({
+      text: 'Worker',
+      icon: RESOURCE_ICONS.worker,
+      remove: pick({ ...picked, workers: picked.workers.filter((x) => x !== w) }),
+    })),
+    ...picked.resources.map((r, i) => ({
+      text: `1 ${r}`,
+      icon: RESOURCE_ICONS[r],
+      remove: pick({ ...picked, resources: picked.resources.filter((_, j) => j !== i) }),
+    })),
+  ];
+  const run: Action[] = [
+    ...picked.workers.map((worker): Action => ({ type: 'carryWorker', unit, worker })),
+    ...picked.resources.map((resource): Action => ({ type: 'carryResource', unit, resource })),
+  ];
+  const pile: ResourcePile = {};
+  for (const r of picked.resources) pile[r] = (pile[r] ?? 0) + 1;
+  return { buttons, slots, run, cargo: { at, workers: picked.workers, resources: pile } };
 }
 
 const pieceKey = (at: Location, kind: UnitRef['kind']) => `${at}|${kind}`;
