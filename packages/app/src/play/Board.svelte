@@ -53,6 +53,8 @@
   /** How far left of a hex's centre its pieces sit, and the gap between them. */
   const PIECES_LEFT = 6;
   const PIECE_STEP = 14;
+  /** Pieces per row; a crowded hex wraps onto more rows. */
+  const PIECES_PER_ROW = 4;
 
   const board = $derived(game.setup.board);
   const hexes = $derived(Object.values(board.hexes));
@@ -214,6 +216,28 @@
     return on;
   });
 
+  type Kind = 'structure' | 'character' | 'mechs' | 'workers';
+  /**
+   * Where each piece on a hex goes: each player's pieces side by side, a
+   * little left of the middle, in rows of up to four. Each mech is its own
+   * piece, so a hex with several gets crowded rather than showing a count.
+   */
+  function placePieces(groups: Pieces[], c: readonly [number, number]) {
+    const rows = groups.flatMap((g) => {
+      const kinds = (['structure', 'character', 'mechs', 'workers'] as const)
+        .filter((k) => g[k])
+        .flatMap((k): Kind[] => (k === 'mechs' ? Array<Kind>(g.mechs).fill('mechs') : [k]));
+      const out: { g: Pieces; kind: Kind }[][] = [];
+      for (let i = 0; i < kinds.length; i += PIECES_PER_ROW) out.push(kinds.slice(i, i + PIECES_PER_ROW).map((kind) => ({ g, kind })));
+      return out;
+    });
+    // One or two rows sit where they always have; more grow upwards.
+    const top = c[1] - 4 - Math.max(0, rows.length - 2) * PIECE_STEP;
+    return rows.flatMap((row, r) =>
+      row.map((p, i) => ({ ...p, x: c[0] - PIECES_LEFT + (i - (row.length - 1) / 2) * PIECE_STEP, y: top + r * PIECE_STEP })),
+    );
+  }
+
   /** Home bases with the faction that starts there and whether its character is at home. */
   const homes = $derived(
     Object.entries(board.homeBasePositions).map(([id, pos]) => {
@@ -328,12 +352,7 @@
     {#each hexes as h (h.id)}
       {@const c = center(h)}
       {@const groups = piecesOn.get(h.id) ?? []}
-      {#each groups as g, gi (g.color)}
-        {@const y = c[1] - 4 + gi * 14}
-        {@const kinds = (['structure', 'character', 'mechs', 'workers'] as const).filter((k) => g[k])}
-        <!-- Packed side by side, centred a little left of the middle of the hex. -->
-        {#each kinds as kind, i (kind)}
-          {@const x = c[0] - PIECES_LEFT + (i - (kinds.length - 1) / 2) * PIECE_STEP}
+      {#each placePieces(groups, c) as { g, kind, x, y }, i (i)}
           {@const pick = kind !== 'structure' && g.seat === game.currentPlayer ? pickable(h.id, kind) : { key: '', select: undefined, selected: false }}
           {@const sel = pick.select}
           {#if sel || pick.selected}
@@ -360,12 +379,11 @@
             <text {x} y={y + 3} class="piece-text">{g.initial}</text>
           {:else if kind === 'mechs'}
             <rect x={x - 6} y={y - 6} width="12" height="12" rx="2" fill={g.color} class="mech" />
-            <text {x} y={y + 3} class="piece-text">{g.mechs}</text>
+            <text {x} y={y + 3} class="piece-text">{g.initial}</text>
           {:else}
             <circle cx={x} cy={y} r="5.5" fill={g.color} class="worker" />
             <text {x} y={y + 3} class="piece-text">{g.workers}</text>
           {/if}
-        {/each}
       {/each}
       {@const pile = Object.entries(game.resources[h.id] ?? {}) as [Resource, number][]}
       {#each pile as [res, n], i (res)}
