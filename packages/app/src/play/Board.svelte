@@ -443,7 +443,7 @@
     <circle cx={x} cy={y} r="6.5" fill={g.color} class="character" />
     <text {x} y={y + LABEL_Y.character} class="piece-text">{g.initial}</text>
   {:else if kind === 'mechs'}
-    <path d={MECH} transform="translate({x} {y})" fill={g.color} class="mech" />
+    <path d={MECH} transform="translate({x} {y})" fill={g.color} class="mech" data-mech="{g.seat}|{at}" />
     <text {x} y={y + LABEL_Y.mech} class="piece-text small">{g.initial}</text>
   {:else}
     <path d={MEEPLE} transform="translate({x} {y})" fill={g.color} class="worker" data-spot={g.seat === game.currentPlayer ? `worker|${at}` : undefined} data-x={x} data-y={y} />

@@ -11,8 +11,8 @@
   import FactionEmblem from './FactionEmblem.svelte';
   import { fade } from 'svelte/transition';
   import { guide } from './camera';
-  import { flyTo, pinTo } from './fly';
-  import { RECRUIT_ICON, STAR_ICON, type Icon } from './icons';
+  import { flyTo, showMoment, type Moment } from './fly';
+  import { BONUS_ICONS, RECRUIT_ICON, STAR_ICON } from './icons';
   import { buildPrompt, combatSummary, sectionHeadings, type Button, type Prompt, type Selection } from './prompt';
   import { canSwitchSection, phase, previousSection, sectionChoices } from './turn';
   import { loadSettings } from './settings';
@@ -40,18 +40,18 @@
   let handoff: { from: number; to: number; note?: string } | null = $state(null);
   const settings = loadSettings();
   /**
-   * Big moments to show (a recruit placed, a star earned), in order: each
-   * icon is pinned over the map, then flies to where it belongs. They wait
-   * for any pass screen or fight reveal to be closed.
+   * Big moments to show (a recruit placed, a star earned, a mech deployed),
+   * in order: each is pinned over the map, then flies to where it belongs.
+   * They wait for any pass screen or fight reveal to be closed.
    */
-  let moments: { icon: Icon; target: string }[] = $state([]);
+  let moments: Moment[] = $state([]);
   let showingMoment = $state(false);
   let boardArea: HTMLElement | undefined = $state();
   $effect(() => {
     if (showingMoment || handoff || revealed || !moments.length || !boardArea) return;
     const [m, ...rest] = moments;
     showingMoment = true;
-    pinTo(m!.icon, boardArea, document.querySelector(m!.target)).finally(() => {
+    showMoment(m!, boardArea).finally(() => {
       moments = rest;
       showingMoment = false;
     });
@@ -90,8 +90,14 @@
     const next = actions.reduce(applyAction, game);
     history = [...history, next];
     travel = travelOf(before, next, actions, ++travels) ?? travel;
-    const enlist = actions.find((a) => a.type === 'enlist');
-    const added: typeof moments = enlist ? [{ icon: RECRUIT_ICON, target: `[data-recruit="${enlist.section}"]` }] : [];
+    const added: Moment[] = [];
+    const { faction, mat } = before.setup.players[before.currentPlayer]!;
+    for (const a of actions) {
+      if (a.type === 'enlist') {
+        added.push({ icon: RECRUIT_ICON, below: BONUS_ICONS[mat.sections[a.section]!.bottom.recruitBonus], target: `[data-recruit="${a.section}"]` });
+      }
+      if (a.type === 'deploy') added.push({ mech: { color: faction.color, initial: faction.name[0]! }, target: `[data-mech="${before.currentPlayer}|${a.hex}"]` });
+    }
     next.players.forEach((p, seat) => {
       for (let i = before.players[seat]!.stars.length; i < p.stars.length; i++) added.push({ icon: STAR_ICON, target: `[data-stars="${seat}"]` });
     });
