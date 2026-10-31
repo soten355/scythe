@@ -218,6 +218,70 @@
     return on;
   });
 
+  // Picking things up (see Prompt.cargo): each worker or resource picked up
+  // arcs from the hex to the unit's load, and back when it's put down. Spots
+  // are read off the drawing just before and just after it changes.
+  type Spots = Map<string, { x: number; y: number; fill: string }>;
+  type Flight = { id: number; from: Point; to: Point; fill: string; delay: number };
+  let flights: Flight[] = $state([]);
+  let nextFlight = 0;
+  let spotsBefore: Spots = new Map();
+  let cargoBefore: { game: GameState; cargo: Prompt['cargo'] } | null = null;
+  const readSpots = (): Spots =>
+    new Map(
+      [...(svg?.querySelectorAll<SVGCircleElement>('[data-spot]') ?? [])].map((el) => [
+        el.dataset.spot!,
+        { x: Number(el.getAttribute('cx')), y: Number(el.getAttribute('cy')), fill: el.getAttribute('fill') ?? '#fff' },
+      ]),
+    );
+  /** How many of each thing (workers, each resource) a load holds. */
+  const loadCounts = (cargo: Prompt['cargo']): Record<string, number> => ({ worker: cargo?.workers.length ?? 0, ...cargo?.resources });
+  $effect.pre(() => {
+    void prompt.cargo;
+    spotsBefore = readSpots();
+  });
+  $effect(() => {
+    const cargo = prompt.cargo;
+    const before = cargoBefore;
+    cargoBefore = { game, cargo };
+    // Only while the same unit loads up, not when it moves off or the turn moves on.
+    if (!before || before.game !== game) return;
+    const at = cargo?.at ?? before.cargo?.at;
+    if (!at || (cargo && before.cargo && cargo.at !== before.cargo.at)) return;
+    const after = readSpots();
+    const was = loadCounts(before.cargo);
+    const now = loadCounts(cargo);
+    const pileKey = (what: string) => (what === 'worker' ? `worker|${at}` : `pile|${at}|${what}`);
+    const added: Flight[] = [];
+    for (const what of new Set([...Object.keys(was), ...Object.keys(now)])) {
+      const change = (now[what] ?? 0) - (was[what] ?? 0);
+      // Picked up: hex to load. Put down: load to hex.
+      const [fromKey, toKey] = change > 0 ? [pileKey(what), `cargo|${what}`] : [`cargo|${what}`, pileKey(what)];
+      const from = spotsBefore.get(fromKey);
+      const to = after.get(toKey) ?? (change < 0 ? undefined : from);
+      if (!from || !to) continue;
+      for (let i = 0; i < Math.abs(change); i++) {
+        added.push({ id: nextFlight++, from: [from.x, from.y], to: [to.x, to.y], fill: from.fill, delay: added.length * 90 });
+      }
+    }
+    if (added.length) flights = [...flights, ...added];
+  });
+
+  /** Arcs a flying piece from its start to its end (it's drawn at the end), then drops it. */
+  function fly(node: SVGElement, f: Flight) {
+    const [dx, dy] = [f.from[0] - f.to[0], f.from[1] - f.to[1]];
+    node
+      .animate(
+        [
+          { transform: `translate(${dx}px, ${dy}px) scale(1)`, opacity: 1 },
+          { transform: `translate(${dx / 2}px, ${dy / 2 - 12}px) scale(1.4)`, opacity: 1 },
+          { transform: 'translate(0, 0) scale(1)', opacity: 0.6 },
+        ],
+        { duration: 450, delay: f.delay, easing: 'ease-in-out', fill: 'backwards' },
+      )
+      .finished.then(() => (flights = flights.filter((x) => x.id !== f.id)));
+  }
+
   type Kind = 'structure' | 'character' | 'mechs' | 'workers';
   /**
    * Where each piece on a hex goes: each player's pieces side by side, a
@@ -384,7 +448,7 @@
             <rect x={x - 6} y={y - 6} width="12" height="12" rx="2" fill={g.color} class="mech" />
             <text {x} y={y + 3} class="piece-text">{g.initial}</text>
           {:else}
-            <circle cx={x} cy={y} r="5.5" fill={g.color} class="worker" />
+            <circle cx={x} cy={y} r="5.5" fill={g.color} class="worker" data-spot={g.seat === game.currentPlayer ? `worker|${h.id}` : undefined} />
             <text {x} y={y + 3} class="piece-text">{g.workers}</text>
           {/if}
       {/each}
@@ -393,13 +457,13 @@
         <!-- What the selected unit has picked up, in a row just above it. -->
         {@const on = placed.find((p) => p.g.seat === game.currentPlayer && p.kind !== 'structure' && pickable(h.id, p.kind).selected)}
         {@const chips = [
-          ...(cargo.workers.length ? [{ fill: on?.g.color ?? '#fff', n: cargo.workers.length, dark: false }] : []),
-          ...(Object.entries(cargo.resources) as [Resource, number][]).map(([r, n]) => ({ fill: RESOURCE_COLOR[r], n, dark: r === 'food' || r === 'metal' })),
+          ...(cargo.workers.length ? [{ what: 'worker', fill: on?.g.color ?? '#fff', n: cargo.workers.length, dark: false }] : []),
+          ...(Object.entries(cargo.resources) as [Resource, number][]).map(([r, n]) => ({ what: r, fill: RESOURCE_COLOR[r], n, dark: r === 'food' || r === 'metal' })),
         ]}
         {#if on}
           {#each chips as chip, ci (ci)}
             {@const cx = on.x + (ci - (chips.length - 1) / 2) * 10}
-            <circle {cx} cy={on.y - 13} r="4.5" fill={chip.fill} class="cargo" />
+            <circle {cx} cy={on.y - 13} r="4.5" fill={chip.fill} class="cargo" data-spot={`cargo|${chip.what}`} />
             <text x={cx} y={on.y - 11} class="piece-text small" class:dark={chip.dark}>{chip.n}</text>
           {/each}
         {/if}
@@ -410,9 +474,12 @@
         .filter(([, n]) => n > 0)}
       {#each pile as [res, n], i (res)}
         {@const x = c[0] - (pile.length - 1) * 7 + i * 14}
-        <circle cx={x} cy={c[1] + SIZE * 0.3} r="6" fill={RESOURCE_COLOR[res]} class="resource" />
+        <circle cx={x} cy={c[1] + SIZE * 0.3} r="6" fill={RESOURCE_COLOR[res]} class="resource" data-spot={`pile|${h.id}|${res}`} />
         <text x={x} y={c[1] + SIZE * 0.3 + 3} class="piece-text" class:dark={res === 'food' || res === 'metal'}>{n}</text>
       {/each}
+    {/each}
+    {#each flights as f (f.id)}
+      <circle cx={f.to[0]} cy={f.to[1]} r="5" fill={f.fill} class="flight" use:fly={f} />
     {/each}
   </g>
 </svg>
@@ -560,6 +627,13 @@
   .character.picked {
     stroke: #ffd23f;
     stroke-width: 3;
+  }
+  .flight {
+    stroke: #ffd23f;
+    stroke-width: 1;
+    transform-box: fill-box;
+    transform-origin: center;
+    pointer-events: none;
   }
   .cargo {
     stroke: #ffd23f;
