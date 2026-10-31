@@ -215,6 +215,8 @@
     if (phase(history[history.length - 1]!) === 'choose') matOpen = true;
   }
 
+  let menuOpen = $state(false);
+
   function restart(sure = false) {
     if (!sure) return ask('Start a new game? This one is not saved.', () => restart(true));
     history = [start()];
@@ -303,7 +305,7 @@
 
 <div class="game">
   <header>
-    <a class="menu" href={import.meta.env.BASE_URL}>☰</a>
+    <button class="menu" aria-label="Menu" aria-expanded={menuOpen} onclick={() => (menuOpen = !menuOpen)}>☰</button>
     <PlayerBar game={shown} />
   </header>
 
@@ -348,10 +350,18 @@
       {/if}
       <div class="footer">
         <button class="quiet" onclick={undo} disabled={!canUndo}>↶ Undo</button>
-        <button class="quiet" onclick={() => restart()}>New game</button>
       </div>
     </aside>
   </main>
+
+  {#if menuOpen}
+    <!-- Tapping anywhere outside the menu closes it. -->
+    <button class="menu-backdrop" aria-label="Close menu" onclick={() => (menuOpen = false)}></button>
+    <nav class="menu-list" transition:fade={{ duration: 120 }}>
+      <button onclick={() => ((menuOpen = false), restart())}>New game</button>
+      <a href={import.meta.env.BASE_URL}>Main menu</a>
+    </nav>
+  {/if}
 
   <MatDrawer {game} {choices} {previous} bind:open={matOpen} onChoose={choose} upgrade={prompt.upgrade} onSelect={(sel) => (selection = sel)} />
 
@@ -424,9 +434,45 @@
   }
   .menu {
     color: var(--fg);
-    text-decoration: none;
+    background: none;
+    border: none;
     padding: 0 8px;
     font-size: 18px;
+    cursor: pointer;
+  }
+  .menu-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 30;
+    background: transparent;
+    border: none;
+  }
+  .menu-list {
+    position: fixed;
+    top: calc(env(safe-area-inset-top) + 30px);
+    left: calc(env(safe-area-inset-left) + 6px);
+    z-index: 31;
+    display: flex;
+    flex-direction: column;
+    min-width: 150px;
+    padding: 4px;
+    border-radius: 8px;
+    background: #2a241e;
+    box-shadow: 0 6px 18px rgb(0 0 0 / 0.5);
+  }
+  .menu-list > * {
+    padding: 9px 12px;
+    border: none;
+    border-radius: 6px;
+    background: none;
+    color: var(--fg);
+    font: inherit;
+    text-align: left;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .menu-list > *:hover {
+    background: rgb(255 255 255 / 0.08);
   }
   main {
     flex: 1;
