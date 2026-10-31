@@ -8,6 +8,7 @@
   import MatDrawer from './MatDrawer.svelte';
   import PlayerBar from './PlayerBar.svelte';
   import InlineIcon from './InlineIcon.svelte';
+  import FactionEmblem from './FactionEmblem.svelte';
   import { fade } from 'svelte/transition';
   import { guide } from './camera';
   import { flyTo, pinTo } from './fly';
@@ -70,6 +71,8 @@
   /** Who acts now: the current player, or a defender choosing for a fight. */
   const seatNow = $derived(activeSeat(game));
   const actions = $derived(legalActions(game, seatNow));
+  /** Changes each time play passes to a seat (once the pass screen is gone): the side panel's crest and text play in again. */
+  const intro = $derived(handoff ? -1 : `${seatNow}|${game.turnsTaken}`);
   const prompt = $derived(buildPrompt(game, actions, selection));
   /** What the board and top bar draw: the game, with resources picked to pay with already taken off. */
   const shown = $derived(prompt.preview ?? game);
@@ -303,7 +306,12 @@
       <div class="round"><small>Round</small><b>{round}</b></div>
       <Board game={shown} {prompt} onTap={tap} onPick={(sel) => (selection = sel)} guideTo={guide(game, prompt)} paused={handoff !== null} {travel} moveMs={settings.moveMs} /></div>
     <aside style:--c={color(seatNow)}>
+      <!-- Whoever acts now: their crest shows, then fades behind the text as it appears (again each time play passes, once the pass screen is gone). -->
+      {#key intro}
+        <div class="emblem"><FactionEmblem faction={game.setup.players[seatNow]!.faction} /></div>
+      {/key}
       <div class="panel" bind:this={panel}>
+        {#key intro}<div class="intro">
         {#if !headings}
           {@render current()}
         {:else}
@@ -320,6 +328,7 @@
             {#if step === 'bottom'}{@render current()}{:else}<p class="hint">After the top action.</p>{/if}
           </section>
         {/if}
+        </div>{/key}
       </div>
       {#if prompt.end}
         {@const end = prompt.end}
@@ -423,6 +432,7 @@
     position: relative;
   }
   aside {
+    position: relative;
     width: 230px;
     display: flex;
     flex-direction: column;
@@ -432,11 +442,45 @@
     background: #241f1a;
     font-size: 13px;
   }
+  @keyframes text-in {
+    0%,
+    40% {
+      opacity: 0;
+    }
+    100% {
+      opacity: 1;
+    }
+  }
   .title {
     margin: 0;
     line-height: 1.3;
   }
+  .emblem {
+    position: absolute;
+    inset: 30px 15px auto;
+    aspect-ratio: 1;
+    pointer-events: none;
+    animation: emblem 1.6s ease-in-out forwards;
+  }
+  @keyframes emblem {
+    0% {
+      opacity: 0;
+      transform: scale(0.92);
+    }
+    25%,
+    45% {
+      opacity: 0.6;
+      transform: none;
+    }
+    100% {
+      opacity: 0.1;
+    }
+  }
+  .intro {
+    animation: text-in 1.6s ease-out;
+  }
   .panel {
+    position: relative;
     flex: 1;
     min-height: 0;
     overflow-y: auto;
