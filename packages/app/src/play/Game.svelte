@@ -510,6 +510,7 @@
   }
   .emblem {
     position: absolute;
+    z-index: 0;
     inset: 30px 15px auto;
     aspect-ratio: 1;
     pointer-events: none;
@@ -528,6 +529,11 @@
     100% {
       opacity: 0.1;
     }
+  }
+  /* Everything in the side panel sits above the crest. */
+  aside > :not(.emblem) {
+    position: relative;
+    z-index: 1;
   }
   .intro {
     animation: text-in 1.6s ease-out;
