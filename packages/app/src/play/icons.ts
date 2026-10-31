@@ -3,7 +3,7 @@
 //   { image: 'icons/food.png' }       an image (a transparent .png or .svg) put in
 //                                     packages/app/public/icons/
 // Leave a terrain out to draw nothing on it.
-import type { RecruitBonus, Resource, Structure, Terrain } from '@scythe/engine';
+import type { RecruitBonus, Resource, StarKind, Structure, Terrain } from '@scythe/engine';
 
 export type Icon = { text: string } | { image: string };
 
@@ -54,3 +54,15 @@ export const RECRUIT_ICON: Icon = { text: '🎖️' };
 
 /** A star, flown to the top bar when one is earned. */
 export const STAR_ICON: Icon = { text: '⭐' };
+
+/** What each star was earned for, shown under the star as it's placed. */
+export const STAR_KIND_ICONS: Record<StarKind, Icon> = {
+  upgrades: { text: '⬆️' }, // all six upgrades
+  mechs: { text: '🤖' }, // all four mechs
+  structures: { text: '🏛️' }, // all four structures
+  recruits: RECRUIT_ICON, // all four recruits
+  workers: RESOURCE_ICONS.worker, // all eight workers
+  popularity: BONUS_ICONS.popularity, // top popularity
+  power: BONUS_ICONS.power, // top power
+  combat: { text: '⚔️' }, // a fight won
+};

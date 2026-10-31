@@ -12,7 +12,7 @@
   import { fade } from 'svelte/transition';
   import { guide } from './camera';
   import { flyTo, showMoment, type Moment } from './fly';
-  import { BONUS_ICONS, RECRUIT_ICON, STAR_ICON } from './icons';
+  import { BONUS_ICONS, RECRUIT_ICON, STAR_ICON, STAR_KIND_ICONS } from './icons';
   import { buildPrompt, combatSummary, sectionHeadings, type Button, type Prompt, type Selection } from './prompt';
   import { canSwitchSection, phase, previousSection, sectionChoices } from './turn';
   import { loadSettings } from './settings';
@@ -99,7 +99,7 @@
       if (a.type === 'deploy') added.push({ mech: { color: faction.color, initial: faction.name[0]! }, target: `[data-mech="${before.currentPlayer}|${a.hex}"]` });
     }
     next.players.forEach((p, seat) => {
-      for (let i = before.players[seat]!.stars.length; i < p.stars.length; i++) added.push({ icon: STAR_ICON, target: `[data-stars="${seat}"]` });
+      for (const kind of p.stars.slice(before.players[seat]!.stars.length)) added.push({ icon: STAR_ICON, below: STAR_KIND_ICONS[kind], target: `[data-stars="${seat}"]` });
     });
     if (added.length) moments = [...moments, ...added];
     selection = {};
