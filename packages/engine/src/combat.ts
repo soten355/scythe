@@ -68,11 +68,11 @@ export function maxCombatCards(state: GameState, seat: number, hex: HexId): numb
 const hasUnitsOn = (player: PlayerState, hex: HexId) =>
   combatUnitsOn(player, hex) > 0 || player.workers.includes(hex);
 
-/** Sends a player's units on a hex to `to` (home by default); workers always go home. */
+/** Sends a player's units on a hex home, or onto a lake (where workers ride along with the mechs). */
 function retreat(state: GameState, seat: number, hex: HexId, to: Location = 'home'): GameState {
   const p = state.players[seat]!;
-  const go = (dest: Location) => (at: Location): Location => (at === hex ? dest : at);
-  return updatePlayer(state, seat, { character: go(to)(p.character), mechs: p.mechs.map(go(to)), workers: p.workers.map(go('home')) });
+  const go = (at: Location): Location => (at === hex ? to : at);
+  return updatePlayer(state, seat, { character: go(p.character), mechs: p.mechs.map(go), workers: p.workers.map(go) });
 }
 
 /** Lakes next to a lost fight that the loser's character and mechs may retreat onto instead of going home. */
@@ -242,11 +242,9 @@ function resolve(state: GameState, turn: CombatStep, fight: Fight): GameState {
   next = { ...next, lastCombat: result };
   const left = turn.left.filter((h) => h !== fight.hex);
 
-  // Workers go home now; the character and mechs too, unless the loser has somewhere else to choose.
+  // Everything goes home, unless the loser may choose a lake (their workers then go with the mechs).
   const lakes = combatUnitsOn(next.players[loser.seat]!, fight.hex) > 0 ? retreatLakes(next, loser.seat, fight.hex) : [];
   if (lakes.length) {
-    const p = next.players[loser.seat]!;
-    next = updatePlayer(next, loser.seat, { workers: p.workers.map((w) => (w === fight.hex ? 'home' : w)) });
     const waiting: Retreat = { seat: loser.seat, hex: fight.hex, to: lakes };
     return { ...next, turn: { step: 'combat', section: turn.section, left, fight: null, retreat: waiting } };
   }

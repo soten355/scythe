@@ -101,7 +101,8 @@ function rewards(state: GameState, section: SectionIndex): GameState {
 /** Choices for what the bottom-row action does, once it's paid for. */
 function effectOptions(state: GameState, kind: BottomActionType): Action[] {
   const { player, mat, faction } = current(state);
-  const workerHexes = [...new Set(onBoard(player.workers))];
+  // Workers on a lake ride on a mech: nothing is deployed or built there.
+  const workerHexes = [...new Set(onBoard(player.workers))].filter((h) => state.setup.board.hexes[h]?.terrain !== 'lake');
   switch (kind) {
     case 'upgrade': {
       const tops = SECTIONS.flatMap((section) =>

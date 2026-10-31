@@ -451,8 +451,9 @@ function carryPrompt(state: GameState, actions: Action[], unit: UnitRef, selecti
       for (let i = 0; i < n; i++) resources.push(a.resource);
     }
   }
-  // The picks (at first, what it carries), less any that aren't there any more.
-  const wanted = selection.carry ?? loaded;
+  // The picks (at first, what it carries; on a lake, everything, as it can't stay behind), less any that aren't there any more.
+  const onLake = at !== 'home' && state.setup.board.hexes[at]?.terrain === 'lake';
+  const wanted = selection.carry ?? (onLake ? { workers, resources } : loaded);
   const picked: Carry = { workers: wanted.workers.filter((w) => workers.includes(w)), resources: [] };
   const left = [...resources];
   for (const r of wanted.resources) {

@@ -101,13 +101,32 @@ describe('lakes', () => {
     expect(targets(state, character)).toEqual(['A1', 'A2', 'B1', 'B3', 'C1', 'C2']);
   });
 
-  it("won't take workers onto a lake", () => {
-    const state = play(game({ mechs: [lakes] }, { mechs: ['A2'], workers: ['A2'] }), choose(2), {
-      type: 'carryWorker',
-      unit: mech(0),
-      worker: 0,
-    });
-    expect(targets(state, mech(0))).not.toContain('B2');
+  it('lets a mech carry workers and resources onto a lake', () => {
+    let state: GameState = { ...game({ mechs: [lakes] }, { mechs: ['A2'], workers: ['A2', 'C4'] }), resources: { A2: { oil: 1 } } };
+    state = play(state, choose(2), { type: 'carryWorker', unit: mech(0), worker: 0 }, { type: 'carryResource', unit: mech(0), resource: 'oil' });
+    expect(targets(state, mech(0))).toContain('B2');
+    state = play(state, move(mech(0), 'B2'));
+    expect(state.players[0]!.workers).toEqual(['B2', 'C4']);
+    expect(state.resources).toEqual({ B2: { oil: 1 } });
+  });
+
+  it("keeps workers on a lake with the mech: they can't move off alone", () => {
+    const state = play(game({ mechs: [lakes] }, { mechs: ['B2'], workers: ['B2', 'C4'] }), choose(2));
+    expect(targets(state, worker(0))).toEqual([]);
+    expect(legalActions(state, 0)).toContainEqual({ type: 'carryWorker', unit: mech(0), worker: 0 });
+  });
+
+  it('takes everything on the lake along when the last mech leaves', () => {
+    let state: GameState = { ...game({ mechs: [lakes] }, { mechs: ['B2'], workers: ['B2', 'B2'] }), resources: { B2: { food: 2 } } };
+    state = play(state, choose(2), move(mech(0), 'B3'));
+    expect(state.players[0]!.workers).toEqual(['B3', 'B3']);
+    expect(state.resources).toEqual({ B3: { food: 2 } });
+  });
+
+  it("can't drop things off on a lake partway through a move", () => {
+    let state = play(game({ mechs: [lakes, speed] }, { mechs: ['A2'], workers: ['A2'] }), choose(2));
+    state = play(state, { type: 'carryWorker', unit: mech(0), worker: 0 }, move(mech(0), 'B2'));
+    expect(legalActions(state, 0).some((a) => a.type === 'dropWorker')).toBe(false);
   });
 
   it('lets a loser retreat onto a lake next to the fight instead of going home', () => {
@@ -116,15 +135,17 @@ describe('lakes', () => {
     state = { ...state, currentPlayer: 1 };
     state = play(state, choose(3), move(character, 'A2'), { type: 'endMove' }, { type: 'combatPower', power: 1 });
     expect(state.lastCombat?.winner).toBe(1);
-    // Workers can't go onto lakes: home already. The mech waits for its owner to choose.
-    expect(state.players[0]!.workers).toEqual(['home']);
+    // The mech (and the worker with it) waits for its owner to choose.
+    expect(state.players[0]!.workers).toEqual(['A2']);
     expect(activeSeat(state)).toBe(0);
     expect(legalActions(state, 0)).toEqual([
       { type: 'retreat', to: 'home' },
       { type: 'retreat', to: 'B2' },
     ]);
     state = play(state, { type: 'retreat', to: 'B2' });
+    // The worker goes onto the lake with the mech.
     expect(state.players[0]!.mechs).toEqual(['B2']);
+    expect(state.players[0]!.workers).toEqual(['B2']);
     expect(state.turn.step).toBe('bottom');
     expect(activeSeat(state)).toBe(1);
   });
@@ -284,8 +305,8 @@ describe('fuzz: random games with every ability', () => {
         if (state.lastCombat !== before) fights++;
         for (const p of state.players) {
           expect(p.power).toBeGreaterThanOrEqual(0);
-          // Workers never stand on lakes.
-          for (const w of p.workers) if (w !== 'home') expect(state.setup.board.hexes[w]!.terrain).not.toBe('lake');
+          // Workers stand on a lake only with one of their mechs.
+          for (const w of p.workers) if (w !== 'home' && state.setup.board.hexes[w]!.terrain === 'lake') expect(p.mechs).toContain(w);
         }
         if (state.turn.step !== 'moving' && state.turn.step !== 'combat') {
           const [a, b] = state.players.map((p) => new Set([p.character, ...p.mechs, ...p.workers].filter((h) => h !== 'home')));

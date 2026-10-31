@@ -192,6 +192,27 @@
     dragged = false;
   }
 
+  const isLake = (hex: HexId) => board.hexes[hex]?.terrain === 'lake';
+
+  /**
+   * Workers and resources on a lake never leave the mechs there: they're
+   * drawn riding on the first mech (or the character), like a load.
+   */
+  function riding(hex: HexId, placed: { g: Pieces; kind: Kind; x: number; y: number }[], cargo: Prompt['cargo']) {
+    const host = placed.find((p) => p.kind === 'mechs') ?? placed.find((p) => p.kind === 'character');
+    if (!host || !isLake(hex)) return null;
+    const seat = host.g.seat;
+    const workers = game.players[seat]!.workers.filter((w, i) => w === hex && !cargo?.workers.includes(i)).length;
+    const resources = (Object.entries(game.resources[hex] ?? {}) as [Resource, number][])
+      .map(([r, n]): [Resource, number] => [r, n - (cargo?.resources[r] ?? 0)])
+      .filter(([, n]) => n > 0);
+    const chips = [
+      ...(workers ? [{ what: 'worker', fill: host.g.color, n: workers, dark: false }] : []),
+      ...resources.map(([r, n]) => ({ what: r as string, fill: RESOURCE_COLOR[r], n, dark: r === 'food' || r === 'metal' })),
+    ];
+    return chips.length ? { x: host.x, y: host.y - (cargo?.at === hex ? 24 : 13), chips } : null;
+  }
+
   /** Everything on a hex, grouped by player. */
   type Pieces = { seat: number; color: string; initial: string; character: boolean; mechs: number; workers: number; structure?: string };
   const piecesOn = $derived.by(() => {
@@ -213,7 +234,8 @@
       for (const m of p.mechs) if (m !== 'home') add(m, { mechs: 1 });
       // Workers the selected mech has picked up ride on it instead (see cargo below).
       const carried = i === game.currentPlayer ? (prompt.cargo?.workers ?? []) : [];
-      p.workers.forEach((w, wi) => w === 'home' || carried.includes(wi) || add(w, { workers: 1 }));
+      // Workers on a lake ride on a mech there (see riding below).
+      p.workers.forEach((w, wi) => w === 'home' || carried.includes(wi) || isLake(w) || add(w, { workers: 1 }));
       for (const [s, hex] of Object.entries(p.structures)) if (hex) add(hex, { structure: STRUCTURE_LETTER[s as keyof typeof STRUCTURE_LETTER] });
     });
     return on;
@@ -490,8 +512,16 @@
           {/each}
         {/if}
       {/if}
-      <!-- Resources picked up by the selected unit are off the hex for now. -->
-      {@const pile = (Object.entries(game.resources[h.id] ?? {}) as [Resource, number][])
+      {@const ride = riding(h.id, placed, cargo)}
+      {#if ride}
+        {#each ride.chips as chip, ci (ci)}
+          {@const cx = ride.x + (ci - (ride.chips.length - 1) / 2) * 10}
+          <circle {cx} cy={ride.y} r="4.5" fill={chip.fill} class="cargo" data-spot={chip.what === 'worker' ? `worker|${h.id}` : `pile|${h.id}|${chip.what}`} />
+          <text x={cx} y={ride.y + 2} class="piece-text small" class:dark={chip.dark}>{chip.n}</text>
+        {/each}
+      {/if}
+      <!-- Resources picked up by the selected unit are off the hex for now (and on a lake, they ride on the mech). -->
+      {@const pile = isLake(h.id) ? [] : (Object.entries(game.resources[h.id] ?? {}) as [Resource, number][])
         .map(([r, n]): [Resource, number] => [r, n - (cargo?.resources[r] ?? 0)])
         .filter(([, n]) => n > 0)}
       {#each pile as [res, n], i (res)}

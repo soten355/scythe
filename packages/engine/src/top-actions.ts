@@ -37,7 +37,7 @@ export function topActions(state: GameState, turn: TopStep): Action[] {
       return [...walkOptions(state, turn), ...moveOptions(state, turn.section, turn.moved), { type: 'endMove' }];
     case 'trading':
       // Every traded resource goes on the hex the first one went to.
-      return tradeResourceOptions(player).filter((a) => a.type === 'tradeResource' && a.hex === turn.hex);
+      return tradeResourceOptions(state, player).filter((a) => a.type === 'tradeResource' && a.hex === turn.hex);
     case 'producing':
       return [...produceOptions(state, turn.section, turn.produced), { type: 'endProduce' }];
     case 'top':
@@ -46,7 +46,7 @@ export function topActions(state: GameState, turn: TopStep): Action[] {
           return [{ type: 'gainCoins' }, ...moveOptions(state, turn.section, [])];
         case 'trade':
           if (player.coins < top.cost) return [];
-          return [...tradeResourceOptions(player), { type: 'tradePopularity' }];
+          return [...tradeResourceOptions(state, player), { type: 'tradePopularity' }];
         case 'produce':
           return canPayProduceCost(player) ? produceOptions(state, turn.section, []) : [];
         case 'bolster':
@@ -95,7 +95,8 @@ export function applyTop(state: GameState, turn: TopStep, action: Action): GameS
       const before = turn.step === 'moving' ? turn.moved : [];
       // A walking unit's next hex is part of the same unit's move.
       const moved = walking ? before : [...before, action.unit];
-      const load = loadOf(turn, action.unit);
+      const from = unitsOf(player).find((u) => sameUnit(u.unit, action.unit))!.at;
+      const load = withLakeCargo(state, seat, action.unit, from, loadOf(turn, action.unit));
       const next = moveUnit(state, seat, action.unit, action.to, load);
       const left = walking ? walking.left - 1 : extraHexes(state, seat, action.unit);
       // Moving onto other players' units ends that unit's move.
@@ -179,6 +180,8 @@ export function moveTargets(state: GameState, seat: number, at: Location, kind: 
   const terrain = (hex: HexId) => board.hexes[hex]?.terrain;
   const crosses = (to: HexId) =>
     rules.some((r) => r.kind === 'crossRivers' && (r.units === 'workers' ? !fighter : fighter && r.onto.includes(terrain(to)!)));
+  // Workers on a lake ride with a mech: they never move off on their own.
+  if (!fighter && at !== 'home' && terrain(at) === 'lake') return [];
   let targets: HexId[];
   if (at === 'home') {
     targets = [...(board.homeBases[state.setup.players[seat]!.faction.homeBase] ?? [])];
@@ -205,11 +208,24 @@ const extraHexes = (state: GameState, seat: number, unit: UnitRef) =>
 const loadOf = (turn: TopStep, unit: UnitRef): Load | undefined =>
   turn.step === 'moving' && turn.load && sameUnit(turn.load.unit, unit) ? turn.load : undefined;
 
-/** Where a unit can go with what it carries: workers can't be taken onto lakes. */
-function targetsWithLoad(state: GameState, unit: UnitRef, at: Location, load?: Load): HexId[] {
-  const targets = moveTargets(state, state.currentPlayer, at, unit.kind);
-  if (!load?.workers.length) return targets;
-  return targets.filter((to) => state.setup.board.hexes[to]?.terrain !== 'lake');
+const isLake = (state: GameState, at: Location) => at !== 'home' && state.setup.board.hexes[at]?.terrain === 'lake';
+
+/**
+ * What goes along when a unit moves: its load, plus, when it's the last of
+ * your units on a lake that can take them, everything else there (workers
+ * and resources on a lake never leave the mechs; the character carries
+ * resources only).
+ */
+function withLakeCargo(state: GameState, seat: number, unit: UnitRef, from: Location, load: Load | undefined): Load | undefined {
+  if (!isLake(state, from) || unit.kind === 'worker') return load;
+  const player = state.players[seat]!;
+  const others = unitsOf(player).filter((u) => u.at === from && u.unit.kind !== 'worker' && !sameUnit(u.unit, unit));
+  const next: Load = { unit, workers: [...(load?.workers ?? [])], resources: { ...load?.resources } };
+  if (unit.kind === 'mech' && !others.some((u) => u.unit.kind === 'mech')) {
+    player.workers.forEach((w, i) => w === from && !next.workers.includes(i) && next.workers.push(i));
+  }
+  if (others.length === 0) next.resources = { ...state.resources[from] };
+  return next;
 }
 
 /** Units that haven't moved yet, while the section allows more: their moves and pick-ups. `load`: only that unit, with it. */
@@ -219,7 +235,7 @@ function moveOptions(state: GameState, section: SectionIndex, moved: UnitRef[], 
   const actions: Action[] = [];
   for (const { unit, at } of unitsOf(player)) {
     if (load ? !sameUnit(load.unit, unit) : moved.some((m) => sameUnit(m, unit))) continue;
-    for (const to of targetsWithLoad(state, unit, at, load)) actions.push({ type: 'moveUnit', unit, to });
+    for (const to of moveTargets(state, state.currentPlayer, at, unit.kind)) actions.push({ type: 'moveUnit', unit, to });
     if (!load) actions.push(...carryOptions(state, unit));
   }
   return actions;
@@ -231,8 +247,10 @@ function walkOptions(state: GameState, turn: Extract<TopStep, { step: 'moving' }
   const unit = turn.walking.unit;
   const load = loadOf(turn, unit);
   const at = unitsOf(current(state).player).find((u) => sameUnit(u.unit, unit))!.at;
-  const actions: Action[] = targetsWithLoad(state, unit, at, load).map((to): Action => ({ type: 'moveUnit', unit, to }));
+  const actions: Action[] = moveTargets(state, state.currentPlayer, at, unit.kind).map((to): Action => ({ type: 'moveUnit', unit, to }));
   actions.push(...carryOptions(state, unit, load));
+  // Nothing is dropped off on a lake.
+  if (isLake(state, at)) return actions;
   for (const worker of load?.workers ?? []) actions.push({ type: 'dropWorker', unit, worker });
   for (const resource of RESOURCES) if (load?.resources[resource]) actions.push({ type: 'dropResource', unit, resource });
   return actions;
@@ -278,9 +296,9 @@ function moveUnit(state: GameState, seat: number, unit: UnitRef, to: HexId, load
 
 // ---- Trade ----
 
-/** A traded resource goes on any hex with one of your workers. */
-const tradeResourceOptions = (player: PlayerState): Action[] =>
-  [...new Set(onBoard(player.workers))].flatMap((hex) => RESOURCES.map((resource): Action => ({ type: 'tradeResource', resource, hex })));
+/** A traded resource goes on any hex with one of your workers (not a lake, where they ride on a mech). */
+const tradeResourceOptions = (state: GameState, player: PlayerState): Action[] =>
+  [...new Set(onBoard(player.workers))].filter((hex) => !isLake(state, hex)).flatMap((hex) => RESOURCES.map((resource): Action => ({ type: 'tradeResource', resource, hex })));
 
 // ---- Produce ----
 

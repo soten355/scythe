@@ -62,10 +62,13 @@ should check it against the rulebook; tick it once confirmed.
       Speed) work for the character as well as the mechs.
 - [ ] Verify: Riverwalk lets a unit cross a river only onto the listed
       terrains (it's the hex you move onto that counts).
-- [ ] Verify: workers can't be on lakes, so a Seaworthy mech can't carry
-      workers onto one; when a Seaworthy loser retreats onto a lake, its
-      workers in the fight still go home. The loser picks one place for all
-      its character and mechs there.
+- [x] A Seaworthy mech can carry workers and resources onto a lake, but
+      there they never leave the mech: they can't be dropped off or move off
+      alone, and the last mech to leave takes them along. A Seaworthy loser
+      may retreat onto a lake next to the fight, taking its workers with it.
+      (Owner.) The loser picks one place for all its units there.
+- [ ] Verify: resources riding on a mech on a lake can still be spent on a
+      bottom-row action (the engine allows it: you control the lake).
 - [ ] Verify: Speed lets a unit move one more hex; moving onto any enemy
       unit ends its move. On the way it may drop off and pick up workers and
       resources (owner's play-test note).
