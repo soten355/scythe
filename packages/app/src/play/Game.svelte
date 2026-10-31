@@ -8,6 +8,7 @@
   import PlayerBar from './PlayerBar.svelte';
   import InlineIcon from './InlineIcon.svelte';
   import FactionEmblem from './FactionEmblem.svelte';
+  import FightScreen from './FightScreen.svelte';
   import { fade } from 'svelte/transition';
   import { guide } from './camera';
   import { showMoment, type Moment } from './fly';
@@ -360,6 +361,9 @@
       </div>
     </aside>
   </main>
+
+  <!-- A fight takes over the screen until it's decided. -->
+  <FightScreen game={shown} {prompt} seat={seatNow} {canUndo} onUndo={undo} onSelect={(sel) => (selection = sel)} onPress={press} />
 
   {#if menuOpen}
     <!-- Tapping anywhere outside the menu closes it. -->
