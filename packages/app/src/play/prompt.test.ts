@@ -422,6 +422,15 @@ describe('combat', () => {
     expect(lock.actions).toEqual([{ type: 'combatCard', value: 5 }, { type: 'combatPower', power: 3 }]);
   });
 
+  it('locks in cards with no power left, then passes to the defender', () => {
+    const ready = fight();
+    const state: GameState = { ...ready, players: [{ ...ready.players[0]!, power: 0 }, ready.players[1]!] };
+    const p = combatPrompt(state, combatPrompt(state).combat!.hand[1]!.select);
+    const after = play(state, ...p.buttons.find((b) => b.primary)!.actions!);
+    expect(activeSeat(after)).toBe(1);
+    expect(combatPrompt(after).combat?.role).toBe('defend');
+  });
+
   it('then asks the defender, with their own cards', () => {
     const state = play(fight(), { type: 'combatPower', power: 2 });
     const p = combatPrompt(state);

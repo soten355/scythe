@@ -200,8 +200,10 @@ function settle(state: GameState): GameState {
   if (fight.before.length) return state;
   if (fight.defender.power !== null) return resolve(state, turn, fight);
   const who = choosing(fight);
+  // A side with nothing to choose (no power, no cards) is locked in at 0. Once a side has
+  // started choosing (played a card), it locks in its own power.
   const options = sideOptions(state, fight, fight[who]);
-  if (options.length === 1 && options[0]!.type === 'combatPower') {
+  if (!fight[who].cards.length && options.length === 1 && options[0]!.type === 'combatPower') {
     return settle({ ...state, turn: { ...turn, fight: { ...fight, [who]: { ...fight[who], power: 0 } } } });
   }
   return state;

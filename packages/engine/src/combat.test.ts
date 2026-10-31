@@ -109,6 +109,15 @@ describe('choosing power and cards', () => {
     expect(state.turn.step).toBe('bottom');
     expect(state.lastCombat).toMatchObject({ winner: 0, defender: { seat: 1, power: 0, cards: [] } });
   });
+  it("waits for a side with no power to lock in its cards before asking the other side", () => {
+    // The attacker has 0 power: after their card, they still lock in 0 themselves.
+    let state = play(attack({ power: 0 }), card(5));
+    expect(activeSeat(state)).toBe(0);
+    expect(legalActions(state, 0)).toEqual([dial(0)]);
+    state = play(state, dial(0));
+    expect(activeSeat(state)).toBe(1);
+    expect(state.turn).toMatchObject({ fight: { attacker: { power: 0, cards: [5] }, defender: { power: null } } });
+  });
 });
 
 describe('resolving a fight', () => {
