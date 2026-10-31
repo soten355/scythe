@@ -8,8 +8,13 @@
   // the fingers or the pointer), drag to pan, or use the buttons at the bottom
   // right. The game also guides it (guideTo) each time there's somewhere new
   // to look, once the pass screen is gone (paused).
+  //
+  // A unit that just moved (travel) glides hex by hex along its path, taking
+  // moveMs per hex; its piece at the destination is hidden until it lands,
+  // then whatever it carried hops off onto the hex.
   import type { GameState, HexId, Location, Resource } from '@scythe/engine';
-  import { untrack } from 'svelte';
+  import { tick, untrack } from 'svelte';
+  import type { Travel } from './travel';
   import { between, fitView, panBy, worldOf, zoomAt, type Limits, type View } from './camera';
   import { boardArea, center, corners, points, sharedEdge, SIZE, spotsArea, type Point } from './geometry';
   import HexIcon from './HexIcon.svelte';
@@ -23,6 +28,8 @@
     onPick,
     guideTo,
     paused = false,
+    travel = null,
+    moveMs = 350,
   }: {
     game: GameState;
     prompt: Prompt;
@@ -31,7 +38,14 @@
     /** Where to look; the camera moves each time the key changes. */
     guideTo?: { key: string; spots: Location[] } | null;
     paused?: boolean;
+    travel?: Travel | null;
+    moveMs?: number;
   } = $props();
+
+  /** The travel that has landed (its piece is drawn normally again). */
+  let landed = $state(-1);
+  const moving = $derived(travel && travel.id !== landed && travel.path.length > 1 ? travel : null);
+  const travelEnd = $derived(moving ? moving.path[moving.path.length - 1]! : null);
 
   /** A piece of the current player that can be tapped to pick that unit (see Prompt.pieces). */
   const pickable = (at: Location, kind: 'character' | 'mechs' | 'workers') => {
@@ -229,13 +243,17 @@
         });
         on.set(hex, list);
       };
+      // A unit still travelling (and what it carries) isn't drawn at its destination yet.
+      const hide = { character: 0, mechs: 0, workers: 0 };
+      if (moving && moving.seat === i) Object.assign(hide, { [moving.kind]: 1 }, { workers: moving.workers + (moving.kind === 'workers' ? 1 : 0) });
+      const shown = (at: Location, kind: keyof typeof hide) => !(at === travelEnd && hide[kind] > 0 && hide[kind]--);
       // Units on the home base (the character, and any sent home after a fight) are drawn there instead.
-      if (p.character !== 'home') add(p.character, { character: true });
-      for (const m of p.mechs) if (m !== 'home') add(m, { mechs: 1 });
+      if (p.character !== 'home' && shown(p.character, 'character')) add(p.character, { character: true });
+      for (const m of p.mechs) if (m !== 'home' && shown(m, 'mechs')) add(m, { mechs: 1 });
       // Workers the selected mech has picked up ride on it instead (see cargo below).
       const carried = i === game.currentPlayer ? (prompt.cargo?.workers ?? []) : [];
       // Workers on a lake ride on a mech there (see riding below).
-      p.workers.forEach((w, wi) => w === 'home' || carried.includes(wi) || isLake(w) || add(w, { workers: 1 }));
+      p.workers.forEach((w, wi) => w === 'home' || carried.includes(wi) || isLake(w) || !shown(w, 'workers') || add(w, { workers: 1 }));
       for (const [s, hex] of Object.entries(p.structures)) if (hex) add(hex, { structure: STRUCTURE_LETTER[s as keyof typeof STRUCTURE_LETTER] });
     });
     return on;
@@ -289,6 +307,47 @@
     }
     if (added.length) flights = [...flights, ...added];
   });
+
+  /** Where a travelling piece is drawn on a hex (or a player's home base). */
+  function spotOf(at: Location, seat: number): Point {
+    const pos = at === 'home' ? board.homeBasePositions[game.setup.players[seat]!.faction.homeBase]! : board.hexes[at]!;
+    const c = center(pos);
+    return [c[0] - PIECES_LEFT, c[1] - 4];
+  }
+
+  /**
+   * Glides a travelling piece (drawn at its destination) along its path, a
+   * hex at a time, then lands it: its piece shows again and what it carried
+   * hops off onto the hex, the way it was picked up but in reverse.
+   */
+  function walk(node: SVGElement, t: Travel) {
+    const end = spotOf(t.path[t.path.length - 1]!, t.seat);
+    const frames = t.path.map((at) => {
+      const p = spotOf(at, t.seat);
+      return { transform: `translate(${p[0] - end[0]}px, ${p[1] - end[1]}px)` };
+    });
+    const hops = t.path.length - 1;
+    const run = node.animate(frames, { duration: moveMs * hops, easing: 'ease-in-out', fill: 'forwards' });
+    run.finished.then(() => land(t, end), () => {});
+    return { destroy: () => run.cancel() };
+  }
+
+  async function land(t: Travel, end: Point) {
+    landed = t.id;
+    const at = t.path[t.path.length - 1]!;
+    // On a lake everything stays riding on the mech.
+    if (at === 'home' || isLake(at)) return;
+    await tick();
+    const spots = readSpots();
+    const what = [...Array<string>(t.workers).fill('worker'), ...(Object.entries(t.resources) as [Resource, number][]).flatMap(([r, n]) => Array<string>(n).fill(r))];
+    const added: Flight[] = [];
+    for (const w of what) {
+      const to = spots.get(w === 'worker' ? `worker|${at}` : `pile|${at}|${w}`);
+      if (!to) continue;
+      added.push({ id: nextFlight++, from: [end[0], end[1] - 13], to: [to.x, to.y], fill: to.fill, delay: added.length * 90 });
+    }
+    if (added.length) flights = [...flights, ...added];
+  }
 
   /** Arcs a flying piece from its start to its end (it's drawn at the end), then drops it. */
   function fly(node: SVGElement, f: Flight) {
@@ -522,7 +581,7 @@
       {/if}
       <!-- Resources picked up by the selected unit are off the hex for now (and on a lake, they ride on the mech). -->
       {@const pile = isLake(h.id) ? [] : (Object.entries(game.resources[h.id] ?? {}) as [Resource, number][])
-        .map(([r, n]): [Resource, number] => [r, n - (cargo?.resources[r] ?? 0)])
+        .map(([r, n]): [Resource, number] => [r, n - (cargo?.resources[r] ?? 0) - (travelEnd === h.id ? (moving?.resources[r] ?? 0) : 0)])
         .filter(([, n]) => n > 0)}
       {#each pile as [res, n], i (res)}
         {@const x = c[0] - (pile.length - 1) * 7 + i * 14}
@@ -533,6 +592,29 @@
     {#each flights as f (f.id)}
       <circle cx={f.to[0]} cy={f.to[1]} r="5" fill={f.fill} class="flight" use:fly={f} />
     {/each}
+    {#if moving}
+      {#key moving.id}
+        {@const end = spotOf(travelEnd!, moving.seat)}
+        {@const f = game.setup.players[moving.seat]!.faction}
+        {@const chips = [
+          ...(moving.workers ? [{ fill: f.color, n: moving.workers, dark: false }] : []),
+          ...(Object.entries(moving.resources) as [Resource, number][]).map(([r, n]) => ({ fill: RESOURCE_COLOR[r], n, dark: r === 'food' || r === 'metal' })),
+        ]}
+        <g class="travel" use:walk={moving}>
+          {#if moving.kind === 'mechs'}
+            <rect x={end[0] - 6} y={end[1] - 6} width="12" height="12" rx="2" fill={f.color} class="mech" />
+          {:else}
+            <circle cx={end[0]} cy={end[1]} r={moving.kind === 'workers' ? 5.5 : 6.5} fill={f.color} class={moving.kind === 'workers' ? 'worker' : 'character'} />
+          {/if}
+          <text x={end[0]} y={end[1] + 3} class="piece-text">{moving.kind === 'workers' ? 1 : f.name[0]}</text>
+          {#each chips as chip, ci (ci)}
+            {@const cx = end[0] + (ci - (chips.length - 1) / 2) * 10}
+            <circle {cx} cy={end[1] - 13} r="4.5" fill={chip.fill} class="cargo" />
+            <text x={cx} y={end[1] - 11} class="piece-text small" class:dark={chip.dark}>{chip.n}</text>
+          {/each}
+        </g>
+      {/key}
+    {/if}
   </g>
 </svg>
   <div class="zoom">
@@ -679,6 +761,9 @@
   .character.picked {
     stroke: #ffd23f;
     stroke-width: 3;
+  }
+  .travel {
+    pointer-events: none;
   }
   .flight {
     stroke: #ffd23f;

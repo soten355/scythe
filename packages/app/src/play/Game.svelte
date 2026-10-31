@@ -13,6 +13,8 @@
   import { flyTo } from './fly';
   import { buildPrompt, combatSummary, sectionHeadings, type Button, type Prompt, type Selection } from './prompt';
   import { canSwitchSection, phase, previousSection, sectionChoices } from './turn';
+  import { loadSettings } from './settings';
+  import { travelOf, type Travel } from './travel';
 
   const start = () =>
     newGame({
@@ -34,6 +36,10 @@
   let selection: Selection = $state({});
   /** Seat being handed the device (and who just played, and why if mid-turn); the board is hidden until they tap. */
   let handoff: { from: number; to: number; note?: string } | null = $state(null);
+  const settings = loadSettings();
+  /** The last unit to move, for the map to animate. */
+  let travel: Travel | null = $state(null);
+  let travels = 0;
   /** A fight just finished: both sides' picks, shown once the device is back with whoever plays on. */
   let revealed: CombatResult | null = $state(null);
   /** An "are you sure?" question shown in the game, and what to do on Yes. */
@@ -62,6 +68,7 @@
     if (canSwitch && actions[0]?.type !== 'chooseSection') matOpen = false;
     const next = actions.reduce(applyAction, game);
     history = [...history, next];
+    travel = travelOf(before, next, actions, ++travels) ?? travel;
     selection = {};
     const nextSeat = activeSeat(next);
     if (next.currentPlayer !== before.currentPlayer) {
@@ -146,8 +153,10 @@
 
   function tap(at: Location) {
     const action = prompt.tapActions.get(at);
+    const route = prompt.tapRoutes?.get(at);
     const select = prompt.tapSelects.get(at);
     if (action) act(...(prompt.tapFirst ?? []), action);
+    else if (route) act(...(prompt.tapFirst ?? []), ...route);
     else if (select) selection = select;
     else selection = { hex: at };
   }
@@ -168,6 +177,7 @@
     if (!canUndo) return;
     history = history.slice(0, -1);
     selection = {};
+    travel = null;
     if (phase(history[history.length - 1]!) === 'choose') matOpen = true;
   }
 
@@ -267,7 +277,7 @@
     <div class="board">
       <!-- Where we are in the story, like a date on the map. -->
       <div class="round"><small>Round</small><b>{round}</b></div>
-      <Board game={shown} {prompt} onTap={tap} onPick={(sel) => (selection = sel)} guideTo={guide(game, prompt)} paused={handoff !== null} /></div>
+      <Board game={shown} {prompt} onTap={tap} onPick={(sel) => (selection = sel)} guideTo={guide(game, prompt)} paused={handoff !== null} {travel} moveMs={settings.moveMs} /></div>
     <aside style:--c={color(seatNow)}>
       <div class="panel" bind:this={panel}>
         {#if !headings}

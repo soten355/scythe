@@ -97,6 +97,8 @@ export interface Prompt {
   tapActions: Map<Location, Action>;
   /** Applied just before a tapped action, as one step: the selected unit picking things up before it moves. */
   tapFirst?: Action[];
+  /** Hexes more than one step away (Speed): tapping one moves there hex by hex (after `tapFirst`), as one step. */
+  tapRoutes?: Map<Location, Action[]>;
   /** What the selected unit has picked up so far; the map draws it on the unit instead of its hex. */
   cargo?: { at: Location; workers: number[]; resources: ResourcePile };
   /** Tapping one of these hexes changes the selection. */
@@ -389,6 +391,8 @@ export function buildPrompt(state: GameState, actions: Action[], selection: Sele
     }
     const carry = carryPrompt(state, actions, unit, selection);
     buttons.push(...carry.buttons);
+    const tapRoutes = routes(state, unit, carry.run, tapActions);
+    for (const hex of tapRoutes.keys()) highlights.add(hex);
     const isWalking = walking && sameUnit(walking, unit);
     if (isWalking) buttons.push({ label: 'Done moving', action: { type: 'endMove' }, quiet: true });
     else if (!forced) buttons.push({ label: 'Back', select: {}, quiet: true });
@@ -400,6 +404,7 @@ export function buildPrompt(state: GameState, actions: Action[], selection: Sele
       tapSelects,
       selected: unitLocation(state, unit),
       ...((carry.slots.length || carry.run.length) && { slots: carry.slots, tapFirst: carry.run, cargo: carry.cargo }),
+      ...(tapRoutes.size && { tapRoutes }),
       // Tapping a hex moves there; tapping another piece switches to it.
       ...(!forced && { pieces: piecesToPick(state, actions) }),
       selectedPiece: pieceKey(unitLocation(state, unit), unit.kind),
@@ -438,6 +443,42 @@ export function buildPrompt(state: GameState, actions: Action[], selection: Sele
     buttons.push({ label: label(state, a), action: a, quiet });
   }
   return { title: title(state), buttons, highlights, tapActions, tapSelects, pieces: piecesToPick(state, actions) };
+}
+
+/**
+ * With Speed, the hexes a unit can reach in more than one step, each with the
+ * moves to get there (shortest first), found by asking the engine where it
+ * can go next from each hex. `first` is what it picks up before setting off;
+ * `near` the hexes one step away, left out here.
+ */
+function routes(state: GameState, unit: UnitRef, first: Action[], near: Map<Location, Action>): Map<Location, Action[]> {
+  const found = new Map<Location, Action[]>();
+  const start = unitLocation(state, unit);
+  let frontier: { state: GameState; path: Action[] }[];
+  try {
+    frontier = [{ state: first.reduce(applyAction, state), path: [] }];
+  } catch {
+    return found;
+  }
+  const seen = new Set<Location>([start, ...near.keys()]);
+  while (frontier.length) {
+    const next: typeof frontier = [];
+    for (const { state: s, path } of frontier) {
+      // Past the first hex, only while this unit is still on its way.
+      if (path.length && !(s.turn.step === 'moving' && s.turn.walking && sameUnit(s.turn.walking.unit, unit))) continue;
+      for (const a of legalActions(s, s.currentPlayer)) {
+        if (a.type !== 'moveUnit' || !sameUnit(a.unit, unit)) continue;
+        const to = [...path, a];
+        if (path.length && !seen.has(a.to)) {
+          seen.add(a.to);
+          found.set(a.to, to);
+        }
+        next.push({ state: applyAction(s, a), path: to });
+      }
+    }
+    frontier = next;
+  }
+  return found;
 }
 
 /**

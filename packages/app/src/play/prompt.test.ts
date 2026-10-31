@@ -443,6 +443,24 @@ describe('Speed', () => {
     expect(p.buttons.map((b) => b.label)).not.toContain('Back');
   });
 
+  it('lets you tap a hex two away, and moves there hex by hex', () => {
+    // From C5, an open forest (around A5, rivers leave nothing two hexes off).
+    const base = speedy();
+    const state: GameState = { ...base, players: [{ ...base.players[0]!, mechs: ['C5'] }, base.players[1]!] };
+    const p = prompt(state, { unit: mech });
+    const far = [...p.tapRoutes!.keys()];
+    expect(far.length).toBeGreaterThan(0);
+    for (const hex of far) {
+      expect(p.highlights.has(hex)).toBe(true);
+      expect(p.tapActions.has(hex)).toBe(false);
+      const route = p.tapRoutes!.get(hex)!;
+      expect(route).toHaveLength(2);
+      expect(route.at(-1)).toMatchObject({ type: 'moveUnit', to: hex });
+      // The route is legal as it stands.
+      expect(play(state, ...route).players[0]!.mechs).toEqual([hex]);
+    }
+  });
+
   it('shows what it carries in the slots; removing one drops it off before the next hex', () => {
     const to = firstHex(speedy());
     const state = play(speedy(), { type: 'carryWorker', unit: mech, worker: 1 }, { type: 'moveUnit', unit: mech, to });
