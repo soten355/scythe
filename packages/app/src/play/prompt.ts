@@ -278,15 +278,24 @@ export function label(state: GameState, action: Action): string {
 }
 
 /** Headings for the two halves of the chosen section, shown in the side panel. */
-export function sectionHeadings(state: GameState): { top: string; bottom: string } | null {
+/** Where a row of the chosen section stands this turn: still to come, under way, done, or skipped. */
+export type RowStatus = 'waiting' | 'now' | 'done' | 'skipped';
+
+/** The chosen section's two rows for the side panel: what each does and costs, and how far the turn has got. */
+export function sectionHeadings(state: GameState): { top: string; bottom: string; status: { top: RowStatus; bottom: RowStatus } } | null {
   const turn = state.turn;
   if (turn.step === 'chooseSection') return null;
   const { mat } = state.setup.players[state.currentPlayer]!;
   const { top, bottom } = mat.sections[turn.section]!;
   const cost = bottomCost(state.players[state.currentPlayer]!, mat, turn.section);
+  const onBottom = turn.step === 'bottom' || turn.step === 'end';
   return {
     top: TOP_NAMES[top.action] + ('cost' in top ? ` · pay ${plural(top.cost, 'coin')}` : ''),
     bottom: `${BOTTOM_NAMES[bottom.action]} · pay ${cost.amount} ${cost.resource} · get ${plural(bottom.coins, 'coin')}`,
+    status: {
+      top: !onBottom ? 'now' : turn.skippedTop ? 'skipped' : 'done',
+      bottom: turn.step === 'end' ? 'done' : onBottom ? 'now' : 'waiting',
+    },
   };
 }
 

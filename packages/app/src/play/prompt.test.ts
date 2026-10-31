@@ -1,7 +1,7 @@
 import { baseBoard, baseFactions, baseMats } from '@scythe/content';
 import { activeSeat, applyAction, legalActions, newGame, type Action, type GameState } from '@scythe/engine';
 import { describe, expect, it } from 'vitest';
-import { buildPrompt, combatSummary, label } from './prompt';
+import { sectionHeadings, buildPrompt, combatSummary, label } from './prompt';
 
 // Nordic (home "ne": workers on A4, A5) on Industrial; Rusviet on Engineering.
 const start = () =>
@@ -523,5 +523,30 @@ describe('Build', () => {
     p = prompt(state, p.tapSelects.get('A5'));
     const go = p.buttons.find((b) => b.primary)!;
     expect(go.actions?.at(-1)).toEqual({ type: 'build', structure: 'mill', hex: 'A5' });
+  });
+});
+
+describe('the side panel headings', () => {
+  // Nordic's section 1 is Produce on top, Deploy below.
+  const status = (state: GameState) => sectionHeadings(state)?.status;
+
+  it('tick the top-row action once it is done, and show which row is under way', () => {
+    const chosen = play(start(), { type: 'chooseSection', section: 1 });
+    expect(status(chosen)).toEqual({ top: 'now', bottom: 'waiting' });
+    const produced = play(chosen, { type: 'produce', hex: 'A4' }, { type: 'endProduce' });
+    expect(status(produced)).toEqual({ top: 'done', bottom: 'now' });
+  });
+
+  it('say skipped instead of ticking a skipped top-row action', () => {
+    const skipped = play(start(), { type: 'chooseSection', section: 1 }, { type: 'skipTop' });
+    expect(status(skipped)).toEqual({ top: 'skipped', bottom: 'now' });
+  });
+
+  it('tick the bottom-row action once it is done, before End turn', () => {
+    const state = play(start(), { type: 'chooseSection', section: 1 }, { type: 'skipTop' });
+    const paid: GameState = { ...state, resources: { A4: { metal: 3 } } };
+    const deployed = play(paid, { type: 'pay', hex: 'A4' }, { type: 'pay', hex: 'A4' }, { type: 'pay', hex: 'A4' }, { type: 'deploy', hex: 'A4', ability: 0 });
+    expect(deployed.turn.step).toBe('end');
+    expect(status(deployed)).toEqual({ top: 'skipped', bottom: 'done' });
   });
 });

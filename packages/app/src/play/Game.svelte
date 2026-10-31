@@ -12,7 +12,7 @@
   import { guide } from './camera';
   import { showMoment, type Moment } from './fly';
   import { BONUS_ICONS, RECRUIT_ICON, STAR_ICON, STAR_KIND_ICONS } from './icons';
-  import { buildPrompt, combatSummary, sectionHeadings, type Button, type Prompt, type Selection } from './prompt';
+  import { buildPrompt, combatSummary, sectionHeadings, type Button, type Prompt, type RowStatus, type Selection } from './prompt';
   import { canSwitchSection, phase, previousSection, sectionChoices } from './turn';
   import { loadSettings } from './settings';
   import { travelOf, type Travel } from './travel';
@@ -234,6 +234,11 @@
   </div>
 {/snippet}
 
+<!-- Done rows get a tick and skipped ones say so, so it's clear both rows are dealt with before ending the turn. -->
+{#snippet mark(status: RowStatus)}
+  {#if status === 'done'}<span class="tick" aria-label="Done">✓</span>{:else if status === 'skipped'}<span class="skipped">Skipped</span>{/if}
+{/snippet}
+
 {#snippet combat()}
   {#if prompt.combat}
     {@const c = prompt.combat}
@@ -317,7 +322,7 @@
           {@render current()}
         {:else}
           <section class:done={step === 'bottom'}>
-            <h3>{headings.top}{step === 'bottom' ? ' ✓' : ''}</h3>
+            <h3>{@render mark(headings.status.top)}{headings.top}</h3>
             {#if step === 'top'}
               {@render current()}
               {#if canSwitch}<p class="hint">Or tap another section on your mat to switch.</p>{/if}
@@ -325,7 +330,7 @@
           </section>
           <hr />
           <section class:waiting={step !== 'bottom'}>
-            <h3>{headings.bottom}</h3>
+            <h3>{@render mark(headings.status.bottom)}{headings.bottom}</h3>
             {#if step === 'bottom'}{@render current()}{:else}<p class="hint">After the top action.</p>{/if}
           </section>
         {/if}
@@ -549,6 +554,31 @@
   .done,
   .waiting {
     opacity: 0.55;
+  }
+  /* A finished row fades less, so its tick stands out. */
+  .done:has(.tick) {
+    opacity: 0.8;
+  }
+  .tick {
+    display: inline-grid;
+    place-items: center;
+    width: 15px;
+    height: 15px;
+    margin-right: 5px;
+    border-radius: 50%;
+    background: #4caf50;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    vertical-align: 1px;
+  }
+  .skipped {
+    margin-right: 5px;
+    padding: 0 4px;
+    border: 1px solid currentColor;
+    border-radius: 4px;
+    font-size: 10px;
+    opacity: 0.8;
   }
   .hint {
     margin: 6px 0 0;
