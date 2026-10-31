@@ -229,6 +229,15 @@ describe('paying for a bottom action', () => {
     expect(deploy.actions).toEqual([...pays(pay), effect]);
     expect(play(deploying(), ...deploy.actions!).players[0]!.mechs).toEqual(['A5']);
   });
+  it('picks the last mech on its own', () => {
+    const pay = ['A4', 'A4', 'A5'];
+    const state = deploying();
+    const last = { ...state, players: [{ ...state.players[0]!, mechs: ['A4', 'A4', 'A4'], mechAbilities: [0, 1, 2] }, state.players[1]!] };
+    const p = prompt(last, { pay, hex: 'A5' });
+    const effect: Action = { type: 'deploy', hex: 'A5', ability: 3 };
+    expect(p.buttons.filter((b) => b.label.startsWith('Mech:'))).toMatchObject([{ chosen: true }]);
+    expect(button(p, 'Deploy')?.actions).toEqual([...pays(pay), effect]);
+  });
 });
 
 describe('upgrading', () => {

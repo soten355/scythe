@@ -876,7 +876,7 @@ function bottomPrompt(state: GameState, actions: Action[], selection: Selection)
       chosen ? { text: `On ${chosen.hex}`, remove: keep({ structure }) } : { empty: "Then tap a worker's hex" },
     );
   } else {
-    // Deploy happens on a worker's hex: tap it, then choose the mech.
+    // Deploy happens on a worker's hex: tap it, then choose the mech (the last one picks itself).
     chosen = options.find((a) => sameAction(a, selection.effect));
     for (const a of options) {
       const hex = (a as { hex: HexId }).hex;
@@ -884,6 +884,8 @@ function bottomPrompt(state: GameState, actions: Action[], selection: Selection)
       tapSelects.set(hex, keep({ hex }));
     }
     selected = selection.hex && highlights.has(selection.hex) ? selection.hex : undefined;
+    const here = options.filter((a) => (a as { hex: HexId }).hex === selected);
+    if (here.length === 1) chosen = here[0];
     for (const a of options) {
       if ((a as { hex: HexId }).hex !== selected) continue;
       const on = a === chosen;
