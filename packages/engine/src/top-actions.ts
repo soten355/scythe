@@ -1,14 +1,17 @@
 // The four top-row actions: Move, Trade, Produce and Bolster.
 //
+// Characters and mechs may move onto other players' units; once the move is
+// over, combat.ts sends enemy workers home and runs the fights.
+//
 // Still to come in Phase 2, with mech and faction abilities: crossing
-// rivers, moving onto lakes, moving two hexes, and combat when moving onto
-// another player's units. When a mech moves two hexes, it may drop off and
-// pick up any workers and resources at the hex in between, then keep moving
-// (one load/move step per hex should handle this).
+// rivers, moving onto lakes and moving two hexes. When a mech moves two
+// hexes, it may drop off and pick up any workers and resources at the hex in
+// between, then keep moving (one load/move step per hex should handle this).
 import { hasRiver, neighbors, type HexId } from './board';
 import type { Action, GameState, Load, Location, PlayerState, SectionIndex, TurnStep, UnitRef } from './game';
 import type { Resource, TopAction } from './mat';
-import { addResources, controlledHexes, current, enemyUnitHexes, gain, MAX_WORKERS, topValue, updatePlayer } from './state';
+import { afterMove, drawCombatCards } from './combat';
+import { addResources, controlledHexes, current, enemyUnitHexes, gain, MAX_WORKERS, onBoard, topValue, updatePlayer } from './state';
 
 type TopStep = Extract<TurnStep, { step: 'top' | 'moving' | 'trading' | 'producing' }>;
 
@@ -60,6 +63,7 @@ export function applyTop(state: GameState, turn: TopStep, action: Action): GameS
   const top = mat.sections[section].top;
   const value = (field: string) => topValue(player, mat, section, field);
   const toBottom = (s: GameState): GameState => ({ ...s, turn: { step: 'bottom', section, paid: 0 } });
+  const endOfMove = (s: GameState): GameState => afterMove(s, section);
 
   switch (action.type) {
     case 'gainCoins':
@@ -80,11 +84,11 @@ export function applyTop(state: GameState, turn: TopStep, action: Action): GameS
       const moved = [...(turn.step === 'moving' ? turn.moved : []), action.unit];
       const load = turn.step === 'moving' ? turn.load : undefined;
       const next = moveUnit(state, seat, action.unit, action.to, load);
-      if (moved.length >= value('units')) return toBottom(next);
+      if (moved.length >= value('units')) return endOfMove(next);
       return { ...next, turn: { step: 'moving', section, moved } };
     }
     case 'endMove':
-      return toBottom(state);
+      return endOfMove(state);
 
     case 'tradePopularity':
       return toBottom(updatePlayer(state, seat, gain(payTopCost(player, top), { popularity: value('popularity'), ...armory(player, top) })));
@@ -116,7 +120,9 @@ export function applyTop(state: GameState, turn: TopStep, action: Action): GameS
 
     case 'bolster': {
       const monument = player.structures[top.structure] ? { popularity: 1 } : {};
-      return toBottom(updatePlayer(state, seat, gain(payTopCost(player, top), { [action.gain]: value(action.gain), ...monument })));
+      const gained = action.gain === 'power' ? { power: value('power') } : {};
+      const next = updatePlayer(state, seat, gain(payTopCost(player, top), { ...gained, ...monument }));
+      return toBottom(action.gain === 'combatCards' ? drawCombatCards(next, seat, value('combatCards')) : next);
     }
     default:
       throw new Error(`unreachable: ${action.type} during ${turn.step}`);
@@ -142,10 +148,11 @@ const sameUnit = (a: UnitRef, b: UnitRef) => a.kind === b.kind && (a.kind === 'c
 /**
  * Where a unit at `at` can move in one step: a neighboring land hex not
  * across a river, or from a tunnel (or your mine) to any other tunnel or your
- * mine. Never onto a lake, back home, or (until combat exists) onto other
- * players' units. From home: the hexes bordering the home base.
+ * mine. Never onto a lake or back home, and workers never onto other
+ * players' units (characters and mechs may: that's an attack). From home:
+ * the hexes bordering the home base.
  */
-export function moveTargets(state: GameState, seat: number, at: Location): HexId[] {
+export function moveTargets(state: GameState, seat: number, at: Location, kind: UnitRef['kind'] = 'worker'): HexId[] {
   const board = state.setup.board;
   const player = state.players[seat]!;
   const enemies = enemyUnitHexes(state, seat);
@@ -158,7 +165,7 @@ export function moveTargets(state: GameState, seat: number, at: Location): HexId
     if (player.structures.mine) tunnels.push(player.structures.mine);
     if (tunnels.includes(at)) targets.push(...tunnels.filter((t) => t !== at));
   }
-  return [...new Set(targets)].filter((to) => board.hexes[to]?.terrain !== 'lake' && !enemies.has(to));
+  return [...new Set(targets)].filter((to) => board.hexes[to]?.terrain !== 'lake' && (kind !== 'worker' || !enemies.has(to)));
 }
 
 function moveOptions(state: GameState, section: SectionIndex, moved: UnitRef[], only?: UnitRef): Action[] {
@@ -167,7 +174,7 @@ function moveOptions(state: GameState, section: SectionIndex, moved: UnitRef[], 
   const actions: Action[] = [];
   for (const { unit, at } of unitsOf(player)) {
     if (only ? !sameUnit(only, unit) : moved.some((m) => sameUnit(m, unit))) continue;
-    for (const to of moveTargets(state, seat, at)) actions.push({ type: 'moveUnit', unit, to });
+    for (const to of moveTargets(state, seat, at, unit.kind)) actions.push({ type: 'moveUnit', unit, to });
     if (!only) actions.push(...carryOptions(state, unit));
   }
   return actions;
@@ -177,14 +184,14 @@ function moveOptions(state: GameState, section: SectionIndex, moved: UnitRef[], 
 function carryOptions(state: GameState, unit: UnitRef, load?: Load): Action[] {
   const { player } = current(state);
   const at = unitsOf(player).find((u) => sameUnit(u.unit, unit))!.at;
-  if (at === 'home' || moveTargets(state, state.currentPlayer, at).length === 0) return [];
+  if (moveTargets(state, state.currentPlayer, at, unit.kind).length === 0) return [];
   const actions: Action[] = [];
   if (unit.kind === 'mech') {
     player.workers.forEach((w, worker) => {
       if (w === at && !load?.workers.includes(worker)) actions.push({ type: 'carryWorker', unit, worker });
     });
   }
-  for (const resource of RESOURCES) {
+  for (const resource of at === 'home' ? [] : RESOURCES) {
     if ((state.resources[at]?.[resource] ?? 0) > (load?.resources[resource] ?? 0)) {
       actions.push({ type: 'carryResource', unit, resource });
     }
@@ -215,7 +222,7 @@ function moveUnit(state: GameState, seat: number, unit: UnitRef, to: HexId, load
 
 /** A traded resource goes on any hex with one of your workers. */
 const tradeResourceOptions = (player: PlayerState): Action[] =>
-  [...new Set(player.workers)].flatMap((hex) => RESOURCES.map((resource): Action => ({ type: 'tradeResource', resource, hex })));
+  [...new Set(onBoard(player.workers))].flatMap((hex) => RESOURCES.map((resource): Action => ({ type: 'tradeResource', resource, hex })));
 
 // ---- Produce ----
 
@@ -264,7 +271,7 @@ export function yieldOf(state: GameState, player: PlayerState, hex: HexId): { wh
  */
 function produceOptions(state: GameState, section: SectionIndex, produced: HexId[]): Action[] {
   const { seat, player, mat } = current(state);
-  const hexes = new Set(player.workers);
+  const hexes = new Set(onBoard(player.workers));
   const mill = player.structures.mill;
   if (mill && controlledHexes(state, seat).has(mill)) hexes.add(mill);
   const limitReached = produced.filter((hex) => hex !== mill).length >= topValue(player, mat, section, 'hexes');

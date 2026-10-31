@@ -132,7 +132,9 @@ describe('Produce', () => {
 describe('Bolster', () => {
   it('pays 1 coin for 2 power or 1 combat card', () => {
     expect(p0(play(game(), choose(0), { type: 'bolster', gain: 'power' }))).toMatchObject({ coins: 3, power: 5 });
-    expect(p0(play(game(), choose(0), { type: 'bolster', gain: 'combatCards' }))).toMatchObject({ coins: 3, combatCards: 3 });
+    const after = p0(play(game(), choose(0), { type: 'bolster', gain: 'combatCards' }));
+    expect(after.coins).toBe(3);
+    expect(after.combatCards).toHaveLength(3);
   });
 
   it('gives 1 popularity with the monument built', () => {
@@ -274,7 +276,7 @@ describe('Enlist', () => {
   it("doesn't give the ongoing bonus on the Enlist that places the recruit", () => {
     const p = p0(play(bottom(3, 'food'), { type: 'enlist', section: 3, bonus: 'coins' }));
     expect(p.coins).toBe(4 + 2);
-    expect(p.combatCards).toBe(2);
+    expect(p.combatCards).toHaveLength(2);
   });
 });
 
@@ -298,8 +300,11 @@ describe('stars', () => {
     expect(p0(play(state, { type: 'enlist', section: 3, bonus: 'popularity' })).stars).toEqual(['recruits', 'popularity']);
   });
 
-  it("doesn't count another player's achievements", () => {
-    const state = play(game({ power: 16 }, {}, 1), choose(0), { type: 'bolster', gain: 'power' });
-    expect(state.players.map((p) => p.stars)).toEqual([[], []]);
+  it("earns stars on other players' turns too, as soon as they're reached", () => {
+    // Player 1's recruit on Upgrade pays them 1 power when their neighbor upgrades: 15 -> 16.
+    let state = bottom(0, 'oil');
+    state = { ...state, players: [p0(state), { ...state.players[1]!, recruits: [0], power: 15 }] };
+    state = play(state, { type: 'upgrade', top: { section: 0, field: 'power' }, bottom: 0 });
+    expect(state.players.map((p) => p.stars)).toEqual([[], ['power']]);
   });
 });

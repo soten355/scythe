@@ -208,11 +208,12 @@
         });
         on.set(hex, list);
       };
+      // Units on the home base (the character, and any sent home after a fight) are drawn there instead.
       if (p.character !== 'home') add(p.character, { character: true });
-      for (const m of p.mechs) add(m, { mechs: 1 });
+      for (const m of p.mechs) if (m !== 'home') add(m, { mechs: 1 });
       // Workers the selected mech has picked up ride on it instead (see cargo below).
       const carried = i === game.currentPlayer ? (prompt.cargo?.workers ?? []) : [];
-      p.workers.forEach((w, wi) => carried.includes(wi) || add(w, { workers: 1 }));
+      p.workers.forEach((w, wi) => w === 'home' || carried.includes(wi) || add(w, { workers: 1 }));
       for (const [s, hex] of Object.entries(p.structures)) if (hex) add(hex, { structure: STRUCTURE_LETTER[s as keyof typeof STRUCTURE_LETTER] });
     });
     return on;
@@ -304,6 +305,16 @@
     );
   }
 
+  function homeGroup(seat: number): Pieces | null {
+    const p = game.players[seat]!;
+    const f = game.setup.players[seat]!.faction;
+    const carried = seat === game.currentPlayer && prompt.cargo?.at === 'home' ? prompt.cargo.workers : [];
+    const mechs = p.mechs.filter((m) => m === 'home').length;
+    const workers = p.workers.filter((w, i) => w === 'home' && !carried.includes(i)).length;
+    if (!mechs && !workers) return null;
+    return { seat, color: f.color, initial: f.name[0] ?? '?', character: false, mechs, workers };
+  }
+
   /** Home bases with the faction that starts there and whether its character is at home. */
   const homes = $derived(
     Object.entries(board.homeBasePositions).map(([id, pos]) => {
@@ -315,11 +326,47 @@
         borders: (board.homeBases[id] ?? []).map((h) => center(board.hexes[h]!)),
         faction,
         characterHome: seat >= 0 && game.players[seat]!.character === 'home',
+        /** Mechs and workers sent home after losing a fight, drawn in a row under the home base. */
+        others: seat >= 0 ? homeGroup(seat) : null,
         mine: seat === game.currentPlayer,
       };
     }),
   );
 </script>
+
+{#snippet piece(g: Pieces, kind: Kind, x: number, y: number, at: Location)}
+  {@const pick = kind !== 'structure' && g.seat === game.currentPlayer ? pickable(at, kind) : { key: '', select: undefined, selected: false }}
+  {@const sel = pick.select}
+  {#if sel || pick.selected}
+    <!-- Your own unit that can move: tap the piece itself to pick it. -->
+    <circle
+      cx={x}
+      cy={y}
+      r="8.5"
+      class="pick-ring"
+      data-piece={pick.key || undefined}
+      class:pickable={sel}
+      class:picked={pick.selected}
+      onclick={() => sel && onPick(sel)}
+      role="button"
+      tabindex="-1"
+      onkeydown={() => {}}
+    />
+  {/if}
+  {#if kind === 'structure'}
+    <rect x={x - 6} y={y - 6} width="12" height="12" fill={g.color} class="structure" />
+    <text {x} y={y + 2} class="piece-text small">{g.structure}</text>
+  {:else if kind === 'character'}
+    <circle cx={x} cy={y} r="6.5" fill={g.color} class="character" />
+    <text {x} y={y + 3} class="piece-text">{g.initial}</text>
+  {:else if kind === 'mechs'}
+    <rect x={x - 6} y={y - 6} width="12" height="12" rx="2" fill={g.color} class="mech" />
+    <text {x} y={y + 3} class="piece-text">{g.initial}</text>
+  {:else}
+    <circle cx={x} cy={y} r="5.5" fill={g.color} class="worker" data-spot={g.seat === game.currentPlayer ? `worker|${at}` : undefined} />
+    <text {x} y={y + 3} class="piece-text">{g.workers}</text>
+  {/if}
+{/snippet}
 
 <svelte:window onpointermove={move} onpointerup={up} onpointercancel={up} />
 
@@ -411,6 +458,11 @@
       />
       <text x={home.c[0]} y={home.c[1] + 3.5} class="piece-text dark">{home.faction?.name[0]}</text>
     {/if}
+    {#if home.others}
+      {#each placePieces([home.others], [home.c[0] + PIECES_LEFT, home.c[1] + SIZE * 0.55 + 12]) as { g, kind, x, y }, i (i)}
+        {@render piece(g, kind, x, y, 'home')}
+      {/each}
+    {/if}
   {/each}
 
   <!-- Pieces and resources sit on top but let taps through to the hex. -->
@@ -420,37 +472,7 @@
       {@const groups = piecesOn.get(h.id) ?? []}
       {@const placed = placePieces(groups, c)}
       {#each placed as { g, kind, x, y }, i (i)}
-          {@const pick = kind !== 'structure' && g.seat === game.currentPlayer ? pickable(h.id, kind) : { key: '', select: undefined, selected: false }}
-          {@const sel = pick.select}
-          {#if sel || pick.selected}
-            <!-- Your own unit that can move: tap the piece itself to pick it. -->
-            <circle
-              cx={x}
-              cy={y}
-              r="8.5"
-              class="pick-ring"
-              data-piece={pick.key || undefined}
-              class:pickable={sel}
-              class:picked={pick.selected}
-              onclick={() => sel && onPick(sel)}
-              role="button"
-              tabindex="-1"
-              onkeydown={() => {}}
-            />
-          {/if}
-          {#if kind === 'structure'}
-            <rect x={x - 6} y={y - 6} width="12" height="12" fill={g.color} class="structure" />
-            <text {x} y={y + 2} class="piece-text small">{g.structure}</text>
-          {:else if kind === 'character'}
-            <circle cx={x} cy={y} r="6.5" fill={g.color} class="character" />
-            <text {x} y={y + 3} class="piece-text">{g.initial}</text>
-          {:else if kind === 'mechs'}
-            <rect x={x - 6} y={y - 6} width="12" height="12" rx="2" fill={g.color} class="mech" />
-            <text {x} y={y + 3} class="piece-text">{g.initial}</text>
-          {:else}
-            <circle cx={x} cy={y} r="5.5" fill={g.color} class="worker" data-spot={g.seat === game.currentPlayer ? `worker|${h.id}` : undefined} />
-            <text {x} y={y + 3} class="piece-text">{g.workers}</text>
-          {/if}
+          {@render piece(g, kind, x, y, h.id)}
       {/each}
       {@const cargo = prompt.cargo?.at === h.id ? prompt.cargo : undefined}
       {#if cargo}

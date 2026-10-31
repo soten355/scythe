@@ -10,3 +10,4 @@ export { moveTargets, produceCost, RESOURCES, TERRAIN_PRODUCES, yieldOf as produ
 export * from './mat';
 export * from './faction';
 export * from './afford';
+export { COMBAT_DECK, MAX_DIAL, MAX_COMBAT_STARS, combatUnitsOn, type CombatResult } from './combat';

@@ -35,6 +35,12 @@ describe('choosing a section', () => {
     expect(sectionChoices(acted, 0)).toEqual([]);
   });
 
+  it("can't be switched after play passes back from a defender mid-turn", () => {
+    // Pretend play passed to a defender at index 1 (a mid-turn hand-over), and they acted once.
+    const history = run(start(), { type: 'chooseSection', section: 2 }, { type: 'gainCoins' });
+    expect(canSwitchSection(history, 1)).toBe(false);
+  });
+
   it("leaves out last turn's section, even while switching", () => {
     const history = run(start(), { type: 'chooseSection', section: 2 }, { type: 'gainCoins' }, { type: 'skipBottom' });
     // Player 1's turn, then back to player 0.

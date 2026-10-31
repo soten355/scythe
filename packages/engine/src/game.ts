@@ -11,10 +11,11 @@
 // top-actions.ts and bottom-actions.ts.
 import type { Board, HexId } from './board';
 import { bottomActions, applyBottom } from './bottom-actions';
+import { applyCombat, combatActions, combatSeat, COMBAT_DECK, drawCombatCards, type CombatResult } from './combat';
 import { awardStars, endTurn, SECTIONS, type StarKind } from './state';
 import type { Faction } from './faction';
 import type { PlayerMat, RecruitBonus, Resource, Structure } from './mat';
-import { seedRng, type RngState } from './rng';
+import { seedRng, shuffle, type RngState } from './rng';
 import { topActions, applyTop } from './top-actions';
 
 export type SectionIndex = 0 | 1 | 2 | 3;
@@ -50,11 +51,12 @@ export interface PlayerState {
   coins: number;
   power: number;
   popularity: number;
-  /** Count only for now; the combat card deck arrives with combat in Phase 2. */
-  combatCards: number;
+  /** Combat cards in hand, by value (hidden from the other players). */
+  combatCards: number[];
+  /** Mechs and workers sent home after losing a fight stand on the home base until they move out. */
   character: Location;
-  mechs: HexId[];
-  workers: HexId[];
+  mechs: Location[];
+  workers: Location[];
   structures: Partial<Record<Structure, HexId>>;
   /** Indexes into the faction's mech abilities, in the order unlocked. */
   mechAbilities: number[];
@@ -64,7 +66,7 @@ export interface PlayerState {
   recruits: SectionIndex[];
   /** One-time recruit bonuses already used. */
   recruitBonusesTaken: RecruitBonus[];
-  /** Stars placed so far, in the order earned (at most one of each kind, and the faction's star count in all). */
+  /** Stars placed so far, in the order earned (one of each kind but two for combat, and the faction's star count in all). */
   stars: StarKind[];
 }
 
@@ -75,9 +77,24 @@ export type TurnStep =
   | { step: 'moving'; section: SectionIndex; moved: UnitRef[]; load?: Load }
   | { step: 'trading'; section: SectionIndex; left: number; hex: HexId }
   | { step: 'producing'; section: SectionIndex; produced: HexId[] }
+  /** Fights still to come after a move (`left`), and the one under way, if picked. */
+  | { step: 'combat'; section: SectionIndex; left: HexId[]; fight: Fight | null }
   | { step: 'bottom'; section: SectionIndex; paid: number }
   /** The bottom-row action is done; only End turn is left. */
   | { step: 'end'; section: SectionIndex };
+
+/** One side of a fight: the cards added so far, and the power dialed once they've chosen (null until then). */
+export interface CombatSide {
+  seat: number;
+  cards: number[];
+  power: number | null;
+}
+
+export interface Fight {
+  hex: HexId;
+  attacker: CombatSide;
+  defender: CombatSide;
+}
 
 export type ResourcePile = Partial<Record<Resource, number>>;
 
@@ -91,6 +108,11 @@ export interface GameState {
   turn: TurnStep;
   /** Completed turns, across all players. */
   turnsTaken: number;
+  /** The combat card deck (drawn from the front) and discard pile. */
+  combatDeck: number[];
+  combatDiscard: number[];
+  /** The most recent fight, as both sides revealed it. */
+  lastCombat?: CombatResult;
 }
 
 export type Action =
@@ -112,6 +134,11 @@ export type Action =
   // Bolster: pay coins, gain power or combat cards.
   | { type: 'bolster'; gain: 'power' | 'combatCards' }
   | { type: 'skipBottom' }
+  // Combat: the attacker picks which fight is next (if there are several);
+  // then each side adds cards one at a time and sets the dial, which locks it in.
+  | { type: 'fight'; hex: HexId }
+  | { type: 'combatCard'; value: number }
+  | { type: 'combatPower'; power: number }
   // Bottom row: pay the cost one resource at a time, then the action itself.
   | { type: 'pay'; hex: HexId }
   | { type: 'upgrade'; top: TopUpgrade; bottom: SectionIndex }
@@ -136,7 +163,7 @@ export function newGame(setup: GameSetup): GameState {
     coins: mat.coins,
     power: faction.power,
     popularity: mat.popularity,
-    combatCards: faction.combatCards,
+    combatCards: [],
     character: 'home',
     mechs: [],
     // One worker on each land hex bordering the home base.
@@ -150,19 +177,28 @@ export function newGame(setup: GameSetup): GameState {
   }));
 
   const first = setup.players.reduce((best, p, i) => (p.mat.turnOrder < setup.players[best]!.mat.turnOrder ? i : best), 0);
-  return {
+  const [combatDeck, rng] = shuffle(seedRng(setup.seed), COMBAT_DECK);
+  const state: GameState = {
     setup,
-    rng: seedRng(setup.seed),
+    rng,
     players,
     resources: {},
     currentPlayer: first,
     turn: { step: 'chooseSection' },
     turnsTaken: 0,
+    combatDeck,
+    combatDiscard: [],
   };
+  return setup.players.reduce((s, p, seat) => drawCombatCards(s, seat, p.faction.combatCards), state);
+}
+
+/** Who must act now: the current player, except while the defender in a fight is choosing. */
+export function activeSeat(state: GameState): number {
+  return state.turn.step === 'combat' ? combatSeat(state, state.turn) : state.currentPlayer;
 }
 
 export function legalActions(state: GameState, seat: number): Action[] {
-  if (seat !== state.currentPlayer || isGameOver(state)) return [];
+  if (seat !== activeSeat(state) || isGameOver(state)) return [];
   const turn = state.turn;
   switch (turn.step) {
     case 'chooseSection': {
@@ -175,6 +211,8 @@ export function legalActions(state: GameState, seat: number): Action[] {
     case 'trading':
     case 'producing':
       return topActions(state, turn);
+    case 'combat':
+      return combatActions(state, turn);
     case 'bottom':
       return [...bottomActions(state, turn), ...(turn.paid === 0 ? [{ type: 'skipBottom' } as const] : [])];
     case 'end':
@@ -193,11 +231,12 @@ const canonical = (value: unknown): string =>
 /** Returns the next state; throws if the action isn't legal for the current player. */
 export function applyAction(state: GameState, action: Action): GameState {
   const key = canonical(action);
-  if (!legalActions(state, state.currentPlayer).some((a) => canonical(a) === key)) {
+  if (!legalActions(state, activeSeat(state)).some((a) => canonical(a) === key)) {
     throw new Error(`action ${JSON.stringify(action)} is not legal now`);
   }
-  // Whatever the action, the player who took it may have earned stars.
-  return awardStars(step(state, action), state.currentPlayer);
+  // Whatever the action, anyone may have earned stars (a defender can gain power, say).
+  const next = step(state, action);
+  return next.players.reduce((s, _p, seat) => awardStars(s, seat), next);
 }
 
 function step(state: GameState, action: Action): GameState {
@@ -212,6 +251,8 @@ function step(state: GameState, action: Action): GameState {
     case 'trading':
     case 'producing':
       return applyTop(state, turn, action);
+    case 'combat':
+      return applyCombat(state, turn, action);
     case 'bottom':
       if (action.type === 'skipBottom') return endTurn(state);
       return applyBottom(state, turn, action);

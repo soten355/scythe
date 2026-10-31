@@ -35,7 +35,7 @@
           <span title="coins">◉ {p.coins}</span>
           <span title="power">⚡ {p.power}</span>
           <span title="popularity">♥ {p.popularity}</span>
-          <span title="combat cards">▭ {p.combatCards}</span>
+          <span title="combat cards">▭ {p.combatCards.length}</span>
           <span title="mechs deployed (of 4)">🤖 {p.mechs.length}</span>
           <span title="workers">👷 {p.workers.length}</span>
           <span class="res" title="oil, metal, wood, food on hexes you control">

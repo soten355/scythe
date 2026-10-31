@@ -23,3 +23,15 @@ export function nextInt(state: RngState, maxExclusive: number): [number, RngStat
   const [f, next] = nextFloat(state);
   return [Math.floor(f * maxExclusive), next];
 }
+
+/** Returns a shuffled copy of `items` (Fisher–Yates) and the next RNG state. */
+export function shuffle<T>(state: RngState, items: readonly T[]): [T[], RngState] {
+  const out = [...items];
+  let rng = state;
+  for (let i = out.length - 1; i > 0; i--) {
+    let j: number;
+    [j, rng] = nextInt(rng, i + 1);
+    [out[i], out[j]] = [out[j]!, out[i]!];
+  }
+  return [out, rng];
+}

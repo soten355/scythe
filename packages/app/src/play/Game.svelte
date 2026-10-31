@@ -3,7 +3,7 @@
   // The game is its setup plus every state reached so far, so undo just steps
   // back (within your own turn). Not saved yet: autosave arrives in Phase 2.
   import { baseBoard, baseFactions, baseMats } from '@scythe/content';
-  import { applyAction, legalActions, newGame, type Action, type GameState, type Location } from '@scythe/engine';
+  import { activeSeat, applyAction, legalActions, newGame, type Action, type CombatResult, type GameState, type Location } from '@scythe/engine';
   import Board from './Board.svelte';
   import MatDrawer from './MatDrawer.svelte';
   import PlayerBar from './PlayerBar.svelte';
@@ -11,7 +11,7 @@
   import { fade } from 'svelte/transition';
   import { guide } from './camera';
   import { flyTo } from './fly';
-  import { buildPrompt, sectionHeadings, type Button, type Prompt, type Selection } from './prompt';
+  import { buildPrompt, combatSummary, sectionHeadings, type Button, type Prompt, type Selection } from './prompt';
   import { canSwitchSection, phase, previousSection, sectionChoices } from './turn';
 
   const start = () =>
@@ -26,11 +26,16 @@
     });
 
   let history: GameState[] = $state.raw([start()]);
-  /** Index in history where the current player's turn began. */
+  /**
+   * Index in history where the current player's turn began, or where play
+   * last passed to another seat or a fight was revealed: undo stops there.
+   */
   let turnStart = $state(0);
   let selection: Selection = $state({});
-  /** Seat being handed the device (and who just played); the board is hidden until they tap. */
-  let handoff: { from: number; to: number } | null = $state(null);
+  /** Seat being handed the device (and who just played, and why if mid-turn); the board is hidden until they tap. */
+  let handoff: { from: number; to: number; note?: string } | null = $state(null);
+  /** A fight just finished: both sides' picks, shown once the device is back with whoever plays on. */
+  let revealed: CombatResult | null = $state(null);
   /** An "are you sure?" question shown in the game, and what to do on Yes. */
   let asking: { message: string; yes: () => void } | null = $state(null);
   const ask = (message: string, yes: () => void) => (asking = { message, yes });
@@ -38,27 +43,41 @@
   let matOpen = $state(true);
 
   const game = $derived(history[history.length - 1]!);
-  const actions = $derived(legalActions(game, game.currentPlayer));
+  /** Who acts now: the current player, or a defender choosing for a fight. */
+  const seatNow = $derived(activeSeat(game));
+  const actions = $derived(legalActions(game, seatNow));
   const prompt = $derived(buildPrompt(game, actions, selection));
   /** What the board and top bar draw: the game, with resources picked to pay with already taken off. */
   const shown = $derived(prompt.preview ?? game);
   const canUndo = $derived(history.length - 1 > turnStart);
   const step = $derived(phase(game));
-  const headings = $derived(sectionHeadings(game));
+  const headings = $derived(seatNow === game.currentPlayer ? sectionHeadings(game) : null);
   const choices = $derived(sectionChoices(history, turnStart));
   const canSwitch = $derived(canSwitchSection(history, turnStart));
 
   /** Apply one action, or several in order as a single undo step. */
   function act(...actions: Action[]) {
-    const seat = game.currentPlayer;
+    const before = game;
+    const seat = seatNow;
     if (canSwitch && actions[0]?.type !== 'chooseSection') matOpen = false;
     const next = actions.reduce(applyAction, game);
     history = [...history, next];
     selection = {};
-    if (next.currentPlayer !== seat) {
+    const nextSeat = activeSeat(next);
+    if (next.currentPlayer !== before.currentPlayer) {
       turnStart = history.length - 1;
-      handoff = { from: seat, to: next.currentPlayer };
+      handoff = { from: seat, to: nextSeat };
       matOpen = true;
+    } else if (nextSeat !== seat) {
+      // Mid-turn hand-over (to a defender, or back to the attacker): no undoing what the other seat chose.
+      turnStart = history.length - 1;
+      const fight = next.turn.step === 'combat' ? next.turn.fight : null;
+      handoff = { from: seat, to: nextSeat, note: fight && nextSeat === fight.defender.seat ? `to defend ${fight.hex}` : undefined };
+    }
+    if (next.lastCombat !== before.lastCombat) {
+      // A fight was revealed: it can't be taken back.
+      turnStart = history.length - 1;
+      revealed = next.lastCombat ?? null;
     }
   }
 
@@ -145,6 +164,7 @@
     turnStart = 0;
     selection = {};
     handoff = null;
+    revealed = null;
     matOpen = true;
   }
 
@@ -158,8 +178,38 @@
   <div bind:this={currentStep}>
     <p class="title">{prompt.title}</p>
     {@render slots()}
+    {@render combat()}
     {@render buttons()}
   </div>
+{/snippet}
+
+{#snippet combat()}
+  {#if prompt.combat}
+    {@const c = prompt.combat}
+    <div class="combat">
+      <p class="them" style:--o={c.opponent.color}>
+        <b>{c.opponent.name}</b> has {c.opponent.power} power and {c.opponent.cards} card{c.opponent.cards === 1 ? '' : 's'}
+        (may play {c.opponent.maxCards})
+      </p>
+      <p class="label">Power</p>
+      <div class="dial">
+        {#each c.powers as p (p.power)}
+          <button class:chosen={p.chosen} onclick={() => (selection = p.select)}>{p.power}</button>
+        {/each}
+      </div>
+      <p class="label">Cards · up to {c.maxCards}</p>
+      <div class="hand">
+        {#each c.hand as card, i (i)}
+          <button class="card" class:chosen={card.chosen} disabled={!card.select} onclick={() => card.select && (selection = card.select)}
+            >{card.value}</button
+          >
+        {:else}
+          <span class="hint">No cards</span>
+        {/each}
+      </div>
+      <p class="total">Total <b>{c.total}</b></p>
+    </div>
+  {/if}
 {/snippet}
 
 {#snippet slots()}
@@ -205,7 +255,7 @@
       <!-- Where we are in the story, like a date on the map. -->
       <div class="round"><small>Round</small><b>{round}</b></div>
       <Board game={shown} {prompt} onTap={tap} onPick={(sel) => (selection = sel)} guideTo={guide(game, prompt)} paused={handoff !== null} /></div>
-    <aside style:--c={color(game.currentPlayer)}>
+    <aside style:--c={color(seatNow)}>
       <div class="panel" bind:this={panel}>
         {#if !headings}
           {@render current()}
@@ -252,7 +302,7 @@
           <span class="badge arriving" style:--f={color(to)}>{name(to)[0]}</span>
         {/key}
       </span>
-      <span>Pass to <b>{name(to)}</b></span>
+      <span>Pass to <b>{name(to)}</b>{handoff.note ? ` ${handoff.note}` : ''}</span>
       <small>Tap when ready</small>
     </button>
   {/if}
@@ -268,6 +318,17 @@
           {/each}
         </div>
         <button class="quiet back" onclick={() => (selection = c.cancel)}>Back</button>
+      </div>
+    </div>
+  {/if}
+
+  {#if revealed && !handoff}
+    {@const r = combatSummary(game, revealed)}
+    <div class="ask" role="dialog" aria-modal="true" style:--c={color(revealed.winner)}>
+      <div class="box">
+        <p><b>⚔ {r.title}</b></p>
+        {#each r.lines as line, i (i)}<p class="line">{line}</p>{/each}
+        <button class="primary ok" onclick={() => (revealed = null)}>OK</button>
       </div>
     </div>
   {/if}
@@ -562,6 +623,59 @@
       transform: none;
       opacity: 1;
     }
+  }
+  .combat {
+    margin-top: 6px;
+  }
+  .combat p {
+    margin: 4px 0;
+  }
+  .them {
+    padding: 4px 6px;
+    border-left: 3px solid var(--o);
+    background: #2e2721;
+    font-size: 12px;
+  }
+  .label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    opacity: 0.7;
+  }
+  .dial,
+  .hand {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 4px;
+  }
+  .dial button,
+  .hand button {
+    text-align: center;
+    padding: 4px;
+    font-weight: 700;
+  }
+  .hand .card {
+    min-height: 44px;
+    border-radius: 4px;
+    background: #e9dcc0;
+    color: #2a241e;
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 17px;
+  }
+  .hand .card.chosen {
+    background: #ffd23f;
+    box-shadow: 0 0 0 2px #ffd23f;
+  }
+  .total {
+    text-align: right;
+    font-size: 15px;
+  }
+  .box .line {
+    margin: 0 0 6px;
+  }
+  .ok {
+    width: 100%;
+    margin-top: 8px;
   }
   .handoff b {
     color: var(--c);

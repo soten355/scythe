@@ -9,19 +9,25 @@
 //      can go; tap a hex to move it there. Before that it can pick things
 //      up (Pick up all, or one at a time, each in a slot that puts it back);
 //      they go with it when it moves.
+// In a fight, each side sets its power dial and picks cards in the side
+// panel, then locks them in with one button.
 // Producing and bottom-row actions are different: you pick everything first
 // (hexes to produce on or pay from fill slots in the side panel, and any slot
 // can be removed), then one button (Produce, Deploy, Build, Upgrade, Enlist)
 // does it all as a single step.
 import {
+  activeSeat,
   applyAction,
   bottomCost,
+  combatUnitsOn,
+  MAX_DIAL,
   legalActions,
   produceCost,
   produceYield,
   shortfall,
   topValue,
   type Action,
+  type CombatResult,
   type GameState,
   type HexId,
   type Location,
@@ -52,6 +58,8 @@ export interface Selection {
   recruit?: SectionIndex;
   /** What the selected unit picks up before it moves: workers (by index) and resources, in the order picked. */
   carry?: Carry;
+  /** In a fight: cards picked (by position in your hand, in the order picked) and the power dialed. */
+  combat?: { cards: number[]; power: number };
 }
 
 export interface Carry {
@@ -115,6 +123,18 @@ export interface Prompt {
    */
   pieces?: Map<string, Selection>;
   selectedPiece?: string;
+  /** While choosing for a fight: the power dial, your hand of cards, and what the other side has to fight with. */
+  combat?: {
+    hex: HexId;
+    role: 'attack' | 'defend';
+    opponent: { name: string; color: string; power: number; cards: number; maxCards: number };
+    /** One card per character or mech in the fight. */
+    maxCards: number;
+    powers: { power: number; chosen: boolean; select: Selection }[];
+    /** A card with no `select` can't be picked now (you've played as many as you can). */
+    hand: { value: number; chosen: boolean; select?: Selection }[];
+    total: number;
+  };
 }
 
 export interface Slot {
@@ -226,6 +246,12 @@ export function label(state: GameState, action: Action): string {
       return 'Take the coins';
     case 'endTurn':
       return 'End turn';
+    case 'fight':
+      return `Fight on ${action.hex}`;
+    case 'combatCard':
+      return `Card ${action.value}`;
+    case 'combatPower':
+      return `${action.power} power`;
   }
 }
 
@@ -278,6 +304,14 @@ export function title(state: GameState): string {
       return `${who} · Produce: ${turn.produced.length} of ${topValue(player, mat, turn.section, 'hexes')} hexes`;
     case 'end':
       return `${who} · ${BOTTOM_NAMES[bottom.action]} done: end your turn`;
+    case 'combat': {
+      const name = (seat: number) => state.setup.players[seat]!.faction.name;
+      const f = turn.fight;
+      if (!f) return `${who} · Fights on ${turn.left.join(' and ')}: tap where to fight first`;
+      const choose = 'set your power and add cards';
+      if (activeSeat(state) === f.attacker.seat) return `${who} · Fight on ${f.hex} against ${name(f.defender.seat)}: ${choose}`;
+      return `${name(f.defender.seat)} · Defend ${f.hex} against ${who}: ${choose}`;
+    }
     case 'bottom': {
       const cost = bottomCost(player, mat, turn.section);
       const name = BOTTOM_NAMES[bottom.action];
@@ -313,6 +347,7 @@ export function buildPrompt(state: GameState, actions: Action[], selection: Sele
   if (actions.some((a) => a.type === 'produce')) return producePrompt(state, actions, selection.produce ?? []);
   if (turn.step === 'top' && actions.some((a) => a.type === 'tradePopularity')) return tradePrompt(state, actions, selection.trade);
   if (turn.step === 'bottom') return bottomPrompt(state, actions, selection);
+  if (turn.step === 'combat') return combatPrompt(state, actions, selection.combat ?? { cards: [], power: 0 });
 
   // A unit is selected: tap a destination; buttons to pick things up.
   if (unit) {
@@ -427,6 +462,91 @@ function carryPrompt(state: GameState, actions: Action[], unit: UnitRef, selecti
   const pile: ResourcePile = {};
   for (const r of picked.resources) pile[r] = (pile[r] ?? 0) + 1;
   return { buttons, slots, run, cargo: { at, workers: picked.workers, resources: pile } };
+}
+
+/**
+ * Combat: with several fights to come, tap which hex to fight on first. In
+ * a fight, pick a power (tap a number) and cards (tap to add or take back),
+ * then lock them in; the other side can't see them until both have chosen.
+ */
+function combatPrompt(state: GameState, actions: Action[], picked: NonNullable<Selection['combat']>): Prompt {
+  const turn = state.turn as Extract<GameState['turn'], { step: 'combat' }>;
+  const highlights = new Set<Location>();
+  const tapActions = new Map<Location, Action>();
+  const tapSelects = new Map<Location, Selection>();
+  const fight = turn.fight;
+  if (!fight) {
+    const buttons = actions.map((a): Button => ({ label: label(state, a), action: a }));
+    for (const a of actions) if (a.type === 'fight') (highlights.add(a.hex), tapActions.set(a.hex, a));
+    return { title: title(state), buttons, highlights, tapActions, tapSelects };
+  }
+
+  const attacking = activeSeat(state) === fight.attacker.seat;
+  const [mine, theirs] = attacking ? [fight.attacker, fight.defender] : [fight.defender, fight.attacker];
+  const me = state.players[mine.seat]!;
+  const them = state.players[theirs.seat]!;
+  const maxCards = combatUnitsOn(me, fight.hex);
+  const full = picked.cards.length >= maxCards;
+  const toggle = (i: number): Selection => ({
+    combat: { ...picked, cards: picked.cards.includes(i) ? picked.cards.filter((c) => c !== i) : [...picked.cards, i] },
+  });
+  const hand = me.combatCards.map((value, i) => {
+    const chosen = picked.cards.includes(i);
+    return { value, chosen, ...((chosen || !full) && { select: toggle(i) }) };
+  });
+  const powers = [];
+  for (let power = 0; power <= Math.min(MAX_DIAL, me.power); power++) {
+    powers.push({ power, chosen: power === picked.power, select: { combat: { ...picked, power } } });
+  }
+  const values = picked.cards.map((i) => me.combatCards[i]!);
+  const total = picked.power + values.reduce((a, b) => a + b, 0);
+  const shown = [`${picked.power} power`, ...values.map((v) => `card ${v}`)].join(' + ');
+  const theirName = state.setup.players[theirs.seat]!.faction;
+
+  return {
+    title: title(state),
+    buttons: [
+      {
+        label: `Lock in ${total}`,
+        primary: true,
+        actions: [...values.map((value): Action => ({ type: 'combatCard', value })), { type: 'combatPower', power: picked.power }],
+        confirm: `Lock in ${total} (${shown})? ${attacking ? `${theirName.name} chooses next, without seeing it.` : 'Then both sides are revealed.'}`,
+      },
+    ],
+    highlights,
+    tapActions,
+    tapSelects,
+    selected: fight.hex,
+    combat: {
+      hex: fight.hex,
+      role: attacking ? 'attack' : 'defend',
+      opponent: {
+        name: theirName.name,
+        color: theirName.color,
+        power: them.power,
+        cards: them.combatCards.length,
+        maxCards: combatUnitsOn(them, fight.hex),
+      },
+      maxCards,
+      powers,
+      hand,
+      total,
+    },
+  };
+}
+
+/** What a finished fight comes to, for the pop-up that reveals both sides. */
+export function combatSummary(state: GameState, result: CombatResult): { title: string; lines: string[] } {
+  const name = (seat: number) => state.setup.players[seat]!.faction.name;
+  const side = (s: CombatResult['attacker']) => {
+    const total = s.power + s.cards.reduce((a, b) => a + b, 0);
+    return `${name(s.seat)}: ${[`${s.power} power`, ...s.cards.map(String)].join(' + ')} = ${total}`;
+  };
+  const loser = result.winner === result.attacker.seat ? result.defender.seat : result.attacker.seat;
+  return {
+    title: `${name(result.winner)} wins on ${result.hex}`,
+    lines: [side(result.attacker), side(result.defender), `${name(loser)} retreats to their home base.`],
+  };
 }
 
 const pieceKey = (at: Location, kind: UnitRef['kind']) => `${at}|${kind}`;

@@ -11,11 +11,13 @@ export function phase(state: GameState): Phase {
 }
 
 /**
- * The states so far, and where the current turn began. Picking a section is
- * the turn's first entry; if nothing has happened since, it can be replaced.
+ * The states so far, and where the current turn began (or, mid-turn, where
+ * play last passed to another seat, such as a defender in a fight). Picking a
+ * section is the turn's first entry; if nothing has happened since, it can be
+ * replaced.
  */
 export function canSwitchSection(history: GameState[], turnStart: number): boolean {
-  return history.length - 1 === turnStart + 1 && phase(history[turnStart + 1]!) !== 'choose';
+  return history.length - 1 === turnStart + 1 && phase(history[turnStart]!) === 'choose' && phase(history[turnStart + 1]!) !== 'choose';
 }
 
 /** The sections the current player may pick now (to start, or to switch to). */

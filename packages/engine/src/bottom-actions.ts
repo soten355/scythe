@@ -8,16 +8,16 @@
 import type { HexId } from './board';
 import type { Action, GameState, PlayerState, SectionIndex, TurnStep } from './game';
 import { STRUCTURES, upgradeables, type BottomActionType, type RecruitBonus } from './mat';
-import { addResources, bottomCost, SECTIONS, controlledHexes, current, gain, structureOn, updatePlayer } from './state';
+import { drawCombatCards } from './combat';
+import { addResources, bottomCost, SECTIONS, controlledHexes, current, gain, onBoard, structureOn, updatePlayer } from './state';
 
 type BottomStep = Extract<TurnStep, { step: 'bottom' }>;
 
-const BONUS_FIELD: Record<RecruitBonus, 'power' | 'coins' | 'popularity' | 'combatCards'> = {
-  power: 'power',
-  coins: 'coins',
-  popularity: 'popularity',
-  combatCard: 'combatCards',
-};
+/** Gives a player a recruit bonus: power, coins or popularity, or combat cards drawn from the deck. */
+function giveBonus(state: GameState, seat: number, bonus: RecruitBonus, amount: number): GameState {
+  if (bonus === 'combatCard') return drawCombatCards(state, seat, amount);
+  return updatePlayer(state, seat, gain(state.players[seat]!, { [bonus]: amount }));
+}
 
 export function bottomActions(state: GameState, turn: BottomStep): Action[] {
   const { seat, player, mat } = current(state);
@@ -71,14 +71,11 @@ export function applyBottom(state: GameState, turn: BottomStep, action: Action):
     case 'enlist': {
       const { faction } = current(next);
       const amount = faction.recruitBonuses.find((r) => r.bonus === action.bonus)?.amount ?? 0;
-      return finish(
-        updatePlayer(next, seat, {
-          ...gain(player, { [BONUS_FIELD[action.bonus]]: amount }),
-          recruits: [...player.recruits, action.section],
-          recruitBonusesTaken: [...player.recruitBonusesTaken, action.bonus],
-        }),
-        turn.section,
-      );
+      const enlisted = updatePlayer(next, seat, {
+        recruits: [...player.recruits, action.section],
+        recruitBonusesTaken: [...player.recruitBonusesTaken, action.bonus],
+      });
+      return finish(giveBonus(enlisted, seat, action.bonus, amount), turn.section);
     }
     default:
       throw new Error(`unreachable: ${action.type} during the bottom row`);
@@ -96,7 +93,7 @@ function rewards(state: GameState, section: SectionIndex): GameState {
     const recruited = next.players[who]!.recruits.find((s) => theirMat.sections[s].bottom.action === kind);
     if (recruited === undefined) continue;
     const bonus = theirMat.sections[recruited].bottom.recruitBonus;
-    next = updatePlayer(next, who, gain(next.players[who]!, { [BONUS_FIELD[bonus]]: 1 }));
+    next = giveBonus(next, who, bonus, 1);
   }
   return next;
 }
@@ -104,7 +101,7 @@ function rewards(state: GameState, section: SectionIndex): GameState {
 /** Choices for what the bottom-row action does, once it's paid for. */
 function effectOptions(state: GameState, kind: BottomActionType): Action[] {
   const { player, mat, faction } = current(state);
-  const workerHexes = [...new Set(player.workers)];
+  const workerHexes = [...new Set(onBoard(player.workers))];
   switch (kind) {
     case 'upgrade': {
       const tops = SECTIONS.flatMap((section) =>

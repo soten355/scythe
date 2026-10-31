@@ -2,7 +2,7 @@
 // board, Nordic + Rusviet on the Industrial + Engineering mats, and prints
 // them, as a quick look at the actions.
 import { baseBoard, baseFactions, baseMats } from '@scythe/content';
-import { applyAction, ENGINE_VERSION, legalActions, newGame, nextInt, type Action } from '@scythe/engine';
+import { activeSeat, applyAction, ENGINE_VERSION, legalActions, newGame, nextInt, type Action } from '@scythe/engine';
 
 const turns = 12;
 let state = newGame({
@@ -27,6 +27,9 @@ const describe = (a: Action): string => {
     case 'deploy': return `deploys a mech on ${a.hex}`;
     case 'build': return `builds a ${a.structure} on ${a.hex}`;
     case 'enlist': return `enlists for ${a.bonus}`;
+    case 'fight': return `fights on ${a.hex}`;
+    case 'combatCard': return `card ${a.value}`;
+    case 'combatPower': return `dials ${a.power}`;
     default: return a.type;
   }
 };
@@ -36,12 +39,16 @@ while (state.turnsTaken < turns) {
   const seat = state.currentPlayer;
   const steps: string[] = [];
   do {
-    const options = legalActions(state, seat);
+    // Usually the player whose turn it is; in a fight, the defender chooses too.
+    const actor = activeSeat(state);
+    const options = legalActions(state, actor);
     let pick: number;
     [pick, rng] = nextInt(rng, options.length);
     const action = options[pick]!;
-    steps.push(describe(action));
+    steps.push(actor === seat ? describe(action) : `(player ${actor + 1} ${describe(action)})`);
+    const before = state.lastCombat;
     state = applyAction(state, action);
+    if (state.lastCombat !== before) steps.push(`player ${state.lastCombat!.winner + 1} wins on ${state.lastCombat!.hex}`);
   } while (state.currentPlayer === seat);
   const p = state.players[seat]!;
   console.log(`turn ${state.turnsTaken}: player ${seat + 1} → ${steps.join(', ')}`);

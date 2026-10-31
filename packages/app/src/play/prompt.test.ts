@@ -1,7 +1,7 @@
 import { baseBoard, baseFactions, baseMats } from '@scythe/content';
-import { applyAction, legalActions, newGame, type Action, type GameState } from '@scythe/engine';
+import { activeSeat, applyAction, legalActions, newGame, type Action, type GameState } from '@scythe/engine';
 import { describe, expect, it } from 'vitest';
-import { buildPrompt, label } from './prompt';
+import { buildPrompt, combatSummary, label } from './prompt';
 
 // Nordic (home "ne": workers on A4, A5) on Industrial; Rusviet on Engineering.
 const start = () =>
@@ -356,5 +356,67 @@ describe('trading', () => {
     const after = play(trading(), ...p.buttons[0]!.actions!);
     expect(after.resources).toEqual({ A4: { oil: 1, food: 1 } });
     expect(after.turn.step).toBe('bottom');
+  });
+});
+
+describe('combat', () => {
+  // Nordic's character leaves home for A4, where Rusviet's character stands.
+  const fight = () => {
+    const state = start();
+    const [n, r] = state.players;
+    const ready: GameState = {
+      ...state,
+      players: [
+        { ...n!, workers: ['A5', 'A5'], power: 4, combatCards: [2, 5] },
+        { ...r!, character: 'A4', power: 3, combatCards: [3, 3] },
+      ],
+    };
+    return play(ready, { type: 'chooseSection', section: 2 }, { type: 'moveUnit', unit: { kind: 'character' }, to: 'A4' }, { type: 'endMove' });
+  };
+  const combatPrompt = (state: GameState, sel = {}) => buildPrompt(state, legalActions(state, activeSeat(state)), sel);
+
+  it('shows the attacker the dial, their cards and what the defender has', () => {
+    const p = combatPrompt(fight());
+    expect(p.title).toBe('Nordic · Fight on A4 against Rusviet: set your power and add cards');
+    expect(p.selected).toBe('A4');
+    expect(p.combat).toMatchObject({
+      role: 'attack',
+      maxCards: 1,
+      total: 0,
+      opponent: { name: 'Rusviet', power: 3, cards: 2, maxCards: 1 },
+    });
+    expect(p.combat!.powers.map((x) => x.power)).toEqual([0, 1, 2, 3, 4]);
+    expect(p.combat!.powers[0]!.chosen).toBe(true);
+    expect(p.combat!.hand.map((c) => c.value)).toEqual([2, 5]);
+  });
+
+  it('adds up the picks and locks them in as one step', () => {
+    const state = fight();
+    let p = combatPrompt(state);
+    p = combatPrompt(state, p.combat!.hand[1]!.select);
+    // One card per unit: the other card can't be picked now.
+    expect(p.combat!.hand.map((c) => [c.chosen, !!c.select])).toEqual([[false, false], [true, true]]);
+    p = combatPrompt(state, p.combat!.powers[3]!.select);
+    expect(p.combat!.total).toBe(8);
+    const lock = p.buttons.find((b) => b.primary)!;
+    expect(lock.label).toBe('Lock in 8');
+    expect(lock.confirm).toBeTruthy();
+    expect(lock.actions).toEqual([{ type: 'combatCard', value: 5 }, { type: 'combatPower', power: 3 }]);
+  });
+
+  it('then asks the defender, with their own cards', () => {
+    const state = play(fight(), { type: 'combatPower', power: 2 });
+    const p = combatPrompt(state);
+    expect(p.title).toBe('Rusviet · Defend A4 against Nordic: set your power and add cards');
+    expect(p.combat).toMatchObject({ role: 'defend', opponent: { name: 'Nordic', power: 4, cards: 2 } });
+    expect(p.combat!.hand.map((c) => c.value)).toEqual([3, 3]);
+  });
+
+  it('sums up a finished fight', () => {
+    const state = play(fight(), { type: 'combatCard', value: 5 }, { type: 'combatPower', power: 3 }, { type: 'combatPower', power: 3 });
+    expect(combatSummary(state, state.lastCombat!)).toEqual({
+      title: 'Nordic wins on A4',
+      lines: ['Nordic: 3 power + 5 = 8', 'Rusviet: 3 power = 3', 'Rusviet retreats to their home base.'],
+    });
   });
 });

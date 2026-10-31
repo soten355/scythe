@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { applyAction, isGameOver, legalActions, newGame, replay, type Action, type GameState } from './game';
+import { activeSeat, applyAction, isGameOver, legalActions, newGame, replay, type Action, type GameState } from './game';
 import { nextInt, seedRng } from './rng';
 import { MAX_POPULARITY, MAX_WORKERS, unitHexes } from './state';
 import { factionA, factionB, testMatA, testMatB, testSetup as setup } from './test-fixtures';
 import { MAX_POWER } from './faction';
+import { COMBAT_DECK } from './combat';
 
 /** Plays a list of actions for whoever's turn it is. */
 const play = (state: GameState, actions: Action[]) => actions.reduce(applyAction, state);
@@ -17,7 +18,8 @@ const fullTurn = (section: number): Action[] => [
 describe('setup', () => {
   it('starts each player with their mat and faction values and pieces', () => {
     const [a, b] = newGame(setup).players;
-    expect(a).toMatchObject({ coins: 4, popularity: 2, power: 3, combatCards: 2, character: 'home', workers: ['A1', 'A2'], mechs: [] });
+    expect(a).toMatchObject({ coins: 4, popularity: 2, power: 3, character: 'home', workers: ['A1', 'A2'], mechs: [] });
+    expect(a!.combatCards).toHaveLength(2);
     expect(b).toMatchObject({ coins: 5, workers: ['C2', 'C3'] });
   });
 
@@ -115,7 +117,7 @@ describe('replay', () => {
 function checkInvariants(state: GameState) {
   const board = state.setup.board;
   for (const p of state.players) {
-    for (const n of [p.coins, p.power, p.popularity, p.combatCards]) expect(n).toBeGreaterThanOrEqual(0);
+    for (const n of [p.coins, p.power, p.popularity]) expect(n).toBeGreaterThanOrEqual(0);
     expect(p.power).toBeLessThanOrEqual(MAX_POWER);
     expect(p.popularity).toBeLessThanOrEqual(MAX_POPULARITY);
     expect(p.workers.length).toBeLessThanOrEqual(MAX_WORKERS);
@@ -125,9 +127,19 @@ function checkInvariants(state: GameState) {
     expect(p.recruits.length).toBeLessThanOrEqual(4);
     for (const hex of unitHexes(p)) expect(board.hexes[hex]?.terrain).not.toBe('lake');
   }
-  // No two players' units share a hex until combat exists.
-  const owners = state.players.map(unitHexes);
-  owners.forEach((a, i) => owners.slice(i + 1).forEach((b) => expect([...a].filter((h) => b.has(h))).toEqual([])));
+  state.players.forEach((p, seat) => {
+    expect(p.stars.length).toBeLessThanOrEqual(state.setup.players[seat]!.faction.stars);
+    expect(p.stars.filter((s) => s === 'combat').length).toBeLessThanOrEqual(2);
+    expect(new Set(p.stars.filter((s) => s !== 'combat')).size).toBe(p.stars.filter((s) => s !== 'combat').length);
+  });
+  // No two players' units share a hex, except during a move and the fights after it.
+  if (state.turn.step !== 'moving' && state.turn.step !== 'combat') {
+    const owners = state.players.map(unitHexes);
+    owners.forEach((a, i) => owners.slice(i + 1).forEach((b) => expect([...a].filter((h) => b.has(h))).toEqual([])));
+  }
+  // Every combat card is in the deck, the discard pile or someone's hand.
+  const cards = [...state.combatDeck, ...state.combatDiscard, ...state.players.flatMap((p) => p.combatCards)];
+  expect(cards.sort()).toEqual([...COMBAT_DECK].sort());
   for (const pile of Object.values(state.resources)) {
     for (const n of Object.values(pile)) expect(n).toBeGreaterThan(0);
   }
@@ -143,7 +155,7 @@ describe('fuzz: random legal games', () => {
       const lastChosen: (number | null)[] = Array(players + 1).fill(null);
 
       for (let step = 0; step < 400; step++) {
-        const seat = state.currentPlayer;
+        const seat = activeSeat(state);
         const options = legalActions(state, seat);
         expect(options.length).toBeGreaterThan(0);
         for (let other = 0; other < state.players.length; other++) {

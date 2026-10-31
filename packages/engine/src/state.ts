@@ -2,16 +2,16 @@
 // control of hexes, resources on hexes and ending the turn.
 import type { HexId } from './board';
 import { MAX_POWER, type Faction } from './faction';
-import type { GameState, PlayerState, ResourcePile, SectionIndex } from './game';
+import type { GameState, Location, PlayerState, ResourcePile, SectionIndex } from './game';
 import { BOTTOM_COST_RESOURCE, upgradeables, type PlayerMat, type Resource } from './mat';
 
 export const SECTIONS: SectionIndex[] = [0, 1, 2, 3];
 export const MAX_POPULARITY = 18;
 export const MAX_WORKERS = 8;
 
-export type StarKind = 'upgrades' | 'mechs' | 'structures' | 'recruits' | 'workers' | 'popularity' | 'power';
+export type StarKind = 'upgrades' | 'mechs' | 'structures' | 'recruits' | 'workers' | 'popularity' | 'power' | 'combat';
 
-/** What earns each star, in the order they're checked. Combat and objective stars arrive with those rules. */
+/** What earns each star, in the order they're checked. Combat stars are placed when a fight is won; objective stars arrive with objectives. */
 const STAR_GOALS: [StarKind, (p: PlayerState) => boolean][] = [
   ['upgrades', (p) => p.upgrades.top.length >= 6],
   ['mechs', (p) => p.mechs.length >= 4],
@@ -31,6 +31,13 @@ export function awardStars(state: GameState, seat: number): GameState {
     if (stars.length < limit && !stars.includes(kind) && reached(player)) stars.push(kind);
   }
   return stars.length === player.stars.length ? state : updatePlayer(state, seat, { stars });
+}
+
+/** Places one star of a kind, if the player has any stars left. */
+export function placeStar(state: GameState, seat: number, kind: StarKind): GameState {
+  const player = state.players[seat]!;
+  if (player.stars.length >= state.setup.players[seat]!.faction.stars) return state;
+  return updatePlayer(state, seat, { stars: [...player.stars, kind] });
 }
 
 /** Records the section used and passes play to the next seat clockwise. */
@@ -54,24 +61,21 @@ export function current(state: GameState): { seat: number; player: PlayerState; 
   return { seat, player: state.players[seat]!, faction, mat };
 }
 
-/** Coins, power, popularity and combat cards, with power and popularity capped. */
-export function gain(
-  player: PlayerState,
-  g: Partial<Record<'coins' | 'power' | 'popularity' | 'combatCards', number>>,
-): Partial<PlayerState> {
+/** Coins, power and popularity, with power and popularity capped. (Combat cards are drawn: see drawCombatCards.) */
+export function gain(player: PlayerState, g: Partial<Record<'coins' | 'power' | 'popularity', number>>): Partial<PlayerState> {
   return {
     coins: player.coins + (g.coins ?? 0),
     power: Math.min(MAX_POWER, player.power + (g.power ?? 0)),
     popularity: Math.min(MAX_POPULARITY, player.popularity + (g.popularity ?? 0)),
-    combatCards: player.combatCards + (g.combatCards ?? 0),
   };
 }
 
-/** Hexes where this player has at least one unit. */
+/** The hexes in a list of locations, leaving out the home base. */
+export const onBoard = (at: Location[]): HexId[] => at.filter((h): h is HexId => h !== 'home');
+
+/** Hexes where this player has at least one unit (units on the home base don't count). */
 export function unitHexes(player: PlayerState): Set<HexId> {
-  const hexes = new Set<HexId>([...player.mechs, ...player.workers]);
-  if (player.character !== 'home') hexes.add(player.character);
-  return hexes;
+  return new Set(onBoard([player.character, ...player.mechs, ...player.workers]));
 }
 
 /** Hexes where any player other than `seat` has a unit. */

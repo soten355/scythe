@@ -237,7 +237,7 @@ Each phase ends in something playable on the phone. A phase is done when its che
 
 **Phase 2: Full rules and all content**
 
-- [ ] Combat (power dial, combat cards), retreats, popularity loss
+- [x] Combat (power dial, combat cards), retreats, popularity loss
 - [ ] Mechs and all mech abilities; faction abilities
   - Note from play-testing: a mech moving more than one hex (Speed) can drop off and pick up any number of workers and resources at each hex along the way, then keep moving.
   - Note from play-testing: drop-offs along the way should use the same pick-up slots in the side panel, with the map updating live as things are dropped off.
