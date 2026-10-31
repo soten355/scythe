@@ -119,8 +119,8 @@ export interface Prompt {
     tops: { top: TopUpgrade; chosen: boolean; select: Selection }[];
     bottoms: { section: SectionIndex; chosen: boolean; select: Selection }[];
   };
-  /** A choice to make in a pop-up (a recruit's spot, then its one-time bonus); cancel goes back. `amount`: icons that fly to the top bar. */
-  choice?: { message: string; options: { label: string; icon: Icon; amount?: number; select: Selection }[]; cancel: Selection };
+  /** A choice to make in a pop-up (a recruit's spot, then its one-time bonus); cancel goes back. */
+  choice?: { message: string; options: { label: string; icon: Icon; select: Selection }[]; cancel: Selection };
   /**
    * The current player's pieces that can be tapped to pick that unit, keyed
    * "hex|kind" (workers on one hex are one piece), and the one picked.
@@ -847,7 +847,7 @@ function bottomPrompt(state: GameState, actions: Action[], selection: Selection)
     } else if (!chosen) {
       choice = {
         message: `Recruit on ${BOTTOM_NAMES[mat.sections[spot]!.bottom.action]}. Choose your one-time bonus:`,
-        options: recruits.filter((a) => a.section === spot).map((a) => ({ label: now(a.bonus), icon: BONUS_ICONS[a.bonus], amount: amount(a.bonus), select: keep({ recruit: spot, effect: a }) })),
+        options: recruits.filter((a) => a.section === spot).map((a) => ({ label: now(a.bonus), icon: BONUS_ICONS[a.bonus], select: keep({ recruit: spot, effect: a }) })),
         cancel: keep({}),
       };
     }

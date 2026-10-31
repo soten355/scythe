@@ -293,7 +293,6 @@ describe('enlisting', () => {
       'Enlist: +1 combat card each time',
     ]);
     expect(p.choice?.options[1]).toMatchObject({ icon: { text: expect.any(String) }, select: { pay, recruit: 1 } });
-    expect(p.choice?.options[1]?.amount).toBeUndefined();
     // Back un-picks the last payment.
     expect(p.choice?.cancel).toEqual({ pay: pay.slice(0, -1) });
     expect(p.slots?.slice(-2)).toEqual([{ empty: 'Choose a recruit spot' }, { empty: 'Then choose a one-time bonus' }]);

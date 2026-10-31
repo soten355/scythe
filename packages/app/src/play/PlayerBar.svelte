@@ -10,7 +10,7 @@
 
   const STAR_NAMES: Record<string, string> = {
     upgrades: 'all upgrades', mechs: 'all mechs', structures: 'all structures', recruits: 'all recruits',
-    workers: 'all workers', popularity: 'top popularity', power: 'top power',
+    workers: 'all workers', popularity: 'top popularity', power: 'top power', combat: 'a fight won',
   };
 
   const rows = $derived(
@@ -27,15 +27,15 @@
 <div class="bar">
   {#each rows as { p, seat, faction, totals } (seat)}
     {@const current = seat === game.currentPlayer}
-    <div class="player" class:current style:--c={faction.color}>
+    <div class="player" class:current style:--c={faction.color} data-player={seat}>
       <span class="name">{faction.name}</span>
       <span class="stars" data-stars={seat} title={p.stars.length ? `Stars: ${p.stars.map((k) => STAR_NAMES[k]).join(', ')}` : 'No stars yet'}>⭐ {p.stars.length}</span>
       {#if current}
         <span class="details" transition:slide={{ axis: 'x', duration: 450, easing: cubicInOut }}>
-          <span title="coins">◉ {p.coins}</span>
-          <span title="power">⚡ {p.power}</span>
-          <span title="popularity">♥ {p.popularity}</span>
-          <span title="combat cards">▭ {p.combatCards.length}</span>
+          <span title="coins" data-stat="{seat}|coins">◉ {p.coins}</span>
+          <span title="power" data-stat="{seat}|power">⚡ {p.power}</span>
+          <span title="popularity" data-stat="{seat}|popularity">♥ {p.popularity}</span>
+          <span title="combat cards" data-stat="{seat}|combatCard">▭ {p.combatCards.length}</span>
           <span title="mechs deployed (of 4)">🤖 {p.mechs.length}</span>
           <span title="workers">👷 {p.workers.length}</span>
           <span class="res" title="oil, metal, wood, food on hexes you control">

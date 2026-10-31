@@ -1,40 +1,7 @@
-// Little animations for gains: copies of an icon arc from where it is to a
-// target (the current faction's spot in the top bar), one after another.
+// Big moments over the map: a large icon pinned in the middle, then flown to
+// where it belongs.
 import type { Icon } from './icons';
 import { MECH_PARTS } from './shapes';
-
-/** Flies `count` copies of `icon` to `target`, then gives the target a little bump. Resolves when done. */
-export async function flyTo(icon: Element, target: Element, count: number): Promise<void> {
-  const from = icon.getBoundingClientRect();
-  const to = target.getBoundingClientRect();
-  const dx = to.left + to.width / 2 - (from.left + from.width / 2);
-  const dy = to.top + to.height / 2 - (from.top + from.height / 2);
-  await Promise.all(
-    Array.from({ length: Math.max(1, count) }, (_, i) => {
-      const copy = icon.cloneNode(true) as HTMLElement;
-      Object.assign(copy.style, {
-        position: 'fixed',
-        left: `${from.left}px`,
-        top: `${from.top}px`,
-        margin: '0',
-        zIndex: '50',
-        pointerEvents: 'none',
-      });
-      document.body.append(copy);
-      return copy
-        .animate(
-          [
-            { transform: 'translate(0, 0) scale(1)', opacity: 1 },
-            { transform: `translate(${dx * 0.4}px, ${dy * 0.4 - 50}px) scale(1.5)`, opacity: 1, offset: 0.35 },
-            { transform: `translate(${dx}px, ${dy}px) scale(0.6)`, opacity: 0.3 },
-          ],
-          { duration: 850, delay: i * 180, easing: 'ease-in-out', fill: 'forwards' },
-        )
-        .finished.then(() => copy.remove());
-    }),
-  );
-  await target.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.08)' }, { transform: 'scale(1)' }], { duration: 300 }).finished;
-}
 
 /** An icon (see icons.ts) as a standalone element. */
 function iconElement(icon: Icon): HTMLElement {
@@ -50,7 +17,12 @@ function iconElement(icon: Icon): HTMLElement {
 }
 
 /** A big moment: an icon (with a smaller one under it, say a recruit's bonus), or a mech being put together. */
-export type Moment = { icon: Icon; below?: Icon; target: string } | { mech: { color: string; initial: string }; target: string };
+export type Moment =
+  | { icon: Icon; below?: Icon; target: string; side?: Side }
+  | { mech: { color: string; initial: string }; target: string };
+
+/** A smaller gain beside the icon (a recruit's one-time bonus: "+2 ⚡"), flown to the first of `targets` on screen. */
+type Side = { text: string; icon: Icon; targets: string[] };
 
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -95,17 +67,37 @@ export async function showMoment(moment: Moment, over: Element): Promise<void> {
     const { el, parts } = mechElement(moment.mech.color, moment.mech.initial);
     return pin(el, over, target, parts);
   }
-  return pin(moment.below ? stacked(moment.icon, moment.below) : iconElement(moment.icon), over, target);
+  const main = pin(moment.below ? stacked(moment.icon, moment.below) : iconElement(moment.icon), over, target);
+  if (!moment.side) return main;
+  await Promise.all([main, pin(sideElement(moment.side), over, onScreen(moment.side.targets), undefined, 1.1)]);
 }
 
-async function pin(el: Element, over: Element, target: Element | null, parts?: Element[]): Promise<void> {
+/** The side gain: its amount and icon, about half the main icon's size. */
+function sideElement(side: Side): HTMLElement {
+  const el = document.createElement('span');
+  const inner = document.createElement('span');
+  Object.assign(inner.style, { fontSize: '0.5em', fontWeight: '700', color: '#fff', display: 'inline-flex', alignItems: 'center', gap: '0.1em' });
+  inner.append(side.text, iconElement(side.icon));
+  el.append(inner);
+  return el;
+}
+
+const isShown = (el: Element | null) => {
+  const r = el?.getBoundingClientRect();
+  return !!r && r.width > 0 && r.bottom > 0 && r.top < innerHeight;
+};
+const onScreen = (selectors: string[]) => selectors.map((s) => document.querySelector(s)).find(isShown) ?? null;
+
+/** `right`: how far right of the middle to pin it, in the big icon's size. */
+async function pin(el: Element, over: Element, target: Element | null, parts?: Element[], right = 0): Promise<void> {
   const box = over.getBoundingClientRect();
-  const [cx, cy] = [box.left + box.width / 2, box.top + box.height / 2];
+  const size = Math.min(110, box.height * 0.35);
+  const [cx, cy] = [box.left + box.width / 2 + right * size, box.top + box.height / 2];
   Object.assign((el as HTMLElement).style, {
     position: 'fixed',
     left: `${cx}px`,
     top: `${cy}px`,
-    fontSize: `${Math.min(110, box.height * 0.35)}px`,
+    fontSize: `${size}px`,
     lineHeight: '1',
     zIndex: '50',
     pointerEvents: 'none',
@@ -114,7 +106,7 @@ async function pin(el: Element, over: Element, target: Element | null, parts?: E
   document.body.append(el);
   // A target that isn't on screen (a closed drawer, say): just fade out in place.
   const to = target?.getBoundingClientRect();
-  const visible = to && to.width > 0 && to.bottom > 0 && to.top < innerHeight;
+  const visible = to && isShown(target);
   const [dx, dy] = visible ? [to.left + to.width / 2 - cx, to.top + to.height / 2 - cy] : [0, 0];
   const at = (x: number, y: number, scale: number) => `translate(-50%, -50%) translate(${x}px, ${y}px) scale(${scale})`;
   // A piece on the map: end at its size there.

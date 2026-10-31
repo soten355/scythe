@@ -11,7 +11,7 @@
   import FactionEmblem from './FactionEmblem.svelte';
   import { fade } from 'svelte/transition';
   import { guide } from './camera';
-  import { flyTo, showMoment, type Moment } from './fly';
+  import { showMoment, type Moment } from './fly';
   import { BONUS_ICONS, RECRUIT_ICON, STAR_ICON, STAR_KIND_ICONS } from './icons';
   import { buildPrompt, combatSummary, sectionHeadings, type Button, type Prompt, type Selection } from './prompt';
   import { canSwitchSection, phase, previousSection, sectionChoices } from './turn';
@@ -94,7 +94,15 @@
     const { faction, mat } = before.setup.players[before.currentPlayer]!;
     for (const a of actions) {
       if (a.type === 'enlist') {
-        added.push({ icon: RECRUIT_ICON, below: BONUS_ICONS[mat.sections[a.section]!.bottom.recruitBonus], target: `[data-recruit="${a.section}"]` });
+        // The recruit flies to its spot on the mat; its one-time bonus, beside it, to that stat in the top bar.
+        const amount = faction.recruitBonuses.find((r) => r.bonus === a.bonus)?.amount ?? 0;
+        const seat = before.currentPlayer;
+        added.push({
+          icon: RECRUIT_ICON,
+          below: BONUS_ICONS[mat.sections[a.section]!.bottom.recruitBonus],
+          target: `[data-recruit="${a.section}"]`,
+          side: { text: `+${amount}`, icon: BONUS_ICONS[a.bonus], targets: [`[data-stat="${seat}|${a.bonus}"]`, `[data-player="${seat}"]`] },
+        });
       }
       if (a.type === 'deploy') added.push({ mech: { color: faction.color, initial: faction.name[0]! }, target: `[data-mech="${before.currentPlayer}|${a.hex}"]` });
     }
@@ -192,19 +200,6 @@
     else if (route) act(...(prompt.tapFirst ?? []), ...route);
     else if (select) selection = select;
     else selection = { hex: at };
-  }
-
-  /** A pop-up choice; for a gain (a recruit's bonus), its icons fly to your spot in the top bar first. */
-  let flying = $state(false);
-  async function pick(option: NonNullable<Prompt['choice']>['options'][number], from: HTMLElement) {
-    if (flying) return;
-    if (!option.amount) return void (selection = option.select);
-    flying = true;
-    const icon = from.querySelector('.big');
-    const target = document.querySelector('.player.current');
-    if (icon && target) await flyTo(icon, target, option.amount);
-    flying = false;
-    selection = option.select;
   }
 
   function undo() {
@@ -387,7 +382,7 @@
         <p>{c.message}</p>
         <div class="options">
           {#each c.options as o (o.label)}
-            <button disabled={flying} onclick={(e) => pick(o, e.currentTarget)}><span class="big"><InlineIcon icon={o.icon} /></span> {o.label}</button>
+            <button onclick={() => (selection = o.select)}><span class="big"><InlineIcon icon={o.icon} /></span> {o.label}</button>
           {/each}
         </div>
         <button class="quiet back" onclick={() => (selection = c.cancel)}>Back</button>
