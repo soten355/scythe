@@ -454,3 +454,30 @@ describe('Speed', () => {
     expect(p.tapFirst).toEqual([{ type: 'dropWorker', unit: mech, worker: 1 }]);
   });
 });
+
+describe('Build', () => {
+  // Nordic builds (their section 2's bottom row) with enough wood on A4.
+  const building = () => {
+    const state = start();
+    const ready: GameState = { ...state, resources: { A4: { wood: 4 } } };
+    return play(ready, { type: 'chooseSection', section: 2 }, { type: 'skipTop' });
+  };
+  const paid = (state: GameState) => {
+    let p = prompt(state);
+    while (p.paying) p = prompt(state, [...p.tapSelects.values()][0]!);
+    return p;
+  };
+
+  it('asks which structure first, then where', () => {
+    const state = building();
+    let p = paid(state);
+    expect(p.highlights.size).toBe(0);
+    const mill = p.buttons.find((b) => b.label.startsWith('Mill'))!;
+    expect(mill).toBeDefined();
+    p = prompt(state, mill.select);
+    expect([...p.highlights].sort()).toEqual(['A4', 'A5']);
+    p = prompt(state, p.tapSelects.get('A5'));
+    const go = p.buttons.find((b) => b.primary)!;
+    expect(go.actions?.at(-1)).toEqual({ type: 'build', structure: 'mill', hex: 'A5' });
+  });
+});

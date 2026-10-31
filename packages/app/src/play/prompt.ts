@@ -37,6 +37,7 @@ import {
   type Resource,
   type ResourcePile,
   type SectionIndex,
+  type Structure,
   type TopUpgrade,
   type UnitRef,
 } from '@scythe/engine';
@@ -55,6 +56,8 @@ export interface Selection {
   effect?: Action;
   /** The two halves of an upgrade, picked on the mat. */
   upgrade?: { top?: TopUpgrade; bottom?: SectionIndex };
+  /** The structure picked to build (before where). */
+  structure?: Structure;
   /** The bottom-row section picked on the mat for a recruit. */
   recruit?: SectionIndex;
   /** What the selected unit picks up before it moves: workers (by index) and resources, in the order picked. */
@@ -162,6 +165,14 @@ const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 /** "1 more coin", "3 more metal and 1 more power". */
 export const needText = (needs: Need[]) =>
   needs.map((n) => `${n.amount} more ${n.what === 'coins' ? (n.amount === 1 ? 'coin' : 'coins') : n.what}`).join(' and ');
+const STRUCTURE_NAMES: Record<Structure, string> = { mine: 'Mine', mill: 'Mill', armory: 'Armory', monument: 'Monument' };
+/** What each structure gives, in a few words. */
+const STRUCTURE_BONUS: Record<Structure, string> = {
+  mine: 'a tunnel only you can use',
+  mill: 'produces as an extra hex',
+  armory: '+1 power when you trade',
+  monument: '+1 popularity when you bolster',
+};
 const UNIT_NAMES = { character: 'Character', mech: 'Mech', worker: 'Worker' } as const;
 
 /** The hex an action happens on, if any (not counting moves). */
@@ -337,7 +348,7 @@ export function title(state: GameState): string {
       const what = {
         upgrade: 'tap a glowing top-row value and a glowing bottom-row cost on your mat',
         deploy: "tap a glowing worker's hex, then choose a mech",
-        build: "tap a glowing worker's hex, then choose a structure",
+        build: "choose a structure, then tap a glowing worker's hex",
         enlist: 'tap a glowing recruit spot on your mat',
       }[bottom.action];
       return `${who} · ${name}: ${what}`;
@@ -802,8 +813,29 @@ function bottomPrompt(state: GameState, actions: Action[], selection: Selection)
         ? { text: `Now: ${now(chosen.bonus)}`, icon: BONUS_ICONS[chosen.bonus], remove: keep({ recruit: spot }) }
         : { empty: 'Then choose a one-time bonus' },
     );
+  } else if (bottom.action === 'build') {
+    // Choose the structure first, then tap one of the hexes where it can go.
+    const builds = options as Extract<Effect, { type: 'build' }>[];
+    const structure = selection.structure;
+    chosen = builds.find((a) => sameAction(a, selection.effect));
+    if (!structure) {
+      for (const s of [...new Set(builds.map((a) => a.structure))]) {
+        choices.push({ label: `${STRUCTURE_NAMES[s]}: ${STRUCTURE_BONUS[s]}`, select: keep({ structure: s }) });
+      }
+    } else {
+      for (const a of builds) {
+        if (a.structure !== structure) continue;
+        highlights.add(a.hex);
+        tapSelects.set(a.hex, keep({ structure, effect: a }));
+      }
+      selected = chosen?.hex;
+    }
+    slots.push(
+      structure ? { text: `Build the ${STRUCTURE_NAMES[structure].toLowerCase()}`, remove: keep({}) } : { empty: 'Choose a structure' },
+      chosen ? { text: `On ${chosen.hex}`, remove: keep({ structure }) } : { empty: "Then tap a worker's hex" },
+    );
   } else {
-    // Deploy and Build happen on a worker's hex: tap it, then choose.
+    // Deploy happens on a worker's hex: tap it, then choose the mech.
     chosen = options.find((a) => sameAction(a, selection.effect));
     for (const a of options) {
       const hex = (a as { hex: HexId }).hex;
@@ -816,12 +848,7 @@ function bottomPrompt(state: GameState, actions: Action[], selection: Selection)
       const on = a === chosen;
       choices.push({ label: label(after, a), select: keep(on ? { hex: selected } : { hex: selected, effect: a }), chosen: on });
     }
-    const what = bottom.action === 'deploy' ? 'the mech' : 'the structure';
-    slots.push(
-      selected
-        ? { text: `${bottom.action === 'deploy' ? 'Mech goes' : 'Build'} on ${selected}`, remove: keep({}) }
-        : { empty: `Tap a worker's hex for ${what}` },
-    );
+    slots.push(selected ? { text: `Mech goes on ${selected}`, remove: keep({}) } : { empty: "Tap a worker's hex for the mech" });
   }
 
   // The choices, the picked one standing out, then the action's own button last.
