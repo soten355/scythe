@@ -420,3 +420,37 @@ describe('combat', () => {
     });
   });
 });
+
+describe('Speed', () => {
+  // Nordic with Speed (their fourth mech ability) out, a mech on A5 with a worker.
+  const speedy = () => {
+    const state = start();
+    const ready: GameState = { ...state, players: [{ ...state.players[0]!, mechs: ['A5'], mechAbilities: [3] }, state.players[1]!] };
+    return play(ready, { type: 'chooseSection', section: 2 });
+  };
+  const mech = { kind: 'mech' as const, index: 0 };
+  const firstHex = (state: GameState) => {
+    const a = legalActions(state, 0).find((x) => x.type === 'moveUnit' && x.unit.kind === 'mech')!;
+    return (a as { to: string }).to;
+  };
+
+  it('keeps the unit selected after its first hex, so it can go on', () => {
+    const state = play(speedy(), { type: 'moveUnit', unit: mech, to: firstHex(speedy()) });
+    const p = prompt(state);
+    expect(p.selected).toBe(firstHex(speedy()));
+    expect(p.tapActions.size).toBeGreaterThan(0);
+    expect(p.buttons.map((b) => b.label)).toContain('Done moving');
+    expect(p.buttons.map((b) => b.label)).not.toContain('Back');
+  });
+
+  it('shows what it carries in the slots; removing one drops it off before the next hex', () => {
+    const to = firstHex(speedy());
+    const state = play(speedy(), { type: 'carryWorker', unit: mech, worker: 1 }, { type: 'moveUnit', unit: mech, to });
+    let p = prompt(state);
+    expect(p.slots).toHaveLength(1);
+    expect(p.cargo?.workers).toEqual([1]);
+    p = prompt(state, (p.slots![0] as { remove: object }).remove);
+    expect(p.cargo?.workers).toEqual([]);
+    expect(p.tapFirst).toEqual([{ type: 'dropWorker', unit: mech, worker: 1 }]);
+  });
+});

@@ -27,4 +27,10 @@ describe('base factions', () => {
       expect(f.mechAbilities.map((m) => m.name).filter(Boolean), f.name).toHaveLength(4);
     }
   });
+
+  it('gives every ability a rule the engine plays', () => {
+    for (const f of baseFactions) {
+      for (const a of [f.ability, ...f.mechAbilities]) expect(a.rule, `${f.name}: ${a.name}`).toBeDefined();
+    }
+  });
 });

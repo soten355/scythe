@@ -11,6 +11,7 @@
 // top-actions.ts and bottom-actions.ts.
 import type { Board, HexId } from './board';
 import { bottomActions, applyBottom } from './bottom-actions';
+import { hasRule } from './abilities';
 import { applyCombat, combatActions, combatSeat, COMBAT_DECK, drawCombatCards, type CombatResult } from './combat';
 import { awardStars, endTurn, SECTIONS, type StarKind } from './state';
 import type { Faction } from './faction';
@@ -74,11 +75,20 @@ export interface PlayerState {
 export type TurnStep =
   | { step: 'chooseSection' }
   | { step: 'top'; section: SectionIndex }
-  | { step: 'moving'; section: SectionIndex; moved: UnitRef[]; load?: Load }
+  /**
+   * Moving units. `load` is what a unit has picked up to take along. A unit
+   * with hexes left to go (Speed) is `walking`: it may move again, and drop
+   * off or pick up things on the way, until another unit moves or the move ends.
+   */
+  | { step: 'moving'; section: SectionIndex; moved: UnitRef[]; load?: Load; walking?: { unit: UnitRef; left: number } }
   | { step: 'trading'; section: SectionIndex; left: number; hex: HexId }
   | { step: 'producing'; section: SectionIndex; produced: HexId[] }
-  /** Fights still to come after a move (`left`), and the one under way, if picked. */
-  | { step: 'combat'; section: SectionIndex; left: HexId[]; fight: Fight | null }
+  /**
+   * Fights still to come after a move (`left`), and the one under way, if
+   * picked. After a lost fight, `retreat` waits for the loser to choose
+   * where their character and mechs go (when they have a choice).
+   */
+  | { step: 'combat'; section: SectionIndex; left: HexId[]; fight: Fight | null; retreat?: Retreat }
   | { step: 'bottom'; section: SectionIndex; paid: number }
   /** The bottom-row action is done; only End turn is left. */
   | { step: 'end'; section: SectionIndex };
@@ -94,6 +104,15 @@ export interface Fight {
   hex: HexId;
   attacker: CombatSide;
   defender: CombatSide;
+  /** Seats still to decide on a before-the-dials ability (attacker first), before anyone dials. */
+  before: number[];
+}
+
+/** The loser of a fight choosing where their character and mechs on `hex` go: home, or one of `to`. */
+export interface Retreat {
+  seat: number;
+  hex: HexId;
+  to: HexId[];
 }
 
 export type ResourcePile = Partial<Record<Resource, number>>;
@@ -123,6 +142,9 @@ export type Action =
   | { type: 'carryWorker'; unit: UnitRef; worker: number }
   | { type: 'carryResource'; unit: UnitRef; resource: Resource }
   | { type: 'moveUnit'; unit: UnitRef; to: HexId }
+  // Speed: a unit partway through its move can drop off what it carries.
+  | { type: 'dropWorker'; unit: UnitRef; worker: number }
+  | { type: 'dropResource'; unit: UnitRef; resource: Resource }
   | { type: 'endMove' }
   | { type: 'gainCoins' }
   // Trade: pay coins, then gain resources (one at a time) or popularity.
@@ -139,6 +161,10 @@ export type Action =
   | { type: 'fight'; hex: HexId }
   | { type: 'combatCard'; value: number }
   | { type: 'combatPower'; power: number }
+  /** Use (or not) an ability that comes before the dials, such as draining the other side's power. */
+  | { type: 'beforeCombat'; use: boolean }
+  /** After losing, where the character and mechs go (when there's a choice). */
+  | { type: 'retreat'; to: Location }
   // Bottom row: pay the cost one resource at a time, then the action itself.
   | { type: 'pay'; hex: HexId }
   | { type: 'upgrade'; top: TopUpgrade; bottom: SectionIndex }
@@ -202,7 +228,7 @@ export function legalActions(state: GameState, seat: number): Action[] {
   const turn = state.turn;
   switch (turn.step) {
     case 'chooseSection': {
-      const last = state.players[seat]?.lastSection;
+      const last = hasRule(state, seat, 'repeatSection') ? null : state.players[seat]?.lastSection;
       return SECTIONS.filter((s) => s !== last).map((section) => ({ type: 'chooseSection', section }));
     }
     case 'top':

@@ -239,6 +239,7 @@ Each phase ends in something playable on the phone. A phase is done when its che
 
 - [x] Combat (power dial, combat cards), retreats, popularity loss
 - [ ] Mechs and all mech abilities; faction abilities
+  - Done for Nordic and Rusviet (the two factions entered so far). Abilities are rules on the faction data (crossing rivers, lakes, Speed, village-Factory link, draining power before a fight, an extra combat card, repeating a section); the other factions get theirs as they're entered, adding new rule kinds only where needed.
   - Note from play-testing: a mech moving more than one hex (Speed) can drop off and pick up any number of workers and resources at each hex along the way, then keep moving.
   - Note from play-testing: drop-offs along the way should use the same pick-up slots in the side panel, with the map updating live as things are dropped off.
 - [ ] Stars, triumph track, game end and final scoring

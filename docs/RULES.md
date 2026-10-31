@@ -35,3 +35,43 @@ should check it against the rulebook; tick it once confirmed.
       character starts on the home base and one worker on each land hex
       next to it; those are board rules, not faction data. Source: rulebook
       setup.
+
+## Combat
+
+- [ ] Verify: characters and mechs may move onto other players' units;
+      workers may not (unless carried by a mech). Fights happen once the
+      whole move is over, in the order the attacker picks.
+- [ ] Verify: moving onto enemy workers alone sends them home with no
+      fight; the mover loses 1 popularity per worker.
+- [ ] Verify: each side adds up to one combat card per character or mech it
+      has in the fight and dials 0–7 power (no more than it has). Ties go to
+      the attacker. Both pay the power dialed and discard the cards played.
+- [ ] Verify: everything of the loser's on the hex goes home; if the
+      attacker won, they lose 1 popularity per enemy worker sent home.
+- [ ] Verify: the loser draws a combat card if they showed at least 1 power.
+      The engine counts dial plus cards; it may be the dial only.
+- [ ] Verify: a mech may carry workers into a fight; if it loses, they go
+      home too.
+- [ ] Verify: the winner places a combat star, at most two per game.
+- [ ] Verify: the combat deck is 16 twos, 12 threes, 8 fours and 6 fives;
+      when it runs out, the discards are shuffled into a new deck.
+
+## Abilities
+
+- [ ] Verify: movement mech abilities (Riverwalk, Seaworthy, Township,
+      Speed) work for the character as well as the mechs.
+- [ ] Verify: Riverwalk lets a unit cross a river only onto the listed
+      terrains (it's the hex you move onto that counts).
+- [ ] Verify: workers can't be on lakes, so a Seaworthy mech can't carry
+      workers onto one; when a Seaworthy loser retreats onto a lake, its
+      workers in the fight still go home. The loser picks one place for all
+      its character and mechs there.
+- [ ] Verify: Speed lets a unit move one more hex; moving onto any enemy
+      unit ends its move. On the way it may drop off and pick up workers and
+      resources (owner's play-test note).
+- [ ] Verify: Township links any village you control with the Factory, both
+      ways, for the character and mechs.
+- [ ] Verify: Artillery is decided before anyone dials: the attacker first,
+      then the defender. The other side can't drop below 0 power.
+- [ ] Verify: People's Army's extra card needs a worker of yours on the
+      fight's hex (for an attacker, one carried in by a mech counts).

@@ -71,8 +71,7 @@
     } else if (nextSeat !== seat) {
       // Mid-turn hand-over (to a defender, or back to the attacker): no undoing what the other seat chose.
       turnStart = history.length - 1;
-      const fight = next.turn.step === 'combat' ? next.turn.fight : null;
-      handoff = { from: seat, to: nextSeat, note: fight && nextSeat === fight.defender.seat ? `to defend ${fight.hex}` : undefined };
+      handoff = { from: seat, to: nextSeat, note: handoffNote(next, nextSeat) };
     }
     if (next.lastCombat !== before.lastCombat) {
       // A fight was revealed: it can't be taken back.
@@ -80,6 +79,20 @@
       revealed = next.lastCombat ?? null;
     }
   }
+
+  /** Why play passes mid-turn: to defend a fight, or to retreat after losing one. */
+  function handoffNote(state: GameState, seat: number): string | undefined {
+    if (state.turn.step !== 'combat') return undefined;
+    if (state.turn.retreat?.seat === seat) return `to retreat from ${state.turn.retreat.hex}`;
+    const fight = state.turn.fight;
+    return fight && seat === fight.defender.seat ? `to defend ${fight.hex}` : undefined;
+  }
+
+  /** Last turn's section, shown as off-limits on the mat (unless an ability allows it again). */
+  const previous = $derived.by(() => {
+    const last = previousSection(history, turnStart);
+    return choices.some((a) => a.type === 'chooseSection' && a.section === last) ? null : last;
+  });
 
   /** Pick a section, replacing the one picked earlier if nothing else has happened yet. */
   function choose(action: Action) {
@@ -290,7 +303,7 @@
     </aside>
   </main>
 
-  <MatDrawer {game} {choices} previous={previousSection(history, turnStart)} bind:open={matOpen} onChoose={choose} upgrade={prompt.upgrade} enlist={prompt.enlist} onSelect={(sel) => (selection = sel)} />
+  <MatDrawer {game} {choices} {previous} bind:open={matOpen} onChoose={choose} upgrade={prompt.upgrade} enlist={prompt.enlist} onSelect={(sel) => (selection = sel)} />
 
   {#if handoff !== null}
     {@const { from, to } = handoff}

@@ -11,8 +11,14 @@
 // Everything of the loser's on the hex goes home; if the attacker won, they
 // lose 1 popularity per enemy worker sent home. The winner earns a combat
 // star (two at most). A loser who showed any power draws a combat card.
+//
+// Abilities can change a fight: an extra card when you have a worker there,
+// draining the other side's power before anyone dials (attacker decides
+// first, then defender), and retreating onto a nearby lake instead of home.
 import type { HexId } from './board';
-import type { Action, CombatSide, Fight, GameState, Location, PlayerState, SectionIndex, TurnStep } from './game';
+import { neighbors } from './board';
+import { hasRule, rulesOfKind } from './abilities';
+import type { Action, CombatSide, Fight, GameState, Location, PlayerState, Retreat, SectionIndex, TurnStep } from './game';
 import { shuffle } from './rng';
 import { MAX_POPULARITY, placeStar, updatePlayer } from './state';
 
@@ -52,14 +58,31 @@ export function combatUnitsOn(player: PlayerState, hex: HexId): number {
   return (player.character === hex ? 1 : 0) + player.mechs.filter((m) => m === hex).length;
 }
 
+/** How many combat cards a player may play in a fight on `hex`: one per character or mech, plus any ability's extra. */
+export function maxCombatCards(state: GameState, seat: number, hex: HexId): number {
+  const player = state.players[seat]!;
+  const extra = hasRule(state, seat, 'extraCardWithWorker') && player.workers.includes(hex) ? 1 : 0;
+  return combatUnitsOn(player, hex) + extra;
+}
+
 const hasUnitsOn = (player: PlayerState, hex: HexId) =>
   combatUnitsOn(player, hex) > 0 || player.workers.includes(hex);
 
-/** Sends all of a player's units on a hex home. */
-function retreat(state: GameState, seat: number, hex: HexId): GameState {
+/** Sends a player's units on a hex to `to` (home by default); workers always go home. */
+function retreat(state: GameState, seat: number, hex: HexId, to: Location = 'home'): GameState {
   const p = state.players[seat]!;
-  const home = (at: Location): Location => (at === hex ? 'home' : at);
-  return updatePlayer(state, seat, { character: home(p.character), mechs: p.mechs.map(home), workers: p.workers.map(home) });
+  const go = (dest: Location) => (at: Location): Location => (at === hex ? dest : at);
+  return updatePlayer(state, seat, { character: go(to)(p.character), mechs: p.mechs.map(go(to)), workers: p.workers.map(go('home')) });
+}
+
+/** Lakes next to a lost fight that the loser's character and mechs may retreat onto instead of going home. */
+function retreatLakes(state: GameState, seat: number, hex: HexId): HexId[] {
+  if (!rulesOfKind(state, seat, 'lakes').some((r) => r.retreat)) return [];
+  const board = state.setup.board;
+  const others = state.players.filter((_, i) => i !== seat);
+  return neighbors(board, hex).filter(
+    (h) => board.hexes[h]?.terrain === 'lake' && !others.some((p) => combatUnitsOn(p, h) > 0 || p.workers.includes(h)),
+  );
 }
 
 const losePopularity = (state: GameState, seat: number, n: number): GameState =>
@@ -99,27 +122,38 @@ function startFight(state: GameState, section: SectionIndex, left: HexId[], hex:
   const attacker = state.currentPlayer;
   const defender = state.players.findIndex((p, i) => i !== attacker && combatUnitsOn(p, hex) > 0);
   const side = (seat: number): CombatSide => ({ seat, cards: [], power: null });
-  const fight: Fight = { hex, attacker: side(attacker), defender: side(defender) };
+  const before = [attacker, defender].filter((seat) => canDrain(state, seat));
+  const fight: Fight = { hex, attacker: side(attacker), defender: side(defender), before };
   return settle({ ...state, turn: { step: 'combat', section, left, fight } });
 }
 
-/** The side whose turn it is to choose in a fight. */
+/** The before-the-dials ability a player can afford now, if any. */
+const drainRule = (state: GameState, seat: number) =>
+  rulesOfKind(state, seat, 'drainPower').find((r) => state.players[seat]!.power >= r.pay);
+const canDrain = (state: GameState, seat: number) => !!drainRule(state, seat);
+
+/** The side whose turn it is to choose in a fight (after any before-the-dials decisions). */
 const choosing = (fight: Fight): 'attacker' | 'defender' => (fight.attacker.power === null ? 'attacker' : 'defender');
 
-/** The seat that must act during combat: whichever side is choosing, or the attacker (the current player) picking a fight. */
-export const combatSeat = (state: GameState, turn: CombatStep): number =>
-  turn.fight ? turn.fight[choosing(turn.fight)].seat : state.currentPlayer;
+/** The seat that must act during combat: a loser retreating, a side deciding or choosing, or the attacker (the current player) picking a fight. */
+export function combatSeat(state: GameState, turn: CombatStep): number {
+  if (turn.retreat) return turn.retreat.seat;
+  if (!turn.fight) return state.currentPlayer;
+  return turn.fight.before[0] ?? turn.fight[choosing(turn.fight)].seat;
+}
 
 export function combatActions(state: GameState, turn: CombatStep): Action[] {
+  if (turn.retreat) return [{ type: 'retreat', to: 'home' }, ...turn.retreat.to.map((to): Action => ({ type: 'retreat', to }))];
   const fight = turn.fight;
   if (!fight) return turn.left.map((hex) => ({ type: 'fight', hex }));
+  if (fight.before.length) return [{ type: 'beforeCombat', use: true }, { type: 'beforeCombat', use: false }];
   return sideOptions(state, fight, fight[choosing(fight)]);
 }
 
 function sideOptions(state: GameState, fight: Fight, side: CombatSide): Action[] {
   const player = state.players[side.seat]!;
   const actions: Action[] = [];
-  if (side.cards.length < combatUnitsOn(player, fight.hex)) {
+  if (side.cards.length < maxCombatCards(state, side.seat, fight.hex)) {
     const left = [...player.combatCards];
     for (const c of side.cards) left.splice(left.indexOf(c), 1);
     for (const value of [...new Set(left)].sort((a, b) => b - a)) actions.push({ type: 'combatCard', value });
@@ -130,7 +164,24 @@ function sideOptions(state: GameState, fight: Fight, side: CombatSide): Action[]
 
 export function applyCombat(state: GameState, turn: CombatStep, action: Action): GameState {
   if (action.type === 'fight') return startFight(state, turn.section, turn.left, action.hex);
+  if (action.type === 'retreat') {
+    const { seat, hex } = turn.retreat!;
+    return nextFight(retreat(state, seat, hex, action.to), turn.section, turn.left);
+  }
   const fight = turn.fight!;
+  if (action.type === 'beforeCombat') {
+    const seat = fight.before[0]!;
+    let next = state;
+    if (action.use) {
+      const rule = drainRule(state, seat)!;
+      const other = seat === fight.attacker.seat ? fight.defender.seat : fight.attacker.seat;
+      next = updatePlayer(next, seat, { power: next.players[seat]!.power - rule.pay });
+      next = updatePlayer(next, other, { power: Math.max(0, next.players[other]!.power - rule.loss) });
+    }
+    // The other side may no longer be able to afford theirs.
+    const before = fight.before.slice(1).filter((s) => canDrain(next, s));
+    return settle({ ...next, turn: { ...turn, fight: { ...fight, before } } });
+  }
   const who = choosing(fight);
   const side = fight[who];
   const changed: CombatSide =
@@ -146,6 +197,7 @@ export function applyCombat(state: GameState, turn: CombatStep, action: Action):
 function settle(state: GameState): GameState {
   const turn = state.turn as CombatStep;
   const fight = turn.fight!;
+  if (fight.before.length) return state;
   if (fight.defender.power !== null) return resolve(state, turn, fight);
   const who = choosing(fight);
   const options = sideOptions(state, fight, fight[who]);
@@ -184,11 +236,19 @@ function resolve(state: GameState, turn: CombatStep, fight: Fight): GameState {
     const workers = next.players[loser.seat]!.workers.filter((w) => w === fight.hex).length;
     next = losePopularity(next, result.winner, workers);
   }
-  next = retreat(next, loser.seat, fight.hex);
   if (total(loser) > 0) next = drawCombatCards(next, loser.seat, 1);
   const combatStars = next.players[result.winner]!.stars.filter((s) => s === 'combat').length;
   if (combatStars < MAX_COMBAT_STARS) next = placeStar(next, result.winner, 'combat');
-
   next = { ...next, lastCombat: result };
-  return nextFight(next, turn.section, turn.left.filter((h) => h !== fight.hex));
+  const left = turn.left.filter((h) => h !== fight.hex);
+
+  // Workers go home now; the character and mechs too, unless the loser has somewhere else to choose.
+  const lakes = combatUnitsOn(next.players[loser.seat]!, fight.hex) > 0 ? retreatLakes(next, loser.seat, fight.hex) : [];
+  if (lakes.length) {
+    const p = next.players[loser.seat]!;
+    next = updatePlayer(next, loser.seat, { workers: p.workers.map((w) => (w === fight.hex ? 'home' : w)) });
+    const waiting: Retreat = { seat: loser.seat, hex: fight.hex, to: lakes };
+    return { ...next, turn: { step: 'combat', section: turn.section, left, fight: null, retreat: waiting } };
+  }
+  return nextFight(retreat(next, loser.seat, fight.hex), turn.section, left);
 }

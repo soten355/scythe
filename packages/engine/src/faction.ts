@@ -1,14 +1,39 @@
 // Factions as data, mirroring the faction mat: home base, starting power and
 // combat cards, stars, faction ability, four mech abilities and the recruit
-// one-time bonuses. Abilities are text for now; Phase 2 attaches rule hooks.
-import type { HomeBaseId } from './board';
+// one-time bonuses. Each ability can carry a rule (below), which is what the
+// engine plays; the name and description are only for showing.
+import type { HomeBaseId, Terrain } from './board';
 import type { RecruitBonus } from './mat';
 
 export interface Ability {
   name: string;
   /** In our own words, never the published text. */
   description: string;
+  /** What the ability does in the rules. Without one, it's only text. */
+  rule?: AbilityRule;
 }
+
+/**
+ * The rules an ability can have, as data so factions can share them. Mech
+ * abilities count once that mech is deployed, and the movement ones work
+ * for the character as well as the mechs.
+ */
+export type AbilityRule =
+  /** Cross rivers: workers anywhere, or the character and mechs onto these terrains only. */
+  | { kind: 'crossRivers'; units: 'workers' }
+  | { kind: 'crossRivers'; units: 'characterAndMechs'; onto: Terrain[] }
+  /** The character and mechs may move onto and off lakes, and may retreat onto a lake next to a lost fight. */
+  | { kind: 'lakes'; retreat: boolean }
+  /** The character and mechs may move this many extra hexes each move. */
+  | { kind: 'speed'; extra: number }
+  /** The character and mechs may move between villages you control and the Factory as if they were next to each other. */
+  | { kind: 'villagesToFactory' }
+  /** Before a fight's dials, you may pay this much power to make the other side lose some. */
+  | { kind: 'drainPower'; pay: number; loss: number }
+  /** In a fight where you have a worker, you may play one more combat card. */
+  | { kind: 'extraCardWithWorker' }
+  /** You may pick the same player mat section as on your last turn. */
+  | { kind: 'repeatSection' };
 
 export interface Faction {
   id: string;

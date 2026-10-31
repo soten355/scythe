@@ -10,4 +10,5 @@ export { moveTargets, produceCost, RESOURCES, TERRAIN_PRODUCES, yieldOf as produ
 export * from './mat';
 export * from './faction';
 export * from './afford';
-export { COMBAT_DECK, MAX_DIAL, MAX_COMBAT_STARS, combatUnitsOn, type CombatResult } from './combat';
+export { COMBAT_DECK, MAX_DIAL, MAX_COMBAT_STARS, combatUnitsOn, maxCombatCards, type CombatResult } from './combat';
+export { rulesOf, rulesOfKind, hasRule } from './abilities';

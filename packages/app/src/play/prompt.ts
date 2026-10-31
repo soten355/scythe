@@ -19,8 +19,9 @@ import {
   activeSeat,
   applyAction,
   bottomCost,
-  combatUnitsOn,
+  maxCombatCards,
   MAX_DIAL,
+  RESOURCES,
   legalActions,
   produceCost,
   produceYield,
@@ -188,7 +189,9 @@ export function unitLocation(state: GameState, unit: UnitRef): Location {
 }
 
 const unitOf = (a: Action): UnitRef | undefined =>
-  a.type === 'moveUnit' || a.type === 'carryWorker' || a.type === 'carryResource' ? a.unit : undefined;
+  a.type === 'moveUnit' || a.type === 'carryWorker' || a.type === 'carryResource' || a.type === 'dropWorker' || a.type === 'dropResource'
+    ? a.unit
+    : undefined;
 
 export function label(state: GameState, action: Action): string {
   const { faction, mat } = state.setup.players[state.currentPlayer]!;
@@ -252,6 +255,14 @@ export function label(state: GameState, action: Action): string {
       return `Card ${action.value}`;
     case 'combatPower':
       return `${action.power} power`;
+    case 'dropWorker':
+      return 'Drop off a worker';
+    case 'dropResource':
+      return `Drop off 1 ${action.resource}`;
+    case 'beforeCombat':
+      return action.use ? 'Use it' : "Don't use it";
+    case 'retreat':
+      return action.to === 'home' ? 'Retreat home' : `Retreat to ${action.to}`;
   }
 }
 
@@ -296,6 +307,7 @@ export function title(state: GameState): string {
       }
       break;
     case 'moving':
+      if (turn.walking) return `${who} · Move: it can go ${plural(turn.walking.left, 'more hex')}${turn.walking.left === 1 ? '' : 'es'}: tap where, or move another unit`;
       if (turn.load) return `${who} · Move: tap where it goes, or pick up more first`;
       return `${who} · Move: ${turn.moved.length} of ${topValue(player, mat, turn.section, 'units')} moved`;
     case 'trading':
@@ -307,7 +319,12 @@ export function title(state: GameState): string {
     case 'combat': {
       const name = (seat: number) => state.setup.players[seat]!.faction.name;
       const f = turn.fight;
+      if (turn.retreat) {
+        const r = turn.retreat;
+        return `${name(r.seat)} · Lost on ${r.hex}: retreat your character and mechs home, or tap a lake`;
+      }
       if (!f) return `${who} · Fights on ${turn.left.join(' and ')}: tap where to fight first`;
+      if (f.before.length) return `${name(f.before[0]!)} · Before the fight on ${f.hex}`;
       const choose = 'set your power and add cards';
       if (activeSeat(state) === f.attacker.seat) return `${who} · Fight on ${f.hex} against ${name(f.defender.seat)}: ${choose}`;
       return `${name(f.defender.seat)} · Defend ${f.hex} against ${who}: ${choose}`;
@@ -331,8 +348,10 @@ export function title(state: GameState): string {
 
 export function buildPrompt(state: GameState, actions: Action[], selection: Selection): Prompt {
   const turn = state.turn;
-  const forced = turn.step === 'moving' ? turn.load?.unit : undefined;
-  const unit = forced ?? selection.unit;
+  // Picking things up before a unit's first hex: that unit only. A unit partway through its move (Speed) stays selected unless you pick another.
+  const forced = turn.step === 'moving' && !turn.walking ? turn.load?.unit : undefined;
+  const walking = turn.step === 'moving' ? turn.walking?.unit : undefined;
+  const unit = forced ?? selection.unit ?? (selection.hex ? undefined : walking);
   const highlights = new Set<Location>();
   const tapActions = new Map<Location, Action>();
   const tapSelects = new Map<Location, Selection>();
@@ -359,7 +378,9 @@ export function buildPrompt(state: GameState, actions: Action[], selection: Sele
     }
     const carry = carryPrompt(state, actions, unit, selection);
     buttons.push(...carry.buttons);
-    if (!forced) buttons.push({ label: 'Back', select: {}, quiet: true });
+    const isWalking = walking && sameUnit(walking, unit);
+    if (isWalking) buttons.push({ label: 'Done moving', action: { type: 'endMove' }, quiet: true });
+    else if (!forced) buttons.push({ label: 'Back', select: {}, quiet: true });
     return {
       title: `${title(state)} — ${UNIT_NAMES[unit.kind]} on ${unitLocation(state, unit)}`,
       buttons,
@@ -367,7 +388,7 @@ export function buildPrompt(state: GameState, actions: Action[], selection: Sele
       tapActions,
       tapSelects,
       selected: unitLocation(state, unit),
-      ...(carry.slots.length && { slots: carry.slots, tapFirst: carry.run, cargo: carry.cargo }),
+      ...((carry.slots.length || carry.run.length) && { slots: carry.slots, tapFirst: carry.run, cargo: carry.cargo }),
       // Tapping a hex moves there; tapping another piece switches to it.
       ...(!forced && { pieces: piecesToPick(state, actions) }),
       selectedPiece: pieceKey(unitLocation(state, unit), unit.kind),
@@ -412,15 +433,17 @@ export function buildPrompt(state: GameState, actions: Action[], selection: Sele
  * Picking things up before a unit moves: Pick up all, or one thing at a
  * time; each thing picked fills a slot that puts it back down. Nothing
  * happens until the unit moves, when the pick-ups and the move go through as
- * one step.
+ * one step. A unit partway through its move (Speed) starts with the slots
+ * holding what it already carries: removing one drops it off here.
  */
 function carryPrompt(state: GameState, actions: Action[], unit: UnitRef, selection: Selection) {
   const at = unitLocation(state, unit);
   const turn = state.turn;
   const load = turn.step === 'moving' && turn.load && sameUnit(turn.load.unit, unit) ? turn.load : undefined;
-  // Everything here this unit could still pick up.
-  const workers: number[] = [];
-  const resources: Resource[] = [];
+  const loaded: Carry = { workers: load?.workers ?? [], resources: RESOURCES.flatMap((r) => Array<Resource>(load?.resources[r] ?? 0).fill(r)) };
+  // Everything here this unit could take along: what it carries, and what it could still pick up.
+  const workers: number[] = [...loaded.workers];
+  const resources: Resource[] = [...loaded.resources];
   for (const a of actions) {
     if (a.type === 'carryWorker' && sameUnit(a.unit, unit)) workers.push(a.worker);
     if (a.type === 'carryResource' && sameUnit(a.unit, unit)) {
@@ -428,10 +451,11 @@ function carryPrompt(state: GameState, actions: Action[], unit: UnitRef, selecti
       for (let i = 0; i < n; i++) resources.push(a.resource);
     }
   }
-  // The picks, less any that aren't there any more.
-  const picked: Carry = { workers: (selection.carry?.workers ?? []).filter((w) => workers.includes(w)), resources: [] };
+  // The picks (at first, what it carries), less any that aren't there any more.
+  const wanted = selection.carry ?? loaded;
+  const picked: Carry = { workers: wanted.workers.filter((w) => workers.includes(w)), resources: [] };
   const left = [...resources];
-  for (const r of selection.carry?.resources ?? []) {
+  for (const r of wanted.resources) {
     const i = left.indexOf(r);
     if (i >= 0) picked.resources.push(...left.splice(i, 1));
   }
@@ -455,9 +479,17 @@ function carryPrompt(state: GameState, actions: Action[], unit: UnitRef, selecti
       remove: pick({ ...picked, resources: picked.resources.filter((_, j) => j !== i) }),
     })),
   ];
+  // What to drop off and pick up to go from what it carries now to the picks.
+  const count = (list: Resource[], r: Resource) => list.filter((x) => x === r).length;
   const run: Action[] = [
-    ...picked.workers.map((worker): Action => ({ type: 'carryWorker', unit, worker })),
-    ...picked.resources.map((resource): Action => ({ type: 'carryResource', unit, resource })),
+    ...loaded.workers.filter((w) => !picked.workers.includes(w)).map((worker): Action => ({ type: 'dropWorker', unit, worker })),
+    ...RESOURCES.flatMap((resource) =>
+      Array<Action>(Math.max(0, count(loaded.resources, resource) - count(picked.resources, resource))).fill({ type: 'dropResource', unit, resource }),
+    ),
+    ...picked.workers.filter((w) => !loaded.workers.includes(w)).map((worker): Action => ({ type: 'carryWorker', unit, worker })),
+    ...RESOURCES.flatMap((resource) =>
+      Array<Action>(Math.max(0, count(picked.resources, resource) - count(loaded.resources, resource))).fill({ type: 'carryResource', unit, resource }),
+    ),
   ];
   const pile: ResourcePile = {};
   for (const r of picked.resources) pile[r] = (pile[r] ?? 0) + 1;
@@ -475,6 +507,26 @@ function combatPrompt(state: GameState, actions: Action[], picked: NonNullable<S
   const tapActions = new Map<Location, Action>();
   const tapSelects = new Map<Location, Selection>();
   const fight = turn.fight;
+  if (turn.retreat) {
+    // Tap a lake, or use the buttons (home is off to the side of the map).
+    const buttons = actions.map((a): Button => ({ label: label(state, a), action: a }));
+    for (const a of actions) if (a.type === 'retreat' && a.to !== 'home') (highlights.add(a.to), tapActions.set(a.to, a));
+    return { title: title(state), buttons, highlights, tapActions, tapSelects, selected: turn.retreat.hex };
+  }
+  if (fight?.before.length) {
+    const seat = fight.before[0]!;
+    const { faction } = state.setup.players[seat]!;
+    const unlocked = state.players[seat]!.mechAbilities.map((i) => faction.mechAbilities[i]!);
+    const ability = [faction.ability, ...unlocked].find((a) => a.rule?.kind === 'drainPower')!;
+    const rule = ability.rule as Extract<NonNullable<typeof ability.rule>, { kind: 'drainPower' }>;
+    const other = seat === fight.attacker.seat ? fight.defender.seat : fight.attacker.seat;
+    const them = state.setup.players[other]!.faction.name;
+    const buttons: Button[] = [
+      { label: `Use ${ability.name}: pay ${rule.pay} power, ${them} loses ${rule.loss}`, action: { type: 'beforeCombat', use: true } },
+      { label: `Don't use ${ability.name}`, action: { type: 'beforeCombat', use: false }, quiet: true },
+    ];
+    return { title: title(state), buttons, highlights, tapActions, tapSelects, selected: fight.hex };
+  }
   if (!fight) {
     const buttons = actions.map((a): Button => ({ label: label(state, a), action: a }));
     for (const a of actions) if (a.type === 'fight') (highlights.add(a.hex), tapActions.set(a.hex, a));
@@ -485,7 +537,7 @@ function combatPrompt(state: GameState, actions: Action[], picked: NonNullable<S
   const [mine, theirs] = attacking ? [fight.attacker, fight.defender] : [fight.defender, fight.attacker];
   const me = state.players[mine.seat]!;
   const them = state.players[theirs.seat]!;
-  const maxCards = combatUnitsOn(me, fight.hex);
+  const maxCards = maxCombatCards(state, mine.seat, fight.hex);
   const full = picked.cards.length >= maxCards;
   const toggle = (i: number): Selection => ({
     combat: { ...picked, cards: picked.cards.includes(i) ? picked.cards.filter((c) => c !== i) : [...picked.cards, i] },
@@ -525,7 +577,7 @@ function combatPrompt(state: GameState, actions: Action[], picked: NonNullable<S
         color: theirName.color,
         power: them.power,
         cards: them.combatCards.length,
-        maxCards: combatUnitsOn(them, fight.hex),
+        maxCards: maxCombatCards(state, theirs.seat, fight.hex),
       },
       maxCards,
       powers,
