@@ -1,7 +1,7 @@
-import { baseBoard, baseFactions, baseMats } from '@scythe/content';
+import { baseBoard, baseFactions, baseMats, sampleEncounters } from '@scythe/content';
 import { activeSeat, applyAction, legalActions, newGame, type Action, type GameState } from '@scythe/engine';
 import { describe, expect, it } from 'vitest';
-import { sectionHeadings, buildPrompt, combatSummary, label, placeName } from './prompt';
+import { sectionHeadings, buildPrompt, combatSummary, costText, gainText, label, placeName } from './prompt';
 
 // Nordic (home "ne": workers on A4, A5) on Industrial; Rusviet on Engineering.
 const start = () =>
@@ -586,5 +586,68 @@ describe('the side panel headings', () => {
     const deployed = play(paid, { type: 'pay', hex: 'A4' }, { type: 'pay', hex: 'A4' }, { type: 'pay', hex: 'A4' }, { type: 'deploy', hex: 'A4', ability: 0 });
     expect(deployed.turn.step).toBe('end');
     expect(status(deployed)).toEqual({ top: 'skipped', bottom: 'done' });
+  });
+});
+
+describe('encounters', () => {
+  // Nordic (Industrial mat: 4 coins, 2 popularity) at an encounter on A4, with card sample-04:
+  // free: 2 metal; 3 coins: a free Deploy; 3 popularity: 3 metal and 2 oil.
+  const atEncounter = (faction = baseFactions[0]!) => {
+    const state = newGame({
+      seed: 1,
+      board: baseBoard,
+      encounters: sampleEncounters,
+      players: [
+        { faction, mat: baseMats[0]! },
+        { faction: baseFactions[1]!, mat: baseMats[1]! },
+      ],
+    });
+    return { ...state, turn: { step: 'encounter', section: 2, hex: 'A4', card: 'sample-04', picked: [], todo: [] } } as GameState;
+  };
+
+  it('describes costs and rewards in words', () => {
+    expect(costText({})).toBe('Free');
+    expect(costText({ coins: 1 })).toBe('Pay 1 coin');
+    expect(costText({ popularity: 2, power: 1 })).toBe('Pay 1 power and lose 2 popularity');
+    expect(gainText({ power: 2, combatCards: 1, workers: 2, resources: { food: 1 }, actions: ['build'] }, 'B2')).toBe(
+      '2 power, 1 combat card, 2 workers, 1 food on B2, a free Build',
+    );
+    expect(gainText({ anyResources: 1 }, 'B2')).toBe('1 resource of your choice on B2');
+    expect(gainText({}, 'B2')).toBe('Nothing');
+  });
+
+  it('shows the card, with the options you can pay for', () => {
+    const p = prompt(atEncounter());
+    expect(p.selected).toBe('A4');
+    expect(p.encounter).toMatchObject({ name: 'The abandoned workshop', hex: 'A4', note: 'Choose one' });
+    expect(p.encounter!.options.map((o) => o.cost)).toEqual(['Free', 'Pay 3 coins', 'Lose 3 popularity']);
+    expect(p.encounter!.options.map((o) => o.gain)).toEqual(['2 metal on A4', 'a free Deploy', '2 oil, 3 metal on A4']);
+    expect(p.encounter!.options.map((o) => !!o.action)).toEqual([true, true, false]);
+    expect(p.encounter!.stop).toBeUndefined();
+  });
+
+  it('then picks the free mech like a Deploy, with nothing to pay', () => {
+    const state = applyAction(atEncounter(), { type: 'encounterOption', option: 1 });
+    let p = prompt(state);
+    expect(p.encounter).toBeUndefined();
+    expect(p.title).toContain('free Deploy');
+    expect([...p.highlights].sort()).toEqual(['A4', 'A5']);
+    p = prompt(state, { hex: 'A4' });
+    const mech = p.buttons[0]!;
+    p = prompt(state, mech.select);
+    const deploy = p.buttons.find((b) => b.primary)!;
+    expect(deploy.label).toBe('Deploy');
+    expect(deploy.actions).toEqual([{ type: 'deploy', hex: 'A4', ability: 0 }]);
+    expect(play(state, ...deploy.actions!).turn.step).toBe('bottom');
+  });
+
+  it('with Meander, asks for up to two, and offers to stop after one', () => {
+    const polonia = baseFactions.find((f) => f.id === 'polonia')!;
+    const state = atEncounter(polonia);
+    expect(prompt(state).encounter!.note).toBe('Choose up to two');
+    const after = prompt(applyAction(state, { type: 'encounterOption', option: 0 }));
+    expect(after.encounter!.note).toBe('Choose up to one more');
+    expect(after.encounter!.options[0]!.taken).toBe(true);
+    expect(after.encounter!.stop).toMatchObject({ label: 'Done', action: { type: 'endEncounter' } });
   });
 });

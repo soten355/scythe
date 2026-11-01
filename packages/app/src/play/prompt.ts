@@ -19,6 +19,8 @@ import {
   activeSeat,
   applyAction,
   bottomCost,
+  encounterCard,
+  encounterOptionLimit,
   maxCombatCards,
   MAX_DIAL,
   RESOURCES,
@@ -28,7 +30,10 @@ import {
   shortfall,
   topValue,
   type Action,
+  type BottomActionType,
   type CombatResult,
+  type EncounterCost,
+  type EncounterGain,
   type GameState,
   type HexId,
   type Location,
@@ -127,6 +132,17 @@ export interface Prompt {
   upgrade?: {
     tops: { top: TopUpgrade; chosen: boolean; select: Selection }[];
     bottoms: { section: SectionIndex; chosen: boolean; select: Selection }[];
+  };
+  /** At an encounter: the card, shown in a pop-up, with an action for each option that can be taken now. */
+  encounter?: {
+    name: string;
+    story: string;
+    hex: HexId;
+    /** "Choose one" or, with Meander, "Choose up to two". */
+    note: string;
+    options: { text: string; cost: string; gain: string; taken: boolean; action?: Action }[];
+    /** Take nothing (more): after a first option with Meander, or when none can be paid for. */
+    stop?: Button;
   };
   /** A choice to make in a pop-up (a recruit's spot, then its one-time bonus); cancel goes back. */
   choice?: { message: string; options: { label: string; icon: Icon; select: Selection }[]; cancel: Selection };
@@ -283,6 +299,12 @@ export function label(state: GameState, action: Action): string {
       return `Drop off 1 ${action.resource}`;
     case 'beforeCombat':
       return action.use ? 'Use it' : "Don't use it";
+    case 'encounterOption':
+      return `Option ${action.option + 1}`;
+    case 'encounterResource':
+      return `1 ${action.resource}`;
+    case 'endEncounter':
+      return 'Done';
     case 'retreat':
       return action.to === 'home' ? 'Retreat home' : `Retreat to ${action.to}`;
   }
@@ -309,6 +331,14 @@ export function sectionHeadings(state: GameState): { top: string; bottom: string
     },
   };
 }
+
+/** How to pick what a bottom-row action does. */
+const EFFECT_HOW: Record<BottomActionType, string> = {
+  upgrade: 'tap a glowing top-row value and a glowing bottom-row cost on your mat',
+  deploy: "tap a glowing worker's hex, then choose a mech",
+  build: "choose a structure, then tap a glowing worker's hex",
+  enlist: 'choose a recruit spot, then a one-time bonus',
+};
 
 /** The instruction line for the current step of the turn. */
 export function title(state: GameState): string {
@@ -347,6 +377,12 @@ export function title(state: GameState): string {
       return `${who} · Produce: ${turn.produced.length} of ${topValue(player, mat, turn.section, 'hexes')} hexes`;
     case 'end':
       return `${who} · ${BOTTOM_NAMES[bottom.action]} done: end your turn`;
+    case 'encounter': {
+      const task = turn.todo[0];
+      if (!task) return `${who} · Encounter on ${turn.hex}: choose from the card`;
+      if (task.kind === 'resources') return `${who} · Encounter: choose ${plural(task.left, 'more resource')} (they go on ${turn.hex})`;
+      return `${who} · Encounter: free ${BOTTOM_NAMES[task.kind]}: ${EFFECT_HOW[task.kind]}`;
+    }
     case 'combat': {
       const name = (seat: number) => state.setup.players[seat]!.faction.name;
       const f = turn.fight;
@@ -365,13 +401,7 @@ export function title(state: GameState): string {
       const name = BOTTOM_NAMES[bottom.action];
       if (turn.paid === 0 && short.bottom.length) return `${who} · ${name}: can't ${bottom.action}, need ${needText(short.bottom)}`;
       if (turn.paid < cost.amount) return `${who} · ${name}: tap glowing hexes you control to pay ${cost.amount} ${cost.resource}`;
-      const what = {
-        upgrade: 'tap a glowing top-row value and a glowing bottom-row cost on your mat',
-        deploy: "tap a glowing worker's hex, then choose a mech",
-        build: "choose a structure, then tap a glowing worker's hex",
-        enlist: 'choose a recruit spot, then a one-time bonus',
-      }[bottom.action];
-      return `${who} · ${name}: ${what}`;
+      return `${who} · ${name}: ${EFFECT_HOW[bottom.action]}`;
     }
   }
   return who;
@@ -394,6 +424,7 @@ export function buildPrompt(state: GameState, actions: Action[], selection: Sele
   if (turn.step === 'end') {
     return { title: title(state), buttons: [], highlights, tapActions, tapSelects, end: { label: 'End turn', action: { type: 'endTurn' }, primary: true } };
   }
+  if (turn.step === 'encounter') return encounterPrompt(state, actions, selection);
   if (actions.some((a) => a.type === 'produce')) return producePrompt(state, actions, selection.produce ?? []);
   if (turn.step === 'top' && actions.some((a) => a.type === 'tradePopularity')) return tradePrompt(state, actions, selection.trade);
   if (turn.step === 'bottom') return bottomPrompt(state, actions, selection);
@@ -743,19 +774,20 @@ type Effect = Extract<Action, { type: (typeof EFFECTS)[number] }>;
 const isEffect = (a: Action): a is Effect => (EFFECTS as readonly string[]).includes(a.type);
 
 /**
- * A bottom-row action. First tap hexes to fill one slot per resource owed;
+ * A bottom-row action (or, with `free`, one an encounter gives). First tap hexes to fill one slot per resource owed;
  * once it's covered, pick what to do (a mech and its hex, a structure and its
  * hex, a recruit, or the two halves of an upgrade on the mat). Then the
  * action's button pays and acts in a single step, so until then any pick can
  * be removed.
  */
-function bottomPrompt(state: GameState, actions: Action[], selection: Selection): Prompt {
+function bottomPrompt(state: GameState, actions: Action[], selection: Selection, free?: BottomActionType): Prompt {
   const { mat } = state.setup.players[state.currentPlayer]!;
   const turn = state.turn as { section: SectionIndex; paid: number };
   const bottom = mat.sections[turn.section]!.bottom;
-  const name = BOTTOM_NAMES[bottom.action];
+  const kind = free ?? bottom.action;
+  const name = BOTTOM_NAMES[kind];
   const cost = bottomCost(state.players[state.currentPlayer]!, mat, turn.section);
-  const owed = cost.amount - turn.paid;
+  const owed = free ? 0 : cost.amount - turn.paid;
   const canAfford = owed <= 0 || actions.some((a) => a.type === 'pay' || a.type === 'payWithCard');
   // Ending the turn asks first if the bottom-row action could still be taken.
   const skip = actions.find((a) => a.type === 'skipBottom');
@@ -813,7 +845,7 @@ function bottomPrompt(state: GameState, actions: Action[], selection: Selection)
   }
 
   // Paid in full. If that ends the turn (nothing to do but take the coins), offer just that.
-  if (after.currentPlayer !== state.currentPlayer || after.turn.step !== 'bottom') {
+  if (!free && (after.currentPlayer !== state.currentPlayer || after.turn.step !== 'bottom')) {
     const button = { label: bottom.coins ? `Pay and take ${plural(bottom.coins, 'coin')}` : 'Pay', actions: pays, primary: true };
     return { ...none, title: title(state), buttons: [button], marked, slots, preview };
   }
@@ -832,7 +864,7 @@ function bottomPrompt(state: GameState, actions: Action[], selection: Selection)
   let upgrade: Prompt['upgrade'];
   let choice: Prompt['choice'];
 
-  if (bottom.action === 'upgrade') {
+  if (kind === 'upgrade') {
     const ups = options as Extract<Effect, { type: 'upgrade' }>[];
     const { top, bottom: low } = selection.upgrade ?? {};
     chosen = ups.find((a) => sameAction(a.top, top) && a.bottom === low);
@@ -854,7 +886,7 @@ function bottomPrompt(state: GameState, actions: Action[], selection: Selection)
         ? { text: `Cheaper ${BOTTOM_NAMES[mat.sections[low]!.bottom.action]}`, remove: keep({ upgrade: { top } }) }
         : { empty: 'Tap a glowing bottom-row cost on your mat' },
     );
-  } else if (bottom.action === 'enlist') {
+  } else if (kind === 'enlist') {
     // A pop-up asks for the recruit spot, then another for its one-time bonus.
     const recruits = options as Extract<Effect, { type: 'enlist' }>[];
     const spot = selection.recruit;
@@ -892,7 +924,7 @@ function bottomPrompt(state: GameState, actions: Action[], selection: Selection)
         ? { text: `Now: ${now(chosen.bonus)}`, icon: BONUS_ICONS[chosen.bonus], remove: keep({ recruit: spot }) }
         : { empty: 'Then choose a one-time bonus' },
     );
-  } else if (bottom.action === 'build') {
+  } else if (kind === 'build') {
     // Choose the structure first, then tap one of the hexes where it can go.
     const builds = options as Extract<Effect, { type: 'build' }>[];
     const structure = selection.structure;
@@ -986,4 +1018,73 @@ function tradePrompt(state: GameState, actions: Action[], trade: Selection['trad
     if (a.type === 'skipTop') buttons.push({ label: label(state, a), action: a, quiet: true });
   }
   return { title: title(state), buttons, highlights, tapActions: new Map(), tapSelects, selected: hex, marked: new Set(hex ? [hex] : []), slots };
+}
+
+const COST_NAMES = { coins: 'coin', popularity: 'popularity', power: 'power' } as const;
+
+/** An encounter option's cost in words: "Free", "Pay 2 coins", "Lose 2 popularity". */
+export function costText(cost: EncounterCost): string {
+  const parts = (['coins', 'power', 'popularity'] as const).flatMap((k) => {
+    const n = cost[k];
+    if (!n) return [];
+    return [k === 'coins' ? `pay ${plural(n, 'coin')}` : `${k === 'power' ? 'pay' : 'lose'} ${n} ${COST_NAMES[k]}`];
+  });
+  if (!parts.length) return 'Free';
+  const text = parts.join(' and ');
+  return text[0]!.toUpperCase() + text.slice(1);
+}
+
+/** What an encounter option gives, in words: "2 power, 1 combat card, 2 workers on A3, a free Deploy". */
+export function gainText(gain: EncounterGain, hex: HexId): string {
+  const parts: string[] = [];
+  if (gain.coins) parts.push(plural(gain.coins, 'coin'));
+  if (gain.power) parts.push(`${gain.power} power`);
+  if (gain.popularity) parts.push(`${gain.popularity} popularity`);
+  if (gain.combatCards) parts.push(plural(gain.combatCards, 'combat card'));
+  const onHex: string[] = [];
+  if (gain.workers) onHex.push(plural(gain.workers, 'worker'));
+  for (const r of RESOURCES) if (gain.resources?.[r]) onHex.push(`${gain.resources[r]} ${r}`);
+  if (gain.anyResources) onHex.push(`${gain.anyResources} resource${gain.anyResources === 1 ? '' : 's'} of your choice`);
+  if (onHex.length) parts.push(`${onHex.join(', ')} on ${hex}`);
+  for (const a of gain.actions ?? []) parts.push(`a free ${BOTTOM_NAMES[a]}`);
+  return parts.join(', ') || 'Nothing';
+}
+
+const NUMBER_WORDS = ['none', 'one', 'two', 'three'];
+
+/**
+ * An encounter. With nothing left to choose for the options taken, the card
+ * shows in a pop-up with one button per option (greyed out when it can't be
+ * paid for). Then, in the side panel: resources of the player's choice, one
+ * button each, and free bottom-row actions picked as on the bottom row.
+ */
+function encounterPrompt(state: GameState, actions: Action[], selection: Selection): Prompt {
+  const turn = state.turn as Extract<GameState['turn'], { step: 'encounter' }>;
+  const task = turn.todo[0];
+  if (task && task.kind !== 'resources') return bottomPrompt(state, actions, selection, task.kind);
+  const base = { title: title(state), highlights: new Set<Location>(), tapActions: new Map<Location, Action>(), tapSelects: new Map<Location, Selection>(), selected: turn.hex };
+  if (task) {
+    return { ...base, buttons: actions.map((a): Button => ({ label: label(state, a), action: a })) };
+  }
+  const card = encounterCard(state, turn.card);
+  const limit = encounterOptionLimit(state, state.currentPlayer);
+  const stop = actions.find((a) => a.type === 'endEncounter');
+  return {
+    ...base,
+    buttons: [],
+    encounter: {
+      name: card.name,
+      story: card.story,
+      hex: turn.hex,
+      note: limit === 1 ? 'Choose one' : turn.picked.length ? `Choose up to ${NUMBER_WORDS[limit - turn.picked.length] ?? limit - turn.picked.length} more` : `Choose up to ${NUMBER_WORDS[limit] ?? limit}`,
+      options: card.options.map((o, i) => ({
+        text: o.text,
+        cost: costText(o.cost),
+        gain: gainText(o.gain, turn.hex),
+        taken: turn.picked.includes(i),
+        action: actions.find((a) => a.type === 'encounterOption' && a.option === i),
+      })),
+      ...(stop && { stop: { label: turn.picked.length ? 'Done' : 'Take nothing', action: stop, quiet: true } }),
+    },
+  };
 }

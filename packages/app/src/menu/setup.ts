@@ -1,6 +1,6 @@
 // The new game screen's choices: the map, how many players, and each seat's
 // faction and mat. Picking a faction or mat another seat has swaps the two.
-import type { Board, Faction, GameSetup, PlayerMat } from '@scythe/engine';
+import type { Board, EncounterCard, Faction, GameSetup, PlayerMat } from '@scythe/engine';
 
 /** A map to play on. The standard one comes first and is picked by default; more can be added later. */
 export interface MapOption {
@@ -14,6 +14,8 @@ export interface Catalog {
   maps: MapOption[];
   factions: Faction[];
   mats: PlayerMat[];
+  /** The encounter deck every new game uses (none: no encounters). */
+  encounters?: EncounterCard[];
 }
 
 export interface SetupChoice {
@@ -123,5 +125,6 @@ export function toSetup(choice: SetupChoice, catalog: Catalog, seed: number): Ga
       faction: catalog.factions.find((f) => f.id === p.faction)!,
       mat: catalog.mats.find((m) => m.id === p.mat)!,
     })),
+    ...(catalog.encounters?.length && { encounters: catalog.encounters }),
   };
 }

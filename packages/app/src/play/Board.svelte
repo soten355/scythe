@@ -2,7 +2,7 @@
   // The 2D board: terrain, rivers, home bases, everyone's pieces and the
   // resources on each hex. Hexes the player can tap are outlined.
   // Each hex shows its terrain icon in the middle, a tunnel icon at the top
-  // and an encounter icon at the bottom (see icons.ts); its ID sits at the upper left.
+  // and an encounter icon at the bottom while its token is there (see icons.ts); its ID sits at the upper left.
   //
   // The camera (see camera.ts): pinch or use the mouse wheel to zoom (around
   // the fingers or the pointer), drag to pan, or use the buttons at the bottom
@@ -500,7 +500,7 @@
     {@const icon = TERRAIN_ICONS[h.terrain]}
     {#if icon}<HexIcon {icon} x={c[0]} y={c[1]} size={SIZE * 0.65} faded />{/if}
     {#if h.tunnel}<HexIcon icon={TUNNEL_ICON} x={c[0]} y={c[1] - SIZE * 0.62} size={SIZE * 0.36} />{/if}
-    {#if h.encounter}<HexIcon icon={ENCOUNTER_ICON} x={c[0]} y={c[1] + SIZE * 0.62} size={SIZE * 0.36} />{/if}
+    {#if game.encounterTokens.includes(h.id)}<HexIcon icon={ENCOUNTER_ICON} x={c[0]} y={c[1] + SIZE * 0.62} size={SIZE * 0.36} />{/if}
     <text x={c[0] - SIZE * 0.5} y={c[1] - SIZE * 0.45} class="id">{h.id}</text>
   {/each}
 

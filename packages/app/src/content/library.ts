@@ -59,9 +59,14 @@ export function removeFromLibrary(library: Library, kind: LibraryKind, id: strin
   return { ...library, [kind]: (library[kind] as { id: string }[]).filter((x) => x.id !== id) };
 }
 
-/** Built-in maps, factions and mats first, then the player's own. */
+/** Built-in maps, factions and mats first, then the player's own (and the built-in encounter deck). */
 export function catalogWith(builtIn: Catalog, library: Library): Catalog {
-  return { maps: [...builtIn.maps, ...library.maps], factions: [...builtIn.factions, ...library.factions], mats: [...builtIn.mats, ...library.mats] };
+  return {
+    maps: [...builtIn.maps, ...library.maps],
+    factions: [...builtIn.factions, ...library.factions],
+    mats: [...builtIn.mats, ...library.mats],
+    ...(builtIn.encounters && { encounters: builtIn.encounters }),
+  };
 }
 
 export function contentFileText(content: Library): string {

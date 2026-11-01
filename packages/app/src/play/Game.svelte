@@ -103,6 +103,11 @@
   /** An "are you sure?" question shown in the game, and what to do on Yes. */
   let asking: { message: string; yes: () => void } | null = $state(null);
   const ask = (message: string, yes: () => void) => (asking = { message, yes });
+  /** The encounter card is put aside to look at the map. */
+  let peeking = $state(false);
+  $effect(() => {
+    if (!prompt.encounter) peeking = false;
+  });
   /** The mat opens at the start of each turn and closes at the turn's first action. */
   let matOpen = $state(true);
 
@@ -451,6 +456,35 @@
         <button class="quiet back" onclick={() => (selection = c.cancel)}>Back</button>
       </div>
     </div>
+  {/if}
+
+  {#if prompt.encounter && !handoff && !battle && !revealed}
+    {@const e = prompt.encounter}
+    {#if peeking}
+      <button class="primary back-to-card" onclick={() => (peeking = false)}>⭐ Back to the encounter</button>
+    {:else}
+      <!-- The encounter card: its story, then one button per option (greyed out when it can't be paid for). -->
+      <div class="ask" role="dialog" aria-modal="true" style:--c={color(game.currentPlayer)}>
+        <div class="box encounter">
+          <p class="heading"><b>⭐ {e.name}</b><span class="where">Encounter on {e.hex}</span></p>
+          {#if e.story}<p class="story">{e.story}</p>{/if}
+          <p class="note">{e.note}:</p>
+          <div class="options">
+            {#each e.options as o, i (i)}
+              <button class:taken={o.taken} disabled={!o.action} onclick={() => o.action && press({ label: o.text, action: o.action })}>
+                <span class="text">{o.taken ? '✓ ' : ''}{o.text}</span>
+                <span class="cost">{o.cost}</span>
+                <span class="gain">{o.gain}</span>
+              </button>
+            {/each}
+          </div>
+          <div class="row">
+            <button class="quiet" onclick={() => (peeking = true)}>Look at the map</button>
+            {#if e.stop}{@const stop = e.stop}<button class="quiet" onclick={() => press(stop)}>{stop.label}</button>{/if}
+          </div>
+        </div>
+      </div>
+    {/if}
   {/if}
 
   {#if revealed && !handoff && !battle}
@@ -906,6 +940,69 @@
   }
   .box .line {
     margin: 0 0 6px;
+  }
+  .box.encounter {
+    width: min(640px, 94vw);
+    max-height: 92vh;
+    overflow-y: auto;
+  }
+  .encounter .heading {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 10px;
+    margin-bottom: 6px;
+  }
+  .encounter .where {
+    font-size: 13px;
+    opacity: 0.6;
+  }
+  .encounter .story {
+    font-style: italic;
+    opacity: 0.85;
+  }
+  .encounter .note {
+    margin-bottom: 8px;
+  }
+  /* Three options side by side, to fit a phone held sideways. */
+  .encounter .options {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .encounter .options button {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    text-align: left;
+    padding: 10px;
+  }
+  .encounter .options button:disabled {
+    opacity: 0.4;
+  }
+  .encounter .options button.taken {
+    opacity: 0.7;
+    border-color: var(--c);
+  }
+  .encounter .cost {
+    font-size: 13px;
+    font-weight: bold;
+  }
+  .encounter .gain {
+    font-size: 13px;
+    opacity: 0.85;
+  }
+  .encounter .row {
+    display: flex;
+    justify-content: space-between;
+  }
+  .back-to-card {
+    position: fixed;
+    left: 50%;
+    bottom: 16px;
+    z-index: 20;
+    transform: translateX(-50%);
   }
   .ok {
     width: 100%;
