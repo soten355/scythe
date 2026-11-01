@@ -78,3 +78,18 @@ should check it against the rulebook; tick it once confirmed.
       then the defender. The other side can't drop below 0 power.
 - [ ] Verify: People's Army's extra card needs a worker of yours on the
       fight's hex (for an attacker, one carried in by a mech counts).
+
+## Game end and scoring
+
+- [ ] Verify: the game ends the moment a player places their sixth star,
+      even partway through their turn (nothing more is done that turn).
+- [ ] Verify: popularity tiers pay 3/2/1 (0-6), 4/3/2 (7-12) and 5/4/3
+      (13-18) coins per star, per territory and per 2 resources.
+- [ ] Verify: the Factory counts as three territories; lakes count as
+      territories (for whoever controls one with a mech); home bases don't.
+- [ ] Verify: resources count if they're on a hex you control.
+- [ ] Verify: ties are broken by workers, mechs, structures and recruits
+      together, then power, then popularity, then resources, territories
+      and stars.
+- [ ] Structure bonus tiles add to the score once they're entered (with
+      the Factory and encounters).

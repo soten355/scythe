@@ -293,7 +293,7 @@ export function replay(setup: GameSetup, log: Action[]): GameState {
   return log.reduce(applyAction, newGame(setup));
 }
 
-/** Game end (the sixth star) arrives in Phase 2. */
-export function isGameOver(_state: GameState): boolean {
-  return false;
+/** The game ends the moment a player places their last (sixth) star, even mid-turn. See scoring.ts. */
+export function isGameOver(state: GameState): boolean {
+  return state.players.some((p, seat) => p.stars.length >= state.setup.players[seat]!.faction.stars);
 }
