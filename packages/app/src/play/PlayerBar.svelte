@@ -1,7 +1,8 @@
 <script lang="ts">
   // Top bar: the current player's coins, power, popularity, combat cards,
   // mechs, workers and the resources on hexes they control. Everyone else shrinks to
-  // their name; everyone's stars always show.
+  // their name (just its first letter with four or more players, so all fit on
+  // a phone); everyone's stars always show.
   import { controlledHexes, RESOURCES, type GameState } from '@scythe/engine';
   import { cubicInOut } from 'svelte/easing';
   import { slide } from 'svelte/transition';
@@ -13,6 +14,7 @@
     workers: 'all workers', popularity: 'top popularity', power: 'top power', combat: 'a fight won',
   };
 
+  const compact = $derived(game.players.length > 3);
   const rows = $derived(
     game.players.map((p, seat) => {
       const totals = Object.fromEntries(RESOURCES.map((r) => [r, 0])) as Record<string, number>;
@@ -28,7 +30,7 @@
   {#each rows as { p, seat, faction, totals } (seat)}
     {@const current = seat === game.currentPlayer}
     <div class="player" class:current style:--c={faction.color} data-player={seat}>
-      <span class="name">{faction.name}</span>
+      <span class="name" title={faction.name}>{compact && !current ? faction.name[0] : faction.name}</span>
       <span class="stars" data-stars={seat} title={p.stars.length ? `Stars: ${p.stars.map((k) => STAR_NAMES[k]).join(', ')}` : 'No stars yet'}>⭐ {p.stars.length}</span>
       {#if current}
         <span class="details" transition:slide={{ axis: 'x', duration: 450, easing: cubicInOut }}>
@@ -70,8 +72,8 @@
   }
   .name {
     font-weight: 700;
-    color: var(--c);
-    filter: brightness(1.4);
+    /* Lightened, so even a black faction (Saxony) reads on the dark bar. */
+    color: color-mix(in srgb, var(--c) 55%, white);
   }
   .details {
     display: flex;

@@ -246,6 +246,7 @@ Each phase ends in something playable on the phone. A phase is done when its che
   - Stars are placed on the triumph track as they're earned (shown in the top bar). The sixth ends the game at once; a final scores screen shows each player's coins, stars, territories and resources at their popularity tier, and the winner (with tie-breakers). Objective stars and structure bonus tiles join when those are entered.
 - [ ] Encounters, the Factory, objectives, structure bonus tiles
 - [ ] All 5 base factions and 5 mats; Invaders from Afar factions and mats
+  - Base game done (Nov 1, 2026): Nordic, Rusviet, Polonia, Crimea, Saxony; Industrial, Engineering, Patriotic, Mechanical, Agricultural. Up to 5 players. Still to come: Invaders from Afar's two factions and two mats.
 - [ ] Autosave, save slots, export and import
 - [ ] Done when: a complete 7-faction game can be played to final scoring and reloaded from a file
 
