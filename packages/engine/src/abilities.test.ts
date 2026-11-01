@@ -7,6 +7,7 @@ import { activeSeat, applyAction, isGameOver, legalActions, newGame, type Action
 import type { AbilityRule, Faction } from './faction';
 import { factionA, factionB, testSetup } from './test-fixtures';
 import { nextInt, seedRng } from './rng';
+import { shortfall } from './afford';
 
 const play = (state: GameState, ...actions: Action[]) => actions.reduce(applyAction, state);
 
@@ -282,6 +283,48 @@ describe('combat abilities', () => {
   it("doesn't offer it without the power to pay", () => {
     const state = attack({ mechs: [artillery] }, { power: 0 });
     expect(legalActions(state, 0).some((a) => a.type === 'beforeCombat')).toBe(false);
+  });
+});
+
+describe('paying with a combat card: Coercion', () => {
+  const coercion: AbilityRule = { kind: 'cardAsResource' };
+  /** Player 0 (a worker on A1) about to pay for Upgrade: 3 oil. */
+  const upgrading = (rule: AbilityRule | undefined, oil: number, cards = [2, 5]) =>
+    play(
+      { ...game({ ability: rule }, { workers: ['A1'], combatCards: cards }), resources: { A1: { oil } } },
+      choose(0),
+      { type: 'skipTop' },
+    );
+  const payments = (state: GameState) => legalActions(state, 0).filter((a) => a.type === 'pay' || a.type === 'payWithCard');
+
+  it('lets one combat card stand in for one resource', () => {
+    let state = upgrading(coercion, 2);
+    expect(payments(state)).toEqual([
+      { type: 'pay', hex: 'A1' },
+      { type: 'payWithCard', value: 2 },
+      { type: 'payWithCard', value: 5 },
+    ]);
+    state = play(state, { type: 'payWithCard', value: 2 });
+    expect(state.players[0]!.combatCards).toEqual([5]);
+    expect(state.combatDiscard).toContain(2);
+    expect(state.turn).toMatchObject({ step: 'bottom', paid: 1 });
+    // Only once a turn: now oil only.
+    expect(payments(state)).toEqual([{ type: 'pay', hex: 'A1' }]);
+    state = play(state, { type: 'pay', hex: 'A1' }, { type: 'pay', hex: 'A1' });
+    expect(legalActions(state, 0).some((a) => a.type === 'upgrade')).toBe(true);
+  });
+
+  it('makes a cost one resource short affordable, but not two short', () => {
+    expect(payments(upgrading(coercion, 2)).length).toBeGreaterThan(0);
+    expect(payments(upgrading(coercion, 1))).toEqual([]);
+    expect(payments(upgrading(undefined, 2))).toEqual([]);
+    expect(payments(upgrading(coercion, 2, []))).toEqual([]);
+  });
+
+  it('counts in what the mat shows as missing', () => {
+    const state = { ...game({ ability: coercion }, { workers: ['A1'], combatCards: [3] }), resources: { A1: { oil: 2 } } };
+    expect(shortfall(state, 0, 0).bottom).toEqual([]);
+    expect(shortfall({ ...state, resources: { A1: { oil: 1 } } }, 0, 0).bottom).toEqual([{ what: 'oil', amount: 1 }]);
   });
 });
 

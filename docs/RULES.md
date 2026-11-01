@@ -95,6 +95,10 @@ should check it against the rulebook; tick it once confirmed.
 - [ ] Verify: Dominate (Saxony) lifts the two-star limit on combat stars
       (objectives later); the game still ends at the sixth star.
 
+- [ ] Verify: Coercion (Crimea) can only stand in for resources paid on the
+      bottom row (and later Factory cards), once per turn; the card goes to
+      the discard pile.
+
 ## Game end and scoring
 
 - [ ] Verify: the game ends the moment a player places their sixth star,

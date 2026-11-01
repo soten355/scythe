@@ -5,10 +5,13 @@
 // recruit bonus of anyone (you or either neighbor) with a recruit on that
 // kind of action. If nothing is left to do (say, every mech is already out),
 // you may still pay for the coins and recruit bonuses.
+// Coercion (Crimea): once a turn, a combat card may be paid in place of one
+// resource.
 import type { HexId } from './board';
 import type { Action, GameState, PlayerState, SectionIndex, TurnStep } from './game';
 import { STRUCTURES, upgradeables, type BottomActionType, type RecruitBonus } from './mat';
 import { drawCombatCards } from './combat';
+import { hasRule } from './abilities';
 import { addResources, bottomCost, SECTIONS, controlledHexes, current, gain, onBoard, structureOn, updatePlayer } from './state';
 
 type BottomStep = Extract<TurnStep, { step: 'bottom' }>;
@@ -25,11 +28,18 @@ export function bottomActions(state: GameState, turn: BottomStep): Action[] {
   if (turn.paid < cost.amount) {
     const sources = [...controlledHexes(state, seat)].filter((hex) => (state.resources[hex]?.[cost.resource] ?? 0) > 0);
     const available = sources.reduce((n, hex) => n + state.resources[hex]![cost.resource]!, 0);
-    if (available < cost.amount - turn.paid) return [];
-    return sources.map((hex) => ({ type: 'pay', hex }));
+    const cards = turn.coerced ? [] : coercionCards(state, seat);
+    if (available + (cards.length ? 1 : 0) < cost.amount - turn.paid) return [];
+    return [...sources.map((hex): Action => ({ type: 'pay', hex })), ...cards.map((value): Action => ({ type: 'payWithCard', value }))];
   }
   const effects = effectOptions(state, mat.sections[turn.section].bottom.action);
   return effects.length ? effects : [{ type: 'takeBottom' }];
+}
+
+/** Coercion: the combat card values a player could pay in place of a resource (lowest first), if they have the ability. */
+export function coercionCards(state: GameState, seat: number): number[] {
+  if (!hasRule(state, seat, 'cardAsResource')) return [];
+  return [...new Set(state.players[seat]!.combatCards)].sort((a, b) => a - b);
 }
 
 /** The bottom-row action is done: the player now ends the turn with End turn. */
@@ -42,10 +52,16 @@ export function applyBottom(state: GameState, turn: BottomStep, action: Action):
   const { seat, mat } = current(state);
   const kind = mat.sections[turn.section].bottom.action;
 
-  if (action.type === 'pay') {
+  if (action.type === 'pay' || action.type === 'payWithCard') {
     const resource = bottomCost(state.players[seat]!, mat, turn.section).resource;
     const paid = turn.paid + 1;
-    const next: GameState = { ...addResources(state, action.hex, resource, -1), turn: { ...turn, paid } };
+    let next: GameState;
+    if (action.type === 'pay') next = { ...addResources(state, action.hex, resource, -1), turn: { ...turn, paid } };
+    else {
+      const hand = [...state.players[seat]!.combatCards];
+      hand.splice(hand.indexOf(action.value), 1);
+      next = { ...updatePlayer(state, seat, { combatCards: hand }), combatDiscard: [...state.combatDiscard, action.value], turn: { ...turn, paid, coerced: true } };
+    }
     const done = paid >= bottomCost(state.players[seat]!, mat, turn.section).amount;
     if (done && effectOptions(next, kind).length === 0) return finish(rewards(next, turn.section), turn);
     return next;

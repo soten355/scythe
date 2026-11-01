@@ -52,6 +52,8 @@ export interface Selection {
   trade?: { hex?: HexId; resources: Resource[] };
   /** Hexes picked to pay the bottom action's cost from, one per resource. */
   pay?: HexId[];
+  /** Coercion: the value of a combat card paid in place of one resource. */
+  card?: number;
   /** The bottom action picked (a mech to deploy, a structure, a recruit). */
   effect?: Action;
   /** The two halves of an upgrade, picked on the mat. */
@@ -242,6 +244,8 @@ export function label(state: GameState, action: Action): string {
         : `Gain ${plural(topValue(player, mat, section, 'combatCards'), 'combat card')}`;
     case 'pay':
       return `Pay 1 ${bottomCost(player, mat, section).resource} from ${action.hex}`;
+    case 'payWithCard':
+      return `Pay a ${action.value} combat card instead of 1 ${bottomCost(player, mat, section).resource}`;
     case 'upgrade': {
       const top = mat.sections[action.top.section]!.top.action;
       const bottom = mat.sections[action.bottom]!.bottom.action;
@@ -745,7 +749,7 @@ function bottomPrompt(state: GameState, actions: Action[], selection: Selection)
   const name = BOTTOM_NAMES[bottom.action];
   const cost = bottomCost(state.players[state.currentPlayer]!, mat, turn.section);
   const owed = cost.amount - turn.paid;
-  const canAfford = owed <= 0 || actions.some((a) => a.type === 'pay');
+  const canAfford = owed <= 0 || actions.some((a) => a.type === 'pay' || a.type === 'payWithCard');
   // Ending the turn asks first if the bottom-row action could still be taken.
   const skip = actions.find((a) => a.type === 'skipBottom');
   const end: Button | undefined = skip && {
@@ -758,21 +762,30 @@ function bottomPrompt(state: GameState, actions: Action[], selection: Selection)
   // Can't pay for it: say what's missing, and End turn becomes the main button.
   if (!canAfford) return { ...none, title: title(state), buttons: [], end: end && { ...end, primary: true } };
 
-  // Pay from each picked hex in turn, as far as the engine allows.
+  // Pay with a combat card first (Coercion), then from each picked hex in turn, as far as the engine allows.
   const pays: Action[] = [];
   let after = state;
+  const card: Action = { type: 'payWithCard', value: selection.card ?? -1 };
+  const coerced = selection.card !== undefined && actions.some((a) => a.type === 'payWithCard' && a.value === selection.card);
+  if (coerced) (pays.push(card), (after = applyAction(after, card)));
   for (const hex of selection.pay ?? []) {
     if (pays.length >= owed || !legalActions(after, after.currentPlayer).some((a) => a.type === 'pay' && a.hex === hex)) continue;
     pays.push({ type: 'pay', hex });
     after = applyAction(after, { type: 'pay', hex });
   }
-  const paid = pays.map((a) => (a as { hex: HexId }).hex);
-  const keep = (sel: Selection): Selection => ({ ...sel, pay: paid });
-  const slots: NonNullable<Prompt['slots']> = Array.from({ length: owed }, (_, i) =>
-    paid[i]
-      ? { text: `1 ${cost.resource} from ${paid[i]}`, icon: RESOURCE_ICONS[cost.resource], remove: { pay: paid.filter((_, j) => j !== i) } }
-      : { empty: `Tap a hex to pay 1 ${cost.resource}` },
-  );
+  const paid = pays.flatMap((a) => (a.type === 'pay' ? [a.hex] : []));
+  /** Keeps the combat card picked to pay with, if any, in a new selection. */
+  const keepCard = (sel: Selection): Selection => (coerced ? { ...sel, card: selection.card } : sel);
+  const keep = (sel: Selection): Selection => keepCard({ ...sel, pay: paid });
+  const cardSlots: NonNullable<Prompt['slots']> = coerced ? [{ text: `Combat card (${selection.card}) in place of 1 ${cost.resource}`, icon: BONUS_ICONS.combatCard, remove: { pay: paid } }] : [];
+  const slots: NonNullable<Prompt['slots']> = [
+    ...cardSlots,
+    ...Array.from({ length: owed - cardSlots.length }, (_, i) =>
+      paid[i]
+        ? { text: `1 ${cost.resource} from ${paid[i]}`, icon: RESOURCE_ICONS[cost.resource], remove: keepCard({ pay: paid.filter((_, j) => j !== i) }) }
+        : { empty: `Tap a hex to pay 1 ${cost.resource}` },
+    ),
+  ];
   const marked = new Set<Location>(paid);
   // The resources picked so far come off the board for now; they're only spent when the action goes through.
   const preview = pays.length ? after : undefined;
@@ -783,9 +796,13 @@ function bottomPrompt(state: GameState, actions: Action[], selection: Selection)
     for (const a of legalActions(after, after.currentPlayer)) {
       if (a.type !== 'pay') continue;
       highlights.add(a.hex);
-      tapSelects.set(a.hex, { pay: [...paid, a.hex] });
+      tapSelects.set(a.hex, keepCard({ pay: [...paid, a.hex] }));
     }
-    return { ...none, title: title(state), buttons: [], highlights, tapSelects, marked, slots, preview, paying: true };
+    // Coercion: a combat card can stand in for one of the resources.
+    const buttons: Button[] = legalActions(after, after.currentPlayer).flatMap((a) =>
+      a.type === 'payWithCard' ? [{ label: `Pay a ${a.value} combat card instead of 1 ${cost.resource}`, select: { pay: paid, card: a.value } }] : [],
+    );
+    return { ...none, title: title(state), buttons, highlights, tapSelects, marked, slots, preview, paying: true };
   }
 
   // Paid in full. If that ends the turn (nothing to do but take the coins), offer just that.

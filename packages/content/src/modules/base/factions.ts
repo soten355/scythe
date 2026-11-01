@@ -100,8 +100,11 @@ export const baseFactions: Faction[] = [
     power: 5,
     combatCards: 0,
     stars: 6,
-    // Waits for paying with a combat card (no rule yet).
-    ability: { name: 'Coercion', description: 'Once a turn, a combat card can stand in for any one resource you pay' },
+    ability: {
+      name: 'Coercion',
+      description: 'Once a turn, a combat card can stand in for any one resource you pay',
+      rule: { kind: 'cardAsResource' },
+    },
     mechAbilities: [
       {
         name: 'Riverwalk',

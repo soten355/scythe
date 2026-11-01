@@ -45,6 +45,8 @@ export type AbilityRule =
   | { kind: 'stealCard' }
   /** Combat stars aren't limited to two (objective stars too, once objectives arrive). */
   | { kind: 'unlimitedCombatStars' }
+  /** Once a turn, a combat card may be paid in place of any one resource. */
+  | { kind: 'cardAsResource' }
   /** You may pick the same player mat section as on your last turn. */
   | { kind: 'repeatSection' };
 

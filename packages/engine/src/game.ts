@@ -89,8 +89,11 @@ export type TurnStep =
    * where their character and mechs go (when they have a choice).
    */
   | { step: 'combat'; section: SectionIndex; left: HexId[]; fight: Fight | null; retreat?: Retreat }
-  /** `skippedTop`: the top-row action was skipped this turn (so the side panel doesn't tick it). */
-  | { step: 'bottom'; section: SectionIndex; paid: number; skippedTop?: true }
+  /**
+   * `skippedTop`: the top-row action was skipped this turn (so the side panel doesn't tick it).
+   * `coerced`: a combat card was paid in place of a resource (once a turn).
+   */
+  | { step: 'bottom'; section: SectionIndex; paid: number; skippedTop?: true; coerced?: true }
   /** The bottom-row action is done; only End turn is left. */
   | { step: 'end'; section: SectionIndex; skippedTop?: true };
 
@@ -168,6 +171,8 @@ export type Action =
   | { type: 'retreat'; to: Location }
   // Bottom row: pay the cost one resource at a time, then the action itself.
   | { type: 'pay'; hex: HexId }
+  /** Coercion: a combat card of this value paid in place of one resource. */
+  | { type: 'payWithCard'; value: number }
   | { type: 'upgrade'; top: TopUpgrade; bottom: SectionIndex }
   | { type: 'deploy'; hex: HexId; ability: number }
   | { type: 'build'; structure: Structure; hex: HexId }

@@ -32,7 +32,7 @@ describe('base factions', () => {
   });
 
   /** Abilities still waiting on a part of the rules that isn't built yet. */
-  const WAITING = ['Meander', 'Coercion', 'Wayfare'];
+  const WAITING = ['Meander', 'Wayfare'];
 
   it('gives every ability a rule the engine plays (except those still waiting)', () => {
     for (const f of baseFactions) {

@@ -5,6 +5,7 @@ import type { GameState, SectionIndex } from './game';
 import type { Resource } from './mat';
 import { bottomCost, controlledHexes } from './state';
 import { produceCost } from './top-actions';
+import { coercionCards } from './bottom-actions';
 
 export interface Need {
   what: 'coins' | 'power' | 'popularity' | Resource;
@@ -25,6 +26,7 @@ export function shortfall(state: GameState, seat: number, section: SectionIndex)
   }
 
   const cost = bottomCost(player, mat, section);
-  const have = [...controlledHexes(state, seat)].reduce((n, hex) => n + (state.resources[hex]?.[cost.resource] ?? 0), 0);
+  // Coercion: one combat card can stand in for one resource.
+  const have = [...controlledHexes(state, seat)].reduce((n, hex) => n + (state.resources[hex]?.[cost.resource] ?? 0), 0) + (coercionCards(state, seat).length ? 1 : 0);
   return { top: topNeeds, bottom: short(cost.resource, cost.amount, have) };
 }
