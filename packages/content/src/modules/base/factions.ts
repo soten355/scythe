@@ -111,8 +111,11 @@ export const baseFactions: Faction[] = [
         description: 'Move across rivers to farms and tundra',
         rule: { kind: 'crossRivers', units: 'characterAndMechs', onto: ['farm', 'tundra'] },
       },
-      // Waits for home bases as places to move to (no rule yet).
-      { name: 'Wayfare', description: 'Move from anywhere to your own home base or to any home base no faction is using' },
+      {
+        name: 'Wayfare',
+        description: 'Move from anywhere to your own home base or to any home base no faction is using',
+        rule: { kind: 'toHomeBases' },
+      },
       { name: 'Scout', description: "As a fight starts, take one of your opponent's combat cards at random", rule: { kind: 'stealCard' } },
       { name: 'Speed', description: 'Move one more hex per movement', rule: { kind: 'speed', extra: 1 } },
     ],

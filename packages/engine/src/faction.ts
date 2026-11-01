@@ -45,6 +45,8 @@ export type AbilityRule =
   | { kind: 'stealCard' }
   /** Combat stars aren't limited to two (objective stars too, once objectives arrive). */
   | { kind: 'unlimitedCombatStars' }
+  /** The character and mechs may move from anywhere to your own home base or any home base no faction uses. */
+  | { kind: 'toHomeBases' }
   /** Once a turn, a combat card may be paid in place of any one resource. */
   | { kind: 'cardAsResource' }
   /** You may pick the same player mat section as on your last turn. */

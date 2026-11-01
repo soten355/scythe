@@ -1,7 +1,7 @@
 import { baseBoard, baseFactions, baseMats } from '@scythe/content';
 import { activeSeat, applyAction, legalActions, newGame, type Action, type GameState } from '@scythe/engine';
 import { describe, expect, it } from 'vitest';
-import { sectionHeadings, buildPrompt, combatSummary, label } from './prompt';
+import { sectionHeadings, buildPrompt, combatSummary, label, placeName } from './prompt';
 
 // Nordic (home "ne": workers on A4, A5) on Industrial; Rusviet on Engineering.
 const start = () =>
@@ -15,6 +15,14 @@ const start = () =>
   });
 const play = (state: GameState, ...actions: Action[]) => actions.reduce(applyAction, state);
 const prompt = (state: GameState, sel = {}) => buildPrompt(state, legalActions(state, state.currentPlayer), sel);
+
+describe('naming places', () => {
+  it('names hexes, your home base and unused home bases', () => {
+    expect(placeName('B3')).toBe('B3');
+    expect(placeName('home')).toBe('your home base');
+    expect(placeName('base:sw')).toBe('the SW home base');
+  });
+});
 
 describe('the prompt', () => {
   it('points to the mat at the start of a turn, with no buttons', () => {

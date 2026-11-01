@@ -8,6 +8,7 @@ import type { AbilityRule, Faction } from './faction';
 import { factionA, factionB, testSetup } from './test-fixtures';
 import { nextInt, seedRng } from './rng';
 import { shortfall } from './afford';
+import { controlledHexes } from './state';
 
 const play = (state: GameState, ...actions: Action[]) => actions.reduce(applyAction, state);
 
@@ -328,6 +329,49 @@ describe('paying with a combat card: Coercion', () => {
   });
 });
 
+describe('home bases: Wayfare', () => {
+  const wayfare: AbilityRule = { kind: 'toHomeBases' };
+  /** The test board with a third home base "c" (bordering A4 and B4) that no faction uses. */
+  const withSpareBase = (state: GameState): GameState => {
+    const board = state.setup.board;
+    const spare = { ...board, homeBases: { ...board.homeBases, c: ['A4', 'B4'] }, homeBasePositions: { ...board.homeBasePositions, c: { q: 5, r: 0 } } };
+    return { ...state, setup: { ...state.setup, board: spare } };
+  };
+  const wayfaring = (p0: Partial<PlayerState> = {}, p1: Partial<PlayerState> = {}, rules: AbilityRule[] = [wayfare]) =>
+    play(withSpareBase(game({ mechs: rules }, { character: 'home', mechs: ['B3'], workers: ['B3'], ...p0 }, { character: 'home', workers: [], ...p1 })), choose(2));
+
+  it('moves the character and mechs to your own home base or an unused one, from anywhere', () => {
+    const state = wayfaring();
+    expect(targets(state, mech(0))).toEqual(expect.arrayContaining(['home', 'base:c']));
+    // Not to the other faction's home base, and not for workers.
+    expect(targets(state, mech(0))).not.toContain('base:b');
+    expect(targets(state, worker(0))).not.toContain('base:c');
+    // Only with the ability.
+    expect(targets(wayfaring({}, {}, []), mech(0))).not.toContain('base:c');
+  });
+
+  it('moves out again to the hexes bordering that base', () => {
+    let state = play(wayfaring(), move(mech(0), 'base:c'));
+    expect(state.players[0]!.mechs).toEqual(['base:c']);
+    state = play(withSpareBase(game({ mechs: [wayfare] }, { character: 'home', mechs: ['base:c'], workers: [] })), choose(2));
+    expect(targets(state, mech(0))).toEqual(expect.arrayContaining(['A4', 'B4']));
+  });
+
+  it('takes along workers the mech carries, but not resources', () => {
+    let state = play(wayfaring(), { type: 'carryWorker', unit: mech(0), worker: 0 }, move(mech(0), 'base:c'));
+    expect(state.players[0]!.workers).toEqual(['base:c']);
+    state = play({ ...wayfaring(), resources: { B3: { oil: 1 } } }, { type: 'carryResource', unit: mech(0), resource: 'oil' });
+    expect(targets(state, mech(0))).not.toContain('base:c');
+    expect(targets(state, mech(0))).not.toContain('home');
+  });
+
+  it("is never a fight or a territory: units from different factions can share a base", () => {
+    const state = play(wayfaring({}, { mechs: ['base:c'] }), move(mech(0), 'base:c'), { type: 'endMove' });
+    expect(state.turn.step).toBe('bottom');
+    expect(controlledHexes(state, 0).has('base:c')).toBe(false);
+  });
+});
+
 describe('fights on a lake', () => {
   it('happen when a mech moves onto a lake held by an enemy mech; the loser goes home with the workers riding on it', () => {
     let state = play(
@@ -447,7 +491,7 @@ describe('fuzz: random games with every ability', () => {
     [
       'next three',
       [{ kind: 'unlimitedCombatStars' }, [{ kind: 'lakes', retreat: false, linked: true }, { kind: 'mountainsToTunnels' }, { kind: 'disarmOnTunnels', loss: 2 }, speed]],
-      [relentless, [{ kind: 'noPopularityLoss' }, { kind: 'stealCard' }, riverwalk, speed]],
+      [{ kind: 'cardAsResource' }, [{ kind: 'noPopularityLoss' }, { kind: 'stealCard' }, { kind: 'toHomeBases' }, speed]],
     ],
   ];
   it.each(pairings)('keeps the invariants (%s)', (_name, [ability0, mechs0], [ability1, mechs1]) => {

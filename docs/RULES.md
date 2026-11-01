@@ -99,6 +99,15 @@ should check it against the rulebook; tick it once confirmed.
       bottom row (and later Factory cards), once per turn; the card goes to
       the discard pile.
 
+- [ ] Verify: Wayfare (Crimea) moves the character and mechs (with any
+      workers a mech carries) from any territory or home base to your own
+      home base or one no faction uses. Resources can't be taken onto a home
+      base. Units there aren't on a territory: they don't count for control
+      or scoring, nobody fights there, and they move out to the hexes that
+      border that base.
+- [x] Fights can happen on a lake when Seaworthy or Submerge mechs meet
+      there. (Owner.)
+
 ## Game end and scoring
 
 - [ ] Verify: the game ends the moment a player places their sixth star,

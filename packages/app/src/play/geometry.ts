@@ -51,7 +51,7 @@ export function boardArea(board: Board): Area {
 /** Some hexes (and "home": the given home base), with room around them. */
 export function spotsArea(board: Board, spots: Location[], home: { q: number; r: number } | undefined): Area | null {
   const pts = spots.flatMap((s) => {
-    const at = s === 'home' ? home : board.hexes[s];
+    const at = s === 'home' ? home : s.startsWith('base:') ? board.homeBasePositions[s.slice('base:'.length)] : board.hexes[s];
     return at ? corners(center(at)) : [];
   });
   return pts.length ? areaAround(pts, SIZE * 0.8) : null;

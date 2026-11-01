@@ -41,6 +41,13 @@ import {
   type TopUpgrade,
   type UnitRef,
 } from '@scythe/engine';
+
+/** A place as the side panel names it: a hex ("B3"), your home base, or another one ("the W home base"). */
+export function placeName(at: Location): string {
+  if (at === 'home') return 'your home base';
+  if (at.startsWith('base:')) return `the ${at.slice('base:'.length).toUpperCase()} home base`;
+  return at;
+}
 import { BONUS_ICONS, RESOURCE_ICONS, type Icon } from './icons';
 
 export interface Selection {
@@ -223,7 +230,7 @@ export function label(state: GameState, action: Action): string {
     case 'gainCoins':
       return `Gain ${plural(topValue(player, mat, section, 'coins'), 'coin')} instead`;
     case 'moveUnit':
-      return `Move to ${action.to}`;
+      return `Move to ${placeName(action.to)}`;
     case 'endMove':
       return 'Done moving';
     case 'carryWorker':
@@ -444,7 +451,7 @@ export function buildPrompt(state: GameState, actions: Action[], selection: Sele
     if (buttons.length === 1 && buttons[0]!.select) return buildPrompt(state, actions, buttons[0]!.select);
     if (!tradingOn) buttons.push({ label: 'Back', select: {}, quiet: true });
     const pieces = piecesToPick(state, actions);
-    return { title: `${title(state)} — ${at === 'home' ? 'home base' : at}`, buttons, highlights, tapActions, tapSelects, selected: at, pieces };
+    return { title: `${title(state)} — ${placeName(at)}`, buttons, highlights, tapActions, tapSelects, selected: at, pieces };
   }
 
   // Actions that don't happen on a hex.

@@ -20,7 +20,7 @@ import { neighbors } from './board';
 import { hasRule, rulesOfKind } from './abilities';
 import type { Action, CombatSide, Fight, GameState, Location, PlayerState, Retreat, SectionIndex, TurnStep } from './game';
 import { nextInt, shuffle } from './rng';
-import { MAX_POPULARITY, placeStar, updatePlayer } from './state';
+import { MAX_POPULARITY, onBoard, placeStar, updatePlayer } from './state';
 
 type CombatStep = Extract<TurnStep, { step: 'combat' }>;
 
@@ -100,7 +100,8 @@ export function afterMove(state: GameState, section: SectionIndex): GameState {
   const me = state.players[seat]!;
   const fights: HexId[] = [];
   let next = state;
-  const myHexes = [...new Set([me.character, ...me.mechs])].filter((h): h is HexId => h !== 'home');
+  // Never on a home base: nobody fights there.
+  const myHexes = onBoard([...new Set([me.character, ...me.mechs])]);
   for (const hex of myHexes) {
     const enemy = state.players.findIndex((p, i) => i !== seat && hasUnitsOn(p, hex));
     if (enemy < 0) continue;

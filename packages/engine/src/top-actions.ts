@@ -10,7 +10,7 @@ import type { Action, GameState, Load, Location, PlayerState, SectionIndex, Turn
 import type { Resource, TopAction } from './mat';
 import { rulesOf, rulesOfKind } from './abilities';
 import { afterMove, drawCombatCards } from './combat';
-import { addResources, controlledHexes, current, enemyUnitHexes, gain, MAX_WORKERS, onBoard, topValue, updatePlayer } from './state';
+import { addResources, controlledHexes, current, enemyUnitHexes, gain, isHomeBase, MAX_WORKERS, onBoard, topValue, unusedHomeBases, updatePlayer } from './state';
 
 type TopStep = Extract<TurnStep, { step: 'top' | 'moving' | 'trading' | 'producing' }>;
 
@@ -166,12 +166,12 @@ const sameUnit = (a: UnitRef, b: UnitRef) => a.kind === b.kind && (a.kind === 'c
 /**
  * Where a unit at `at` can move in one step: a neighboring land hex not
  * across a river, or from a tunnel (or your mine) to any other tunnel or your
- * mine. Never back home, and workers never onto other players' units
- * (characters and mechs may: that's an attack). From home: the hexes
- * bordering the home base. Abilities add river crossings, lakes and the
- * village-Factory link.
+ * mine. Never back home (except with Wayfare), and workers never onto other
+ * players' units (characters and mechs may: that's an attack). From a home
+ * base: the hexes bordering it. Abilities add river crossings, lakes, the
+ * village-Factory and mountain-tunnel links, and home bases (Wayfare).
  */
-export function moveTargets(state: GameState, seat: number, at: Location, kind: UnitRef['kind'] = 'worker'): HexId[] {
+export function moveTargets(state: GameState, seat: number, at: Location, kind: UnitRef['kind'] = 'worker'): Location[] {
   const board = state.setup.board;
   const player = state.players[seat]!;
   const enemies = enemyUnitHexes(state, seat);
@@ -181,10 +181,12 @@ export function moveTargets(state: GameState, seat: number, at: Location, kind: 
   const crosses = (to: HexId) =>
     rules.some((r) => r.kind === 'crossRivers' && (r.units === 'workers' ? !fighter : fighter && r.onto.includes(terrain(to)!)));
   // Workers on a lake ride with a mech: they never move off on their own.
-  if (!fighter && at !== 'home' && terrain(at) === 'lake') return [];
-  let targets: HexId[];
-  if (at === 'home') {
-    targets = [...(board.homeBases[state.setup.players[seat]!.faction.homeBase] ?? [])];
+  if (!fighter && terrain(at) === 'lake') return [];
+  let targets: Location[];
+  if (isHomeBase(at)) {
+    // Out to the hexes bordering this home base (your own, or an unused one).
+    const base = at === 'home' ? state.setup.players[seat]!.faction.homeBase : at.slice('base:'.length);
+    targets = [...(board.homeBases[base] ?? [])];
   } else {
     targets = neighbors(board, at).filter((to) => !hasRiver(board, at, to) || crosses(to));
     const tunnels = Object.values(board.hexes).filter((h) => h.tunnel).map((h) => h.id);
@@ -207,6 +209,8 @@ export function moveTargets(state: GameState, seat: number, at: Location, kind: 
       if (terrain(at) === 'factory') targets.push(...[...controlledHexes(state, seat)].filter((h) => terrain(h) === 'village'));
     }
   }
+  // Wayfare: from anywhere to your own home base or an unused one.
+  if (fighter && rules.some((r) => r.kind === 'toHomeBases')) targets.push('home', ...unusedHomeBases(state));
   const lakes = fighter && rules.some((r) => r.kind === 'lakes');
   return [...new Set(targets)].filter((to) => to !== at && (terrain(to) !== 'lake' || lakes) && (fighter || !enemies.has(to)));
 }
@@ -219,7 +223,7 @@ const extraHexes = (state: GameState, seat: number, unit: UnitRef) =>
 const loadOf = (turn: TopStep, unit: UnitRef): Load | undefined =>
   turn.step === 'moving' && turn.load && sameUnit(turn.load.unit, unit) ? turn.load : undefined;
 
-const isLake = (state: GameState, at: Location) => at !== 'home' && state.setup.board.hexes[at]?.terrain === 'lake';
+const isLake = (state: GameState, at: Location) => state.setup.board.hexes[at]?.terrain === 'lake';
 
 /**
  * What goes along when a unit moves: its load, plus, when it's the last of
@@ -239,6 +243,10 @@ function withLakeCargo(state: GameState, seat: number, unit: UnitRef, from: Loca
   return next;
 }
 
+/** Resources can't be taken onto a home base: a unit carrying any can't go to one. */
+const landable = (targets: Location[], load: Load | undefined) =>
+  load && Object.keys(load.resources).length ? targets.filter((to) => !isHomeBase(to)) : targets;
+
 /** Units that haven't moved yet, while the section allows more: their moves and pick-ups. `load`: only that unit, with it. */
 function moveOptions(state: GameState, section: SectionIndex, moved: UnitRef[], load?: Load): Action[] {
   const { player, mat } = current(state);
@@ -246,7 +254,7 @@ function moveOptions(state: GameState, section: SectionIndex, moved: UnitRef[], 
   const actions: Action[] = [];
   for (const { unit, at } of unitsOf(player)) {
     if (load ? !sameUnit(load.unit, unit) : moved.some((m) => sameUnit(m, unit))) continue;
-    for (const to of moveTargets(state, state.currentPlayer, at, unit.kind)) actions.push({ type: 'moveUnit', unit, to });
+    for (const to of landable(moveTargets(state, state.currentPlayer, at, unit.kind), load)) actions.push({ type: 'moveUnit', unit, to });
     if (!load) actions.push(...carryOptions(state, unit));
   }
   return actions;
@@ -258,7 +266,7 @@ function walkOptions(state: GameState, turn: Extract<TopStep, { step: 'moving' }
   const unit = turn.walking.unit;
   const load = loadOf(turn, unit);
   const at = unitsOf(current(state).player).find((u) => sameUnit(u.unit, unit))!.at;
-  const actions: Action[] = moveTargets(state, state.currentPlayer, at, unit.kind).map((to): Action => ({ type: 'moveUnit', unit, to }));
+  const actions: Action[] = landable(moveTargets(state, state.currentPlayer, at, unit.kind), load).map((to): Action => ({ type: 'moveUnit', unit, to }));
   actions.push(...carryOptions(state, unit, load));
   // Nothing is dropped off on a lake.
   if (isLake(state, at)) return actions;
@@ -278,7 +286,7 @@ function carryOptions(state: GameState, unit: UnitRef, load?: Load): Action[] {
       if (w === at && !load?.workers.includes(worker)) actions.push({ type: 'carryWorker', unit, worker });
     });
   }
-  for (const resource of at === 'home' ? [] : RESOURCES) {
+  for (const resource of isHomeBase(at) ? [] : RESOURCES) {
     if ((state.resources[at]?.[resource] ?? 0) > (load?.resources[resource] ?? 0)) {
       actions.push({ type: 'carryResource', unit, resource });
     }
@@ -287,7 +295,7 @@ function carryOptions(state: GameState, unit: UnitRef, load?: Load): Action[] {
 }
 
 /** Moves a unit, with whatever it picked up, to `to`. */
-function moveUnit(state: GameState, seat: number, unit: UnitRef, to: HexId, load: Load | undefined): GameState {
+function moveUnit(state: GameState, seat: number, unit: UnitRef, to: Location, load: Load | undefined): GameState {
   const player = state.players[seat]!;
   const from = unitsOf(player).find((u) => sameUnit(u.unit, unit))!.at;
   const carried: Pick<Load, 'workers' | 'resources'> = load && sameUnit(load.unit, unit) ? load : { workers: [], resources: {} };
@@ -297,7 +305,8 @@ function moveUnit(state: GameState, seat: number, unit: UnitRef, to: HexId, load
     mechs: player.mechs.map((at, i) => (isUnit('mech', i) ? to : at)),
     workers: player.workers.map((at, i) => (isUnit('worker', i) || carried.workers.includes(i) ? to : at)),
   });
-  if (from !== 'home') {
+  // Resources move hex to hex only (none go onto a home base).
+  if (!isHomeBase(from) && !isHomeBase(to)) {
     for (const [resource, n] of Object.entries(carried.resources) as [Resource, number][]) {
       next = addResources(addResources(next, from, resource, -n), to, resource, n);
     }

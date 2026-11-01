@@ -70,8 +70,17 @@ export function gain(player: PlayerState, g: Partial<Record<'coins' | 'power' | 
   };
 }
 
-/** The hexes in a list of locations, leaving out the home base. */
-export const onBoard = (at: Location[]): HexId[] => at.filter((h): h is HexId => h !== 'home');
+/** Your own home base ("home") or an unused one ("base:<id>"): never a territory. */
+export const isHomeBase = (at: Location): boolean => at === 'home' || at.startsWith('base:');
+
+/** The hexes in a list of locations, leaving out home bases. */
+export const onBoard = (at: Location[]): HexId[] => at.filter((h): h is HexId => !isHomeBase(h));
+
+/** Home bases no faction in this game starts at, as locations ("base:<id>"). */
+export function unusedHomeBases(state: GameState): Location[] {
+  const used = new Set(state.setup.players.map((p) => p.faction.homeBase));
+  return Object.keys(state.setup.board.homeBases).filter((id) => !used.has(id)).map((id) => `base:${id}`);
+}
 
 /** Hexes where this player has at least one unit (units on the home base don't count). */
 export function unitHexes(player: PlayerState): Set<HexId> {

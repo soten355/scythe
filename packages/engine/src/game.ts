@@ -28,7 +28,11 @@ export interface GameSetup {
   players: { faction: Faction; mat: PlayerMat }[];
 }
 
-/** Where a unit stands: a hex, or "home" for the player's own home base. */
+/**
+ * Where a unit stands: a hex, "home" for the player's own home base, or
+ * "base:<id>" for a home base no faction is using (reached with Wayfare).
+ * Home bases are never territories: nobody controls, produces or fights there.
+ */
 export type Location = HexId | 'home';
 
 export type UnitRef = { kind: 'character' } | { kind: 'mech' | 'worker'; index: number };
@@ -145,7 +149,7 @@ export type Action =
   // unit can pick up resources (and a mech, workers) from its hex, one at a time.
   | { type: 'carryWorker'; unit: UnitRef; worker: number }
   | { type: 'carryResource'; unit: UnitRef; resource: Resource }
-  | { type: 'moveUnit'; unit: UnitRef; to: HexId }
+  | { type: 'moveUnit'; unit: UnitRef; to: Location }
   // Speed: a unit partway through its move can drop off what it carries.
   | { type: 'dropWorker'; unit: UnitRef; worker: number }
   | { type: 'dropResource'; unit: UnitRef; resource: Resource }

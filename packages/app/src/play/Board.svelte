@@ -12,7 +12,7 @@
   // A unit that just moved (travel) glides hex by hex along its path, taking
   // moveMs per hex; its piece at the destination is hidden until it lands,
   // then whatever it carried hops off onto the hex.
-  import type { GameState, HexId, Location, Resource } from '@scythe/engine';
+  import { isHomeBase, type GameState, type HexId, type Location, type Resource } from '@scythe/engine';
   import { tick, untrack } from 'svelte';
   import type { Travel } from './travel';
   import { between, fitView, panBy, worldOf, zoomAt, type Limits, type View } from './camera';
@@ -249,12 +249,12 @@
       if (moving && moving.seat === i) Object.assign(hide, { [moving.kind]: 1 }, { workers: moving.workers + (moving.kind === 'workers' ? 1 : 0) });
       const shown = (at: Location, kind: keyof typeof hide) => !(at === travelEnd && hide[kind] > 0 && hide[kind]--);
       // Units on the home base (the character, and any sent home after a fight) are drawn there instead.
-      if (p.character !== 'home' && shown(p.character, 'character')) add(p.character, { character: true });
-      for (const m of p.mechs) if (m !== 'home' && shown(m, 'mechs')) add(m, { mechs: 1 });
+      if (!isHomeBase(p.character) && shown(p.character, 'character')) add(p.character, { character: true });
+      for (const m of p.mechs) if (!isHomeBase(m) && shown(m, 'mechs')) add(m, { mechs: 1 });
       // Workers the selected mech has picked up ride on it instead (see cargo below).
       const carried = i === game.currentPlayer ? (prompt.cargo?.workers ?? []) : [];
       // Workers on a lake ride on a mech there (see riding below).
-      p.workers.forEach((w, wi) => w === 'home' || carried.includes(wi) || isLake(w) || !shown(w, 'workers') || add(w, { workers: 1 }));
+      p.workers.forEach((w, wi) => isHomeBase(w) || carried.includes(wi) || isLake(w) || !shown(w, 'workers') || add(w, { workers: 1 }));
       for (const [s, hex] of Object.entries(p.structures)) if (hex) add(hex, { structure: STRUCTURE_LETTER[s as keyof typeof STRUCTURE_LETTER] });
     });
     return on;
@@ -312,7 +312,12 @@
 
   /** Where a travelling piece is drawn on a hex (or a player's home base). */
   function spotOf(at: Location, seat: number): Point {
-    const pos = at === 'home' ? board.homeBasePositions[game.setup.players[seat]!.faction.homeBase]! : board.hexes[at]!;
+    const pos =
+      at === 'home'
+        ? board.homeBasePositions[game.setup.players[seat]!.faction.homeBase]!
+        : at.startsWith('base:')
+          ? board.homeBasePositions[at.slice('base:'.length)]!
+          : board.hexes[at]!;
     const c = center(pos);
     return [c[0] - PIECES_LEFT, c[1] - 4];
   }
@@ -338,7 +343,7 @@
     landed = t.id;
     const at = t.path[t.path.length - 1]!;
     // On a lake everything stays riding on the mech.
-    if (at === 'home' || isLake(at)) return;
+    if (isHomeBase(at) || isLake(at)) return;
     await tick();
     const spots = readSpots();
     const what = [...Array<string>(t.workers).fill('worker'), ...(Object.entries(t.resources) as [Resource, number][]).flatMap(([r, n]) => Array<string>(n).fill(r))];
@@ -398,6 +403,18 @@
     return { seat, color: f.color, initial: f.name[0] ?? '?', character: false, mechs, workers };
   }
 
+  /** Units of any faction standing on an unused home base (moved there with Wayfare). */
+  function visitorsAt(at: Location): Pieces[] {
+    return game.players.flatMap((p, seat) => {
+      const f = game.setup.players[seat]!.faction;
+      const carried = seat === game.currentPlayer && prompt.cargo?.at === at ? prompt.cargo.workers : [];
+      const character = p.character === at;
+      const mechs = p.mechs.filter((m) => m === at).length;
+      const workers = p.workers.filter((w, i) => w === at && !carried.includes(i)).length;
+      return character || mechs || workers ? [{ seat, color: f.color, initial: f.name[0] ?? '?', character, mechs, workers }] : [];
+    });
+  }
+
   /** Home bases with the faction that starts there and whether its character is at home. */
   const homes = $derived(
     Object.entries(board.homeBasePositions).map(([id, pos]) => {
@@ -412,6 +429,10 @@
         /** Mechs and workers sent home after losing a fight, drawn in a row under the home base. */
         others: seat >= 0 ? homeGroup(seat) : null,
         mine: seat === game.currentPlayer,
+        /** How moves and taps name this base: "home" for the current player's own, "base:<id>" for the others. */
+        key: seat === game.currentPlayer ? 'home' : `base:${id}`,
+        /** On an unused base: whoever has moved there. */
+        visitors: seat < 0 ? visitorsAt(`base:${id}`) : [],
       };
     }),
   );
@@ -501,8 +522,8 @@
     {#each home.borders as b, i (i)}
       <line x1={home.c[0]} y1={home.c[1]} x2={b[0]} y2={b[1]} class="home-link" />
     {/each}
-    {@const lit = home.mine && prompt.highlights.has('home')}
-    {@const tappable = home.mine && (lit || prompt.tapSelects.has('home'))}
+    {@const lit = prompt.highlights.has(home.key)}
+    {@const tappable = lit || prompt.tapSelects.has(home.key)}
     {#if home.mine && home.faction}
       <!-- The current player's home base glows in their colour. -->
       <circle cx={home.c[0]} cy={home.c[1]} r={SIZE * 0.55} fill="none" stroke={home.faction.color} class="home-glow" />
@@ -514,9 +535,9 @@
       fill={home.faction?.color ?? '#444'}
       class="home"
       class:lit
-      class:selected={home.mine && prompt.selected === 'home'}
+      class:selected={prompt.selected === home.key}
       class:tappable
-      onclick={() => tappable && onTap('home')}
+      onclick={() => tappable && onTap(home.key)}
       role="button"
       tabindex="-1"
       onkeydown={() => {}}
@@ -544,6 +565,11 @@
     {#if home.others}
       {#each placePieces([home.others], [home.c[0] + PIECES_LEFT, home.c[1] + SIZE * 0.55 + 12]) as { g, kind, x, y }, i (i)}
         {@render piece(g, kind, x, y, 'home')}
+      {/each}
+    {/if}
+    {#if home.visitors.length}
+      {#each placePieces(home.visitors, [home.c[0] + PIECES_LEFT, home.c[1] + SIZE * 0.55 + 12]) as { g, kind, x, y }, i (i)}
+        {@render piece(g, kind, x, y, home.key)}
       {/each}
     {/if}
   {/each}
@@ -699,7 +725,9 @@
   .outline.lit,
   .home.lit {
     stroke: #fff6c8;
-    stroke-width: 2.5;
+    stroke-width: 3;
+    /* Easy to spot even zoomed out (unused bases are a dull grey). */
+    filter: drop-shadow(0 0 5px #fff6c8);
     cursor: pointer;
     animation: pulse 1.4s ease-in-out infinite;
   }
