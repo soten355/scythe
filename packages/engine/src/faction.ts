@@ -22,16 +22,29 @@ export type AbilityRule =
   /** Cross rivers: workers anywhere, or the character and mechs onto these terrains only. */
   | { kind: 'crossRivers'; units: 'workers' }
   | { kind: 'crossRivers'; units: 'characterAndMechs'; onto: Terrain[] }
-  /** The character and mechs may move onto and off lakes, and may retreat onto a lake next to a lost fight. */
-  | { kind: 'lakes'; retreat: boolean }
+  /**
+   * The character and mechs may move onto and off lakes, and (`retreat`) may retreat onto a lake
+   * next to a lost fight; `linked`: from any lake to any other, as if through a tunnel.
+   */
+  | { kind: 'lakes'; retreat: boolean; linked?: boolean }
   /** The character and mechs may move this many extra hexes each move. */
   | { kind: 'speed'; extra: number }
   /** The character and mechs may move between villages you control and the Factory as if they were next to each other. */
   | { kind: 'villagesToFactory' }
+  /** The character and mechs may move between mountains you control and any tunnel, as if they were next to each other. */
+  | { kind: 'mountainsToTunnels' }
   /** Before a fight's dials, you may pay this much power to make the other side lose some. */
   | { kind: 'drainPower'; pay: number; loss: number }
   /** In a fight where you have a worker, you may play one more combat card. */
   | { kind: 'extraCardWithWorker' }
+  /** No popularity lost for enemy workers you send home (in a fight or by moving onto them). */
+  | { kind: 'noPopularityLoss' }
+  /** When a fight starts on a tunnel hex, the other side loses this much power. */
+  | { kind: 'disarmOnTunnels'; loss: number }
+  /** When a fight starts, take one of the other side's combat cards at random. */
+  | { kind: 'stealCard' }
+  /** Combat stars aren't limited to two (objective stars too, once objectives arrive). */
+  | { kind: 'unlimitedCombatStars' }
   /** You may pick the same player mat section as on your last turn. */
   | { kind: 'repeatSection' };
 

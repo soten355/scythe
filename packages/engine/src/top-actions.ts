@@ -190,6 +190,16 @@ export function moveTargets(state: GameState, seat: number, at: Location, kind: 
     const tunnels = Object.values(board.hexes).filter((h) => h.tunnel).map((h) => h.id);
     if (player.structures.mine) tunnels.push(player.structures.mine);
     if (tunnels.includes(at)) targets.push(...tunnels.filter((t) => t !== at));
+    // Submerge: any lake to any other, like a tunnel.
+    if (fighter && terrain(at) === 'lake' && rules.some((r) => r.kind === 'lakes' && r.linked)) {
+      targets.push(...Object.values(board.hexes).filter((h) => h.terrain === 'lake').map((h) => h.id));
+    }
+    // Underpass: mountains you control and every tunnel, both ways, for the character and mechs.
+    if (fighter && rules.some((r) => r.kind === 'mountainsToTunnels')) {
+      const mountains = [...controlledHexes(state, seat)].filter((h) => terrain(h) === 'mountain');
+      if (mountains.includes(at)) targets.push(...tunnels);
+      if (tunnels.includes(at)) targets.push(...mountains);
+    }
     // Township moves workers only (owner's ruling).
     if (!fighter && rules.some((r) => r.kind === 'villagesToFactory')) {
       const factories = Object.values(board.hexes).filter((h) => h.terrain === 'factory').map((h) => h.id);

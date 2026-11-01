@@ -5,12 +5,13 @@ import { defaultChoice, maxPlayers, MIN_PLAYERS, problems, setFaction, setMat, s
 
 const [nordic, rusviet] = baseFactions as [Faction, Faction];
 const [mat1, mat2] = baseMats as [PlayerMat, PlayerMat];
-const catalog: Catalog = { maps: [{ id: 'standard', name: 'Standard', board: baseBoard }], factions: baseFactions, mats: baseMats };
+/** Two factions and two mats (whatever else gets entered later). */
+const catalog: Catalog = { maps: [{ id: 'standard', name: 'Standard', board: baseBoard }], factions: [nordic, rusviet], mats: [mat1, mat2] };
 /** A bigger catalog, as if more factions and mats were entered. */
 const more: Catalog = {
   ...catalog,
-  factions: [...baseFactions, { ...nordic, id: 'third', name: 'Third', homeBase: 'se' }],
-  mats: [...baseMats, { ...mat1, id: 'mat-3', name: 'Third mat', turnOrder: 3 }],
+  factions: [nordic, rusviet, { ...nordic, id: 'third', name: 'Third', homeBase: 'se' }],
+  mats: [mat1, mat2, { ...mat1, id: 'mat-3', name: 'Third mat', turnOrder: 3 }],
 };
 
 describe('the new game choices', () => {
@@ -55,7 +56,7 @@ describe('the new game choices', () => {
   it('point out what stops a game from starting', () => {
     const same = { map: 'standard', players: [{ faction: nordic.id, mat: mat1.id }, { faction: nordic.id, mat: mat1.id }] };
     expect(problems(same, catalog)).toEqual(['Two seats have Nordic.', 'Two seats have the Industrial mat.']);
-    const sharedHome = { ...more, factions: [...baseFactions, { ...nordic, id: 'third', name: 'Third' }] };
+    const sharedHome = { ...more, factions: [nordic, rusviet, { ...nordic, id: 'third', name: 'Third' }] };
     const c = setPlayerCount(defaultChoice(sharedHome), 3, sharedHome);
     expect(problems(c, sharedHome)).toEqual(['Nordic and Third start from the same home base.']);
   });

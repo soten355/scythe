@@ -3,7 +3,7 @@
 // B2 is a lake, B3 the Factory, B1 and C3 villages, A4 and C1 tunnels.
 // Player 0 uses mat A (section 2 is Move, 2 units).
 import { describe, expect, it } from 'vitest';
-import { activeSeat, applyAction, legalActions, newGame, type Action, type GameState, type PlayerState } from './game';
+import { activeSeat, applyAction, isGameOver, legalActions, newGame, type Action, type GameState, type PlayerState } from './game';
 import type { AbilityRule, Faction } from './faction';
 import { factionA, factionB, testSetup } from './test-fixtures';
 import { nextInt, seedRng } from './rng';
@@ -285,23 +285,126 @@ describe('combat abilities', () => {
   });
 });
 
+describe('more lakes: Submerge', () => {
+  const submerge: AbilityRule = { kind: 'lakes', retreat: false, linked: true };
+  /** The test board with C4 turned into a second lake. */
+  const twoLakes = (state: GameState): GameState => {
+    const board = state.setup.board;
+    return { ...state, setup: { ...state.setup, board: { ...board, hexes: { ...board.hexes, C4: { ...board.hexes.C4!, terrain: 'lake' } } } } };
+  };
+
+  it('moves from any lake to any other, as if through a tunnel', () => {
+    const state = play(twoLakes(game({ mechs: [submerge] }, { mechs: ['B2'] })), choose(2));
+    expect(targets(state, mech(0))).toContain('C4');
+  });
+
+  it('only with the ability', () => {
+    const state = play(twoLakes(game({ mechs: [lakes] }, { mechs: ['B2'] })), choose(2));
+    expect(targets(state, mech(0))).not.toContain('C4');
+  });
+});
+
+describe('mountains and tunnels: Underpass', () => {
+  const underpass: AbilityRule = { kind: 'mountainsToTunnels' };
+
+  it('links a mountain you control to every tunnel, for the character and mechs', () => {
+    // A worker holds the mountain A3; the mech stands on the tunnel C1 (far away).
+    const state = play(game({ mechs: [underpass] }, { mechs: ['C1'], workers: ['A3'] }), choose(2));
+    expect(targets(state, mech(0))).toContain('A3');
+    const back = play(game({ mechs: [underpass] }, { mechs: ['A3'], workers: [] }), choose(2));
+    expect(targets(back, mech(0))).toContain('C1');
+  });
+
+  it("not to a mountain you don't control, and not for workers", () => {
+    const state = play(game({ mechs: [underpass] }, { mechs: ['C1'], workers: ['C1'] }), choose(2));
+    expect(targets(state, mech(0))).not.toContain('A3');
+    expect(targets(state, worker(0))).not.toContain('A3');
+  });
+});
+
+describe('more combat abilities', () => {
+  /** Player 0's character on `from` attacks player 1's character (and a worker) on `to`. */
+  const attack = (rules: Parameters<typeof game>[0], p0: Partial<PlayerState> = {}, p1: Partial<PlayerState> = {}, from = 'A2', to = 'B3') =>
+    play(
+      game(rules, { character: from, power: 5, combatCards: [2], ...p0 }, { character: to, workers: [to], power: 4, combatCards: [5, 5], ...p1 }),
+      choose(2),
+      move(character, to),
+      { type: 'endMove' },
+    );
+  const win = (state: GameState) => play(state, { type: 'combatPower', power: 5 }, { type: 'combatPower', power: 0 });
+
+  it('Camaraderie: no popularity lost for workers sent home in a won fight', () => {
+    const camaraderie: AbilityRule = { kind: 'noPopularityLoss' };
+    expect(win(attack({ mechs: [camaraderie] }, { popularity: 5 })).players[0]!.popularity).toBe(5);
+    expect(win(attack({}, { popularity: 5 })).players[0]!.popularity).toBe(4);
+  });
+
+  it('Camaraderie: nor for moving onto workers alone', () => {
+    const camaraderie: AbilityRule = { kind: 'noPopularityLoss' };
+    const state = play(
+      game({ mechs: [camaraderie] }, { character: 'A2', popularity: 5 }, { character: 'home', workers: ['B3'] }),
+      choose(2),
+      move(character, 'B3'),
+      { type: 'endMove' },
+    );
+    expect(state.players[1]!.workers).toEqual(['home']);
+    expect(state.players[0]!.popularity).toBe(5);
+  });
+
+  it('Disarm: the other side loses 2 power when the fight is on a tunnel', () => {
+    const disarm: AbilityRule = { kind: 'disarmOnTunnels', loss: 2 };
+    // A4 is a tunnel; A3 is next to it.
+    expect(attack({ mechs: [disarm] }, {}, {}, 'A3', 'A4').players[1]!.power).toBe(2);
+    expect(attack({ mechs: [disarm] }, {}, { power: 1 }, 'A3', 'A4').players[1]!.power).toBe(0);
+    expect(attack({ mechs: [disarm] }).players[1]!.power).toBe(4);
+    // Defending works too.
+    expect(attack({ theirs: [disarm] }, {}, {}, 'A3', 'A4').players[0]!.power).toBe(3);
+  });
+
+  it('Scout: takes one of the other side’s combat cards at random before the fight', () => {
+    const scout: AbilityRule = { kind: 'stealCard' };
+    const state = attack({ mechs: [scout] });
+    expect(state.players[0]!.combatCards.sort()).toEqual([2, 5]);
+    expect(state.players[1]!.combatCards).toEqual([5]);
+    // Nothing to take: nothing happens.
+    expect(attack({ mechs: [scout] }, {}, { combatCards: [] }).players[0]!.combatCards).toEqual([2]);
+  });
+
+  it('Dominate: combat stars past the usual two', () => {
+    const dominate: AbilityRule = { kind: 'unlimitedCombatStars' };
+    const stars = win(attack({ ability: dominate }, { stars: ['combat', 'combat'] })).players[0]!.stars;
+    expect(stars.filter((s) => s === 'combat')).toHaveLength(3);
+    expect(win(attack({}, { stars: ['combat', 'combat'] })).players[0]!.stars).toEqual(['combat', 'combat']);
+  });
+});
+
 describe('fuzz: random games with every ability', () => {
-  it('keeps the invariants', () => {
-    const all = [riverwalk, lakes, artillery, speed];
-    const rest = [township, peoplesArmy, { kind: 'crossRivers', units: 'characterAndMechs', onto: ['farm', 'forest'] } as AbilityRule, speed];
+  const pairings: [string, [AbilityRule, AbilityRule[]], [AbilityRule, AbilityRule[]]][] = [
+    [
+      'first two factions',
+      [swim, [riverwalk, lakes, artillery, speed]],
+      [relentless, [township, peoplesArmy, { kind: 'crossRivers', units: 'characterAndMechs', onto: ['farm', 'forest'] }, speed]],
+    ],
+    [
+      'next three',
+      [{ kind: 'unlimitedCombatStars' }, [{ kind: 'lakes', retreat: false, linked: true }, { kind: 'mountainsToTunnels' }, { kind: 'disarmOnTunnels', loss: 2 }, speed]],
+      [relentless, [{ kind: 'noPopularityLoss' }, { kind: 'stealCard' }, riverwalk, speed]],
+    ],
+  ];
+  it.each(pairings)('keeps the invariants (%s)', (_name, [ability0, mechs0], [ability1, mechs1]) => {
     let fights = 0;
     for (let g = 0; g < 30; g++) {
       const setup = {
         ...testSetup,
         seed: g,
         players: [
-          { ...testSetup.players[0]!, faction: withRules(factionA, swim, all) },
-          { ...testSetup.players[1]!, faction: withRules(factionB, relentless, rest) },
+          { ...testSetup.players[0]!, faction: withRules(factionA, ability0, mechs0) },
+          { ...testSetup.players[1]!, faction: withRules(factionB, ability1, mechs1) },
         ],
       };
       let state = newGame(setup);
       let rng = seedRng(g + 100);
-      for (let step = 0; step < 400; step++) {
+      for (let step = 0; step < 400 && !isGameOver(state); step++) {
         const options = legalActions(state, activeSeat(state));
         expect(options.length).toBeGreaterThan(0);
         let pick: number;
@@ -311,6 +414,7 @@ describe('fuzz: random games with every ability', () => {
         if (state.lastCombat !== before) fights++;
         for (const p of state.players) {
           expect(p.power).toBeGreaterThanOrEqual(0);
+          expect(p.stars.length).toBeLessThanOrEqual(6);
           // Workers stand on a lake only with one of their mechs.
           for (const w of p.workers) if (w !== 'home' && state.setup.board.hexes[w]!.terrain === 'lake') expect(p.mechs).toContain(w);
         }

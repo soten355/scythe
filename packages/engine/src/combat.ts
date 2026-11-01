@@ -19,7 +19,7 @@ import type { HexId } from './board';
 import { neighbors } from './board';
 import { hasRule, rulesOfKind } from './abilities';
 import type { Action, CombatSide, Fight, GameState, Location, PlayerState, Retreat, SectionIndex, TurnStep } from './game';
-import { shuffle } from './rng';
+import { nextInt, shuffle } from './rng';
 import { MAX_POPULARITY, placeStar, updatePlayer } from './state';
 
 type CombatStep = Extract<TurnStep, { step: 'combat' }>;
@@ -85,8 +85,11 @@ function retreatLakes(state: GameState, seat: number, hex: HexId): HexId[] {
   );
 }
 
+/** Popularity lost for sending `n` enemy workers home (none with Camaraderie). */
 const losePopularity = (state: GameState, seat: number, n: number): GameState =>
-  updatePlayer(state, seat, { popularity: Math.max(0, Math.min(MAX_POPULARITY, state.players[seat]!.popularity - n)) });
+  hasRule(state, seat, 'noPopularityLoss')
+    ? state
+    : updatePlayer(state, seat, { popularity: Math.max(0, Math.min(MAX_POPULARITY, state.players[seat]!.popularity - n)) });
 
 /**
  * Called when the current player's move is over: sends home enemy workers
@@ -118,13 +121,37 @@ function nextFight(state: GameState, section: SectionIndex, left: HexId[]): Game
   return startFight(state, section, left, left[0]!);
 }
 
-function startFight(state: GameState, section: SectionIndex, left: HexId[], hex: HexId): GameState {
-  const attacker = state.currentPlayer;
-  const defender = state.players.findIndex((p, i) => i !== attacker && combatUnitsOn(p, hex) > 0);
+function startFight(start: GameState, section: SectionIndex, left: HexId[], hex: HexId): GameState {
+  const attacker = start.currentPlayer;
+  const defender = start.players.findIndex((p, i) => i !== attacker && combatUnitsOn(p, hex) > 0);
+  const state = asFightStarts(start, hex, attacker, defender);
   const side = (seat: number): CombatSide => ({ seat, cards: [], power: null });
   const before = [attacker, defender].filter((seat) => canDrain(state, seat));
   const fight: Fight = { hex, attacker: side(attacker), defender: side(defender), before };
   return settle({ ...state, turn: { step: 'combat', section, left, fight } });
+}
+
+/**
+ * Abilities that act on their own as a fight starts, attacker's first:
+ * Disarm (the other side loses power on a tunnel hex) and Scout (take one of
+ * their combat cards at random).
+ */
+function asFightStarts(state: GameState, hex: HexId, attacker: number, defender: number): GameState {
+  const tunnel = (seat: number) => !!state.setup.board.hexes[hex]?.tunnel || state.players[seat]!.structures.mine === hex;
+  let next = state;
+  for (const [seat, other] of [[attacker, defender], [defender, attacker]] as const) {
+    for (const r of rulesOfKind(next, seat, 'disarmOnTunnels')) {
+      if (tunnel(seat)) next = updatePlayer(next, other, { power: Math.max(0, next.players[other]!.power - r.loss) });
+    }
+    if (hasRule(next, seat, 'stealCard') && next.players[other]!.combatCards.length) {
+      const hand = [...next.players[other]!.combatCards];
+      const [i, rng] = nextInt(next.rng, hand.length);
+      const [card] = hand.splice(i, 1);
+      next = updatePlayer({ ...next, rng }, other, { combatCards: hand });
+      next = updatePlayer(next, seat, { combatCards: [...next.players[seat]!.combatCards, card!] });
+    }
+  }
+  return next;
 }
 
 /** The before-the-dials ability a player can afford now, if any. */
@@ -240,7 +267,7 @@ function resolve(state: GameState, turn: CombatStep, fight: Fight): GameState {
   }
   if (total(loser) > 0) next = drawCombatCards(next, loser.seat, 1);
   const combatStars = next.players[result.winner]!.stars.filter((s) => s === 'combat').length;
-  if (combatStars < MAX_COMBAT_STARS) next = placeStar(next, result.winner, 'combat');
+  if (combatStars < MAX_COMBAT_STARS || hasRule(next, result.winner, 'unlimitedCombatStars')) next = placeStar(next, result.winner, 'combat');
   next = { ...next, lastCombat: result };
   const left = turn.left.filter((h) => h !== fight.hex);
 

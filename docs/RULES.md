@@ -79,6 +79,21 @@ should check it against the rulebook; tick it once confirmed.
 - [ ] Verify: People's Army's extra card needs a worker of yours on the
       fight's hex (for an attacker, one carried in by a mech counts).
 
+- [ ] Verify: Submerge (Polonia) moves the character and mechs onto and off
+      lakes and from any lake to any other; it doesn't allow retreating onto
+      a lake (Seaworthy does).
+- [ ] Verify: Underpass (Saxony) is for the character and mechs (not
+      workers), between any mountain you control and any tunnel, both ways;
+      Saxony's own mine counts as a tunnel.
+- [ ] Verify: Camaraderie (Polonia) also covers moving onto enemy workers
+      alone, not only workers in a fight.
+- [ ] Verify: Disarm (Saxony) works attacking or defending, happens on its
+      own as the fight starts, and a Saxony mine counts as a tunnel.
+- [ ] Verify: Scout (Crimea) happens on its own as the fight starts,
+      attacking or defending, taking one card at random.
+- [ ] Verify: Dominate (Saxony) lifts the two-star limit on combat stars
+      (objectives later); the game still ends at the sixth star.
+
 ## Game end and scoring
 
 - [ ] Verify: the game ends the moment a player places their sixth star,
