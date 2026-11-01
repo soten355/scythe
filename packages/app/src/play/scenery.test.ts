@@ -2,13 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { backdropFor, ridge } from './scenery';
 
 describe('fight backgrounds', () => {
-  it('has one for each resource hex and the Factory', () => {
-    for (const t of ['forest', 'tundra', 'mountain', 'farm', 'factory'] as const) expect(backdropFor(t)).toBe(t);
+  it('has one for each resource hex, the Factory and lakes (Seaworthy and Submerge fights)', () => {
+    for (const t of ['forest', 'tundra', 'mountain', 'farm', 'factory', 'lake'] as const) expect(backdropFor(t)).toBe(t);
   });
 
   it('uses the farm for villages and anything else', () => {
     expect(backdropFor('village')).toBe('farm');
-    expect(backdropFor('lake')).toBe('farm');
+    expect(backdropFor('somewhere')).toBe('farm');
   });
 
   it('draws the same hills every time', () => {

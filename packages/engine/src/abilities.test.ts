@@ -213,18 +213,18 @@ describe('speed', () => {
 });
 
 describe('villages and the Factory', () => {
-  it('links a village you control to the Factory and back, for workers', () => {
-    let state = play(game({ mechs: [township] }, { character: 'B1', workers: ['B1'] }), choose(2));
-    expect(targets(state, worker(0))).toContain('B3');
-    // From the Factory to any village you control (B1, with your other worker), even far away.
-    state = play(game({ mechs: [township] }, { workers: ['B3', 'B1'] }), choose(2));
-    expect(targets(state, worker(0))).toContain('B1');
+  it('links a village you control to the Factory and back, for the character and mechs', () => {
+    let state = play(game({ mechs: [township] }, { character: 'B1', mechs: ['B1'], workers: [] }), choose(2));
+    expect(targets(state, character)).toContain('B3');
+    expect(targets(state, mech(0))).toContain('B3');
+    // From the Factory to any village you control (B1, with your worker), even far away.
+    state = play(game({ mechs: [township] }, { mechs: ['B3'], workers: ['B1'] }), choose(2));
+    expect(targets(state, mech(0))).toContain('B1');
   });
 
-  it("doesn't link them for the character or mechs (owner's ruling)", () => {
-    const state = play(game({ mechs: [township] }, { character: 'B1', mechs: ['B1'], workers: ['B1'] }), choose(2));
-    expect(targets(state, character)).not.toContain('B3');
-    expect(targets(state, mech(0))).not.toContain('B3');
+  it("doesn't link them for workers (owner's ruling)", () => {
+    const state = play(game({ mechs: [township] }, { character: 'home', workers: ['B1'] }), choose(2));
+    expect(targets(state, worker(0))).not.toContain('B3');
   });
 });
 
@@ -282,6 +282,22 @@ describe('combat abilities', () => {
   it("doesn't offer it without the power to pay", () => {
     const state = attack({ mechs: [artillery] }, { power: 0 });
     expect(legalActions(state, 0).some((a) => a.type === 'beforeCombat')).toBe(false);
+  });
+});
+
+describe('fights on a lake', () => {
+  it('happen when a mech moves onto a lake held by an enemy mech; the loser goes home with the workers riding on it', () => {
+    let state = play(
+      game({ mechs: [lakes], theirs: [lakes] }, { mechs: ['A2'], power: 5, combatCards: [] }, { character: 'home', mechs: ['B2'], workers: ['B2'], power: 1, combatCards: [], popularity: 6 }),
+      choose(2),
+      move(mech(0), 'B2'),
+      { type: 'endMove' },
+    );
+    expect(state.turn).toMatchObject({ step: 'combat', fight: { hex: 'B2' } });
+    state = play(state, { type: 'combatPower', power: 3 }, { type: 'combatPower', power: 1 });
+    expect(state.lastCombat?.winner).toBe(0);
+    expect(state.players[1]).toMatchObject({ mechs: ['home'], workers: ['home'] });
+    expect(state.players[0]!.mechs).toEqual(['B2']);
   });
 });
 

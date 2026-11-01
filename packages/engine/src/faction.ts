@@ -29,7 +29,7 @@ export type AbilityRule =
   | { kind: 'lakes'; retreat: boolean; linked?: boolean }
   /** The character and mechs may move this many extra hexes each move. */
   | { kind: 'speed'; extra: number }
-  /** The character and mechs may move between villages you control and the Factory as if they were next to each other. */
+  /** The character and mechs (not workers) may move between villages you control and the Factory as if they were next to each other. */
   | { kind: 'villagesToFactory' }
   /** The character and mechs may move between mountains you control and any tunnel, as if they were next to each other. */
   | { kind: 'mountainsToTunnels' }

@@ -1,7 +1,8 @@
 <script lang="ts">
   // The fight screen's background, matched to the hex being fought over:
   // a misty pine forest, a snowy tundra under an aurora, mountain peaks at
-  // alpenglow, golden farmland with a windmill, or the smoky Factory. The
+  // alpenglow, golden farmland with a windmill, the smoky Factory, or a
+  // misty lake (for Seaworthy and Submerge fights on the water). The
   // fighters stand on the ground line (70% down); the scenery above it is
   // anchored to that line and the ground below it to its top, so the two
   // always meet whatever the screen shape. Original placeholder art.
@@ -26,6 +27,12 @@
     mid: ridge({ base: 400, height: 220, points: 11, seed: 22 }),
     near: ridge({ base: 400, height: 110, points: 14, seed: 23 }),
   };
+  const lake = {
+    far: ridge({ base: 400, height: 110, points: 6, seed: 91, sharp: false }),
+    shore: ridge({ base: 400, height: 34, points: 9, seed: 92, sharp: false }),
+  };
+  /** Reeds in clumps at the left and right edges: [x, height]. */
+  const reeds = Array.from({ length: 24 }, (_, i) => [i < 12 ? i * 9 : 1000 - (i - 12) * 9 - 6, 60 + rand(94 + i) * 70] as const);
   const farm = {
     far: ridge({ base: 400, height: 90, points: 5, seed: 31, sharp: false }),
     near: ridge({ base: 400, height: 50, points: 4, seed: 32, sharp: false }),
@@ -34,6 +41,7 @@
   const scatter = (n: number, seed: number) => Array.from({ length: n }, (_, i) => [rand(seed + i) * 1000, 10 + rand(seed + i * 5) * 180, 0.6 + rand(seed + i * 9) * 0.8] as const);
   const tufts = scatter(40, 41);
   const rocks = scatter(14, 51);
+  const ripples = scatter(18, 93);
   // Falling snow / rising embers / fireflies: [left %, delay s, duration s, size px].
   const motes = (n: number, seed: number) => Array.from({ length: n }, (_, i) => [rand(seed + i) * 100, rand(seed + i * 3) * 8, 5 + rand(seed + i * 7) * 6, 2 + rand(seed + i * 11) * 4] as const);
   const snow = motes(60, 61);
@@ -190,6 +198,47 @@
         <linearGradient id="wheat" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stop-color="#6e5420" />
           <stop offset="1" stop-color="#22190a" />
+        </linearGradient>
+      </defs>
+    </svg>
+  {:else if kind === 'lake'}
+    <div class="sun"></div>
+    <svg class="horizon" viewBox="0 0 1000 400" preserveAspectRatio="xMidYMax slice">
+      <path d={lake.far} fill="#5a6e7e" opacity="0.7" />
+      <path d={lake.shore} fill="#2e3e3a" />
+      <!-- A little jetty on the far shore -->
+      <path d="M690 392 H790 V386 H690 Z" fill="#3a2a1e" />
+      {#each [700, 730, 760, 785] as x (x)}<rect x={x} y="386" width="4" height="14" fill="#2a1e14" />{/each}
+      <rect y="380" width="1000" height="20" fill="url(#mist)" />
+      <defs>
+        <linearGradient id="mist" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#d8e4ea" stop-opacity="0" />
+          <stop offset="1" stop-color="#d8e4ea" stop-opacity="0.5" />
+        </linearGradient>
+      </defs>
+    </svg>
+    <div class="fog"></div>
+    <svg class="ground" viewBox="0 0 1000 200" preserveAspectRatio="xMidYMin slice">
+      <rect width="1000" height="200" fill="url(#water)" />
+      <!-- The sun's reflection, broken up by the ripples -->
+      {#each [0, 1, 2, 3, 4, 5, 6, 7] as i (i)}
+        <rect class="glint" x={500 - (40 - i * 3)} y={6 + i * 14} width={80 - i * 6} height="3" rx="1.5" fill="#ffe2b0" style:animation-delay="{-i * 0.3}s" />
+      {/each}
+      {#each ripples as [x, y, s], i (i)}
+        <ellipse class="ripple" cx={x} cy={y} rx={30 * s} ry={3 * s} style:animation-delay="{-(i % 6) * 0.7}s" />
+      {/each}
+      <!-- Reeds at the water's edge, both sides -->
+      {#each reeds as [x, h], i (i)}
+        <g class="reed" style:transform-origin="{x}px 200px" style:animation-delay="{-(i % 5) * 0.5}s">
+          <path d="M{x} 200 Q{x + 3} {200 - h / 2} {x + 6} {200 - h}" stroke="#2a3a26" stroke-width="3" fill="none" />
+          {#if i % 3 === 0}<ellipse cx={x + 6} cy={200 - h + 8} rx="3" ry="9" fill="#5a3a22" />{/if}
+        </g>
+      {/each}
+      <defs>
+        <linearGradient id="water" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#7a98a8" />
+          <stop offset="0.4" stop-color="#3e5a6c" />
+          <stop offset="1" stop-color="#14222c" />
         </linearGradient>
       </defs>
     </svg>
@@ -403,6 +452,39 @@
   }
   @keyframes bend {
     to { transform: rotate(6deg); }
+  }
+
+  /* Lake: misty morning water, a shimmering reflection, ripples and reeds. */
+  .lake .sky {
+    background: linear-gradient(#24304a 0%, #6a7a96 40%, #e0b48a 62%, #f4dcb8 70%);
+  }
+  .lake .sun {
+    top: 60%;
+    background: radial-gradient(#fff4dc, #ffcc8a 50%, transparent 70%);
+    opacity: 0.85;
+  }
+  .lake .fog {
+    top: 60%;
+    background: radial-gradient(ellipse at center, rgb(230 236 240 / 0.35), transparent 65%);
+  }
+  .glint {
+    animation: shimmer 1.6s ease-in-out infinite alternate;
+  }
+  .ripple {
+    fill: none;
+    stroke: rgb(220 236 244 / 0.35);
+    stroke-width: 1.5;
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: ripple 4.2s ease-out infinite;
+  }
+  @keyframes ripple {
+    0% { transform: scale(0.4); opacity: 0; }
+    30% { opacity: 1; }
+    100% { transform: scale(1.4); opacity: 0; }
+  }
+  .reed {
+    animation: bend 3s ease-in-out infinite alternate;
   }
 
   /* Factory: smog and furnace glow, smoke plumes, a turning gear, embers. */

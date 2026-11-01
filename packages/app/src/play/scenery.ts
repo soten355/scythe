@@ -2,9 +2,9 @@
 // simple generators for treelines and ridges. Seeded so a background looks
 // the same every time it's shown.
 
-export type Backdrop = 'forest' | 'tundra' | 'mountain' | 'farm' | 'factory';
+export type Backdrop = 'forest' | 'tundra' | 'mountain' | 'farm' | 'factory' | 'lake';
 
-const BACKDROPS: readonly string[] = ['forest', 'tundra', 'mountain', 'farm', 'factory'];
+const BACKDROPS: readonly string[] = ['forest', 'tundra', 'mountain', 'farm', 'factory', 'lake'];
 
 /** The background for a fight on this terrain: villages (and anything else) use the farm. */
 export function backdropFor(terrain: string): Backdrop {

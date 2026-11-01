@@ -73,7 +73,8 @@ should check it against the rulebook; tick it once confirmed.
       unit ends its move. On the way it may drop off and pick up workers and
       resources (owner's play-test note).
 - [x] Township links any village you control with the Factory, both ways,
-      for workers only, not the character or mechs. (Owner.)
+      for the character and mechs only, not workers. (Owner, Nov 1, 2026:
+      replaces the earlier workers-only ruling.)
 - [ ] Verify: Artillery is decided before anyone dials: the attacker first,
       then the defender. The other side can't drop below 0 power.
 - [ ] Verify: People's Army's extra card needs a worker of yours on the

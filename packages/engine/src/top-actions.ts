@@ -200,8 +200,8 @@ export function moveTargets(state: GameState, seat: number, at: Location, kind: 
       if (mountains.includes(at)) targets.push(...tunnels);
       if (tunnels.includes(at)) targets.push(...mountains);
     }
-    // Township moves workers only (owner's ruling).
-    if (!fighter && rules.some((r) => r.kind === 'villagesToFactory')) {
+    // Township moves the character and mechs only, not workers (owner's ruling).
+    if (fighter && rules.some((r) => r.kind === 'villagesToFactory')) {
       const factories = Object.values(board.hexes).filter((h) => h.terrain === 'factory').map((h) => h.id);
       if (terrain(at) === 'village') targets.push(...factories);
       if (terrain(at) === 'factory') targets.push(...[...controlledHexes(state, seat)].filter((h) => terrain(h) === 'village'));
