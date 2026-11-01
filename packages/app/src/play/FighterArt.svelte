@@ -3,12 +3,23 @@
   // a riveted walker mech with a cannon arm and a smokestack. Original
   // placeholder art in the faction's colour, gently animated; a later art
   // pass (painted 2D or 3D) can replace this one file.
-  let { kind, color, facing = 'right' }: { kind: 'character' | 'mech'; color: string; facing?: 'left' | 'right' } = $props();
+  let {
+    kind,
+    color,
+    facing = 'right',
+    broken = false,
+  }: {
+    kind: 'character' | 'mech';
+    color: string;
+    facing?: 'left' | 'right';
+    /** Beaten in a fight: still, scorched, cracked, smouldering. */
+    broken?: boolean;
+  } = $props();
   // Gradient ids must be unique on the page.
   const id = `f${Math.random().toString(36).slice(2, 8)}`;
 </script>
 
-<svg viewBox="0 0 200 260" class="fighter {kind}" class:flip={facing === 'left'} style:--c={color} aria-hidden="true">
+<svg viewBox="0 0 200 260" class="fighter {kind}" class:flip={facing === 'left'} class:broken style:--c={color} aria-hidden="true">
   <defs>
     <linearGradient id="{id}-paint" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="color-mix(in srgb, {color} 80%, white)" />
@@ -62,6 +73,11 @@
       <circle cx="100" cy="106" r="19" fill="#2a2927" stroke="#161513" stroke-width="2.5" />
       <circle cx="100" cy="106" r="13" fill="url(#{id}-glow)" class="cockpit" />
       <path d="M92 99 A11 11 0 0 1 106 96" stroke="#fff" stroke-width="2" fill="none" opacity="0.7" />
+      {#if broken}
+        <path d="M100 106 L92 96 M100 106 L111 101 M100 106 L103 119 M100 106 L88 112" stroke="#161513" stroke-width="2" fill="none" />
+        <path d="M60 80 L72 98 L66 112 M140 126 L128 112" stroke="#161513" stroke-width="2.5" fill="none" />
+        <path d="M120 128 l6 -10 l-2 8 l6 -2 z" fill="#ffb43a" class="spark" />
+      {/if}
       <!-- Claw arm (back) -->
       <g class="arm-back">
         <rect x="16" y="96" width="22" height="16" rx="4" fill="url(#{id}-steel)" stroke="#161513" stroke-width="2" />
@@ -105,6 +121,10 @@
       <circle cx="109" cy="52" r="6" fill="#7fb3c9" stroke="#161513" stroke-width="2" />
       <path d="M99 52 L103 52" stroke="#161513" stroke-width="2" />
       <path d="M94 72 Q101 76 108 72" stroke="#161513" stroke-width="1.5" fill="none" />
+      {#if broken}
+        <path d="M89 48 L97 56 M107 47 L111 57 M105 52 L113 50" stroke="#161513" stroke-width="1.5" />
+        <path d="M70 120 L84 132 L76 146 M122 168 L132 180" stroke="#161513" stroke-width="2" fill="none" />
+      {/if}
     </g>
   {/if}
 </svg>
@@ -119,6 +139,32 @@
   .flip {
     transform: scaleX(-1);
   }
+  /* A beaten fighter: no idle motion, scorched and dark. */
+  .broken {
+    filter: grayscale(0.6) brightness(0.55) drop-shadow(0 0 6px rgb(0 0 0 / 0.6));
+  }
+  .broken .body,
+  .broken .cockpit,
+  .broken .pennant,
+  .broken .scarf {
+    animation: none;
+  }
+  .broken .cockpit {
+    opacity: 0.15;
+  }
+  .broken .smoke {
+    display: none;
+  }
+  .spark {
+    animation: spark 0.9s steps(2) infinite;
+  }
+
+  @keyframes spark {
+    50% {
+      opacity: 0;
+    }
+  }
+
   .body {
     animation: breathe 3.2s ease-in-out infinite;
     transform-origin: 100px 246px;

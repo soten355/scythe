@@ -1,7 +1,7 @@
 import { baseBoard, baseFactions, baseMats } from '@scythe/content';
 import { applyAction, newGame, type Action, type GameState } from '@scythe/engine';
 import { describe, expect, it } from 'vitest';
-import { fightSides } from './fight';
+import { battleOf, fightSides } from './fight';
 
 const play = (state: GameState, ...actions: Action[]) => actions.reduce(applyAction, state);
 const start = () =>
@@ -52,5 +52,26 @@ describe('the fight screen', () => {
     const f = fightSides(play(fight(), { type: 'combatPower', power: 2 }))!;
     expect(f.attacker.lockedIn).toBe(true);
     expect(f.defender.lockedIn).toBe(false);
+  });
+});
+
+describe('the battle', () => {
+  it('shows what each side played, the totals, and who won, with the units they fought with', () => {
+    const before = play(fight(), { type: 'combatCard', value: 5 }, { type: 'combatPower', power: 2 });
+    const after = play(before, { type: 'combatPower', power: 3 });
+    const b = battleOf([before, after], after.lastCombat!);
+    expect(b.hex).toBe('A4');
+    expect(b.winner).toBe('attacker');
+    expect(b.attacker).toMatchObject({ seat: 0, name: 'Nordic', character: true, mechs: 1, power: 2, cards: [5], total: 7 });
+    expect(b.defender).toMatchObject({ seat: 1, name: 'Rusviet', character: true, mechs: 0, power: 3, cards: [], total: 3 });
+  });
+
+  it('still shows a side whose units have already gone home, from an earlier moment', () => {
+    const before = fight();
+    const after = play(before, { type: 'combatPower', power: 0 }, { type: 'combatPower', power: 3 });
+    // The attacker lost: their units are home in `after`, but on the hex in `before`.
+    const b = battleOf([before, after], after.lastCombat!);
+    expect(b.winner).toBe('defender');
+    expect(b.attacker).toMatchObject({ character: true, mechs: 1 });
   });
 });

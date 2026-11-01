@@ -3,9 +3,11 @@
   // the right, each shown by their character (or a mech), with the mechs and
   // workers they brought and what they have to fight with. Whoever is
   // choosing gets the power dial and their cards below; the other side only
-  // shows whether it has locked in. Placeholder art (FighterArt) for now.
+  // shows whether it has locked in. Once both have, the battle plays out
+  // (BattleScene) on the same backdrop. Placeholder art (FighterArt) for now.
   import { fade, fly } from 'svelte/transition';
-  import { fightSides, type FightSide } from './fight';
+  import BattleScene from './BattleScene.svelte';
+  import { fightSides, type Battle, type FightSide } from './fight';
   import FighterArt from './FighterArt.svelte';
   import type { Button, Prompt, Selection } from './prompt';
   import type { GameState } from '@scythe/engine';
@@ -18,6 +20,8 @@
     onUndo,
     onSelect,
     onPress,
+    battle,
+    onBattleDone,
   }: {
     game: GameState;
     prompt: Prompt;
@@ -27,6 +31,9 @@
     onUndo: () => void;
     onSelect: (selection: Selection) => void;
     onPress: (button: Button) => void;
+    /** A fight that just ended, to play out before going back to the map. */
+    battle: Battle | null;
+    onBattleDone: () => void;
   } = $props();
 
   const view = $derived(fightSides(game));
@@ -39,8 +46,9 @@
   };
 </script>
 
-{#if view}
-  {@const v = view}
+{#if battle || view}
+  {@const hex = battle?.hex ?? view!.hex}
+  {@const terrain = game.setup.board.hexes[hex]?.terrain ?? ''}
   <div class="fight" transition:fade={{ duration: 300 }}>
     <!-- The backdrop: a dusk sky, far hills and drifting haze. -->
     <div class="sky"></div>
@@ -53,9 +61,14 @@
     <div class="ground"></div>
 
     <header>
-      {#if canUndo}<button class="undo" onclick={onUndo}>↶ Undo</button>{/if}
-      <p class="where">{TERRAIN[v.terrain] ?? v.terrain} · {v.hex}</p>
+      {#if canUndo && !battle}<button class="undo" onclick={onUndo}>↶ Undo</button>{/if}
+      <p class="where">{TERRAIN[terrain] ?? terrain} · {hex}</p>
     </header>
+
+    {#if battle}
+      {#key battle}<BattleScene {battle} onDone={onBattleDone} />{/key}
+    {:else if view}
+    {@const v = view}
 
     {#each [{ s: v.attacker, role: 'Attacking', side: 'left' }, { s: v.defender, role: 'Defending', side: 'right' }] as { s, role, side } (side)}
       {@const active = s.seat === seat}
@@ -116,6 +129,7 @@
         {/each}
       </div>
     </div>
+    {/if}
   </div>
 {/if}
 

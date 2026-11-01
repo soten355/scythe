@@ -9,6 +9,7 @@
   import InlineIcon from './InlineIcon.svelte';
   import FactionEmblem from './FactionEmblem.svelte';
   import FightScreen from './FightScreen.svelte';
+  import { battleOf, type Battle } from './fight';
   import { fade } from 'svelte/transition';
   import { guide } from './camera';
   import { showMoment, type Moment } from './fly';
@@ -62,7 +63,7 @@
   let showingMoment = $state(false);
   let boardArea: HTMLElement | undefined = $state();
   $effect(() => {
-    if (showingMoment || handoff || revealed || !moments.length || !boardArea) return;
+    if (showingMoment || handoff || battle || revealed || !moments.length || !boardArea) return;
     const [m, ...rest] = moments;
     showingMoment = true;
     showMoment(m!, boardArea).finally(() => {
@@ -75,6 +76,8 @@
   let travels = 0;
   /** A fight just finished: both sides' picks, shown once the device is back with whoever plays on. */
   let revealed: CombatResult | null = $state(null);
+  /** The same fight, played out on the fight screen first (before any pass screen or the summary). */
+  let battle: Battle | null = $state(null);
   /** An "are you sure?" question shown in the game, and what to do on Yes. */
   let asking: { message: string; yes: () => void } | null = $state(null);
   const ask = (message: string, yes: () => void) => (asking = { message, yes });
@@ -101,7 +104,10 @@
     const before = game;
     const seat = seatNow;
     if (canSwitch && actions[0]?.type !== 'chooseSection') matOpen = false;
-    const next = actions.reduce(applyAction, game);
+    // Each step along the way: a fight's loser may have gone home by the end, but the battle still shows them.
+    const states = [before];
+    for (const a of actions) states.push(applyAction(states[states.length - 1]!, a));
+    const next = states[states.length - 1]!;
     history = [...history, next];
     travel = travelOf(before, next, actions, ++travels) ?? travel;
     const added: Moment[] = [];
@@ -139,6 +145,7 @@
       // A fight was revealed: it can't be taken back.
       turnStart = history.length - 1;
       revealed = next.lastCombat ?? null;
+      battle = next.lastCombat ? battleOf(states, next.lastCombat) : null;
     }
   }
 
@@ -363,7 +370,7 @@
   </main>
 
   <!-- A fight takes over the screen until it's decided. -->
-  <FightScreen game={shown} {prompt} seat={seatNow} {canUndo} onUndo={undo} onSelect={(sel) => (selection = sel)} onPress={press} />
+  <FightScreen game={shown} {prompt} seat={seatNow} {canUndo} onUndo={undo} onSelect={(sel) => (selection = sel)} onPress={press} {battle} onBattleDone={() => (battle = null)} />
 
   {#if menuOpen}
     <!-- Tapping anywhere outside the menu closes it. -->
@@ -376,7 +383,7 @@
 
   <MatDrawer {game} {choices} {previous} bind:open={matOpen} onChoose={choose} upgrade={prompt.upgrade} onSelect={(sel) => (selection = sel)} />
 
-  {#if handoff !== null}
+  {#if handoff !== null && !battle}
     {@const { from, to } = handoff}
     <button class="handoff" style:--c={color(to)} onclick={() => (handoff = null)} transition:fade={{ duration: 350 }}>
       <!-- The last player's badge slides off to the left as the next one slides in from the right. -->
@@ -406,7 +413,7 @@
     </div>
   {/if}
 
-  {#if revealed && !handoff}
+  {#if revealed && !handoff && !battle}
     {@const r = combatSummary(game, revealed)}
     <div class="ask" role="dialog" aria-modal="true" style:--c={color(revealed.winner)}>
       <div class="box">
