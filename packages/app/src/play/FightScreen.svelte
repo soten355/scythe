@@ -7,6 +7,7 @@
   // (BattleScene) on the same backdrop. Placeholder art (FighterArt) for now.
   import { fade, fly } from 'svelte/transition';
   import BattleScene from './BattleScene.svelte';
+  import FightBackdrop from './FightBackdrop.svelte';
   import { fightSides, type Battle, type FightSide } from './fight';
   import FighterArt from './FighterArt.svelte';
   import type { Button, Prompt, Selection } from './prompt';
@@ -50,15 +51,8 @@
   {@const hex = battle?.hex ?? view!.hex}
   {@const terrain = game.setup.board.hexes[hex]?.terrain ?? ''}
   <div class="fight" transition:fade={{ duration: 300 }}>
-    <!-- The backdrop: a dusk sky, far hills and drifting haze. -->
-    <div class="sky"></div>
-    <div class="sun"></div>
-    <svg class="hills" viewBox="0 0 1000 200" preserveAspectRatio="none" aria-hidden="true">
-      <path d="M0 120 Q120 60 240 110 T480 90 T740 100 T1000 80 V200 H0 Z" fill="#3b2a22" opacity="0.7" />
-      <path d="M0 160 Q160 110 320 150 T640 140 T1000 130 V200 H0 Z" fill="#2a1e18" />
-    </svg>
-    <div class="haze"></div>
-    <div class="ground"></div>
+    <!-- Scenery to match the hex: forest, tundra, mountain, farm or the Factory. -->
+    <FightBackdrop {terrain} />
 
     <header>
       {#if canUndo && !battle}<button class="undo" onclick={onUndo}>↶ Undo</button>{/if}
@@ -141,49 +135,6 @@
     overflow: hidden;
     color: var(--fg);
     font-size: 13px;
-  }
-  .sky {
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(#1c1420 0%, #4a2a2a 38%, #b8562c 62%, #e39a4a 72%, #3a2620 73%);
-  }
-  .sun {
-    position: absolute;
-    left: 50%;
-    top: 48%;
-    width: 22vh;
-    height: 22vh;
-    transform: translate(-50%, -50%);
-    border-radius: 50%;
-    background: radial-gradient(#ffe2a8, #f3a13c 55%, transparent 70%);
-    opacity: 0.85;
-  }
-  .hills {
-    position: absolute;
-    left: 0;
-    right: 0;
-    top: 50%;
-    height: 26%;
-    width: 100%;
-  }
-  .haze {
-    position: absolute;
-    inset: 40% -20% 20%;
-    background: radial-gradient(ellipse at center, rgb(255 210 160 / 0.18), transparent 60%);
-    animation: drift 14s ease-in-out infinite alternate;
-  }
-  @keyframes drift {
-    to {
-      transform: translateX(8%);
-    }
-  }
-  .ground {
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    height: 30%;
-    background: linear-gradient(#2a1e18, #120d0a);
   }
   header {
     position: absolute;
