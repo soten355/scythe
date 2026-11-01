@@ -242,7 +242,8 @@ Each phase ends in something playable on the phone. A phase is done when its che
   - Done for Nordic and Rusviet (the two factions entered so far). Abilities are rules on the faction data (crossing rivers, lakes, Speed, village-Factory link, draining power before a fight, an extra combat card, repeating a section); the other factions get theirs as they're entered, adding new rule kinds only where needed.
   - Note from play-testing: a mech moving more than one hex (Speed) can drop off and pick up any number of workers and resources at each hex along the way, then keep moving.
   - Note from play-testing: drop-offs along the way should use the same pick-up slots in the side panel, with the map updating live as things are dropped off.
-- [ ] Stars, triumph track, game end and final scoring
+- [x] Stars, triumph track, game end and final scoring
+  - Stars are placed on the triumph track as they're earned (shown in the top bar). The sixth ends the game at once; a final scores screen shows each player's coins, stars, territories and resources at their popularity tier, and the winner (with tie-breakers). Objective stars and structure bonus tiles join when those are entered.
 - [ ] Encounters, the Factory, objectives, structure bonus tiles
 - [ ] All 5 base factions and 5 mats; Invaders from Afar factions and mats
 - [ ] Autosave, save slots, export and import

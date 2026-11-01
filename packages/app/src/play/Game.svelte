@@ -2,13 +2,14 @@
   // Pass-and-play game, from the setup chosen on the new game screen.
   // The game is its setup plus every state reached so far, so undo just steps
   // back (within your own turn). Not saved yet: autosave arrives in Phase 2.
-  import { activeSeat, applyAction, legalActions, newGame, type Action, type CombatResult, type GameSetup, type GameState, type Location } from '@scythe/engine';
+  import { activeSeat, applyAction, isGameOver, legalActions, newGame, type Action, type CombatResult, type GameSetup, type GameState, type Location } from '@scythe/engine';
   import Board from './Board.svelte';
   import MatDrawer from './MatDrawer.svelte';
   import PlayerBar from './PlayerBar.svelte';
   import InlineIcon from './InlineIcon.svelte';
   import FactionEmblem from './FactionEmblem.svelte';
   import FightScreen from './FightScreen.svelte';
+  import GameOver from './GameOver.svelte';
   import { battleOf, type Battle } from './fight';
   import { fade } from 'svelte/transition';
   import { guide } from './camera';
@@ -95,6 +96,11 @@
   const shown = $derived(prompt.preview ?? game);
   const canUndo = $derived(history.length - 1 > turnStart);
   const step = $derived(phase(game));
+  /** Someone has placed their sixth star: final scores, once every animation and pop-up is done. */
+  const over = $derived(isGameOver(game));
+  /** The final scores are put aside to look at the board. */
+  let viewingBoard = $state(false);
+  const showScores = $derived(over && !viewingBoard && !battle && !revealed && !handoff && !moments.length && !showingMoment);
   const headings = $derived(seatNow === game.currentPlayer ? sectionHeadings(game) : null);
   const choices = $derived(sectionChoices(history, turnStart));
   const canSwitch = $derived(canSwitchSection(history, turnStart));
@@ -336,7 +342,10 @@
       {/key}
       <div class="panel" bind:this={panel}>
         {#key intro}<div class="intro">
-        {#if !headings}
+        {#if over}
+          <p class="title">Game over: a sixth star has been placed.</p>
+          <button class="primary" onclick={() => (viewingBoard = false)}>Final scores</button>
+        {:else if !headings}
           {@render current()}
         {:else}
           <section class:done={step === 'bottom'}>
@@ -354,7 +363,7 @@
         {/if}
         </div>{/key}
       </div>
-      {#if prompt.end}
+      {#if prompt.end && !over}
         {@const end = prompt.end}
         {#if end.primary}
           <!-- Nothing else to do this turn: End turn is the main button. -->
@@ -371,6 +380,10 @@
 
   <!-- A fight takes over the screen until it's decided. -->
   <FightScreen game={shown} {prompt} seat={seatNow} {canUndo} onUndo={undo} onSelect={(sel) => (selection = sel)} onPress={press} {battle} onBattleDone={() => (battle = null)} />
+
+  {#if showScores}
+    <GameOver {game} {canUndo} onUndo={undo} onBoard={() => (viewingBoard = true)} {onNewGame} {onMenu} />
+  {/if}
 
   {#if menuOpen}
     <!-- Tapping anywhere outside the menu closes it. -->
