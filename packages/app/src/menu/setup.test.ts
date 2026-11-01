@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { baseBoard, baseFactions, baseMats } from '@scythe/content';
 import type { Faction, PlayerMat } from '@scythe/engine';
-import { defaultChoice, maxPlayers, MIN_PLAYERS, problems, setFaction, setMat, setPlayerCount, shuffleSeats, toSetup, type Catalog } from './setup';
+import { defaultChoice, fitChoice, maxPlayers, MIN_PLAYERS, problems, setFaction, setMat, setPlayerCount, shuffleSeats, toSetup, type Catalog } from './setup';
 
 const [nordic, rusviet] = baseFactions as [Faction, Faction];
 const [mat1, mat2] = baseMats as [PlayerMat, PlayerMat];
@@ -70,4 +70,16 @@ describe('the new game choices', () => {
       [rusviet.id, mat2.id],
     ]);
   });
+
+  it('picks that are no longer offered (removed from the library) are swapped for unused ones', () => {
+    const extra = { ...baseFactions[0]!, id: 'extra', name: 'Extra' };
+    const bigger: Catalog = { ...catalog, factions: [...catalog.factions, extra], maps: [...catalog.maps, { id: 'm2', name: 'M2', board: baseBoard }] };
+    const choice = { map: 'm2', players: [{ faction: 'extra', mat: catalog.mats[0]!.id }, { faction: catalog.factions[0]!.id, mat: catalog.mats[1]!.id }] };
+    expect(fitChoice(choice, bigger)).toBe(choice);
+    const fitted = fitChoice(choice, catalog);
+    expect(fitted.map).toBe(catalog.maps[0]!.id);
+    expect(fitted.players.map((p) => p.faction)).toEqual([catalog.factions[1]!.id, catalog.factions[0]!.id]);
+    expect(problems(fitted, catalog)).toEqual([]);
+  });
 });
+

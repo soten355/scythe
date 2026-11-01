@@ -4,7 +4,8 @@ import { baseBoard, baseFactions } from '@scythe/content';
 import { MAX_POWER, RECRUIT_BONUSES, validateFaction, type Faction, type RecruitBonus } from '@scythe/engine';
 import '../shared/forms.css';
 import './faction-editor.css';
-import { ask, esc, setPath, showExport } from '../shared/editor-utils';
+import { addToGame, ask, esc, setPath, showExport, tell } from '../shared/editor-utils';
+import { exportContent } from '../saves/files';
 import { formatFactions, homeBaseClashes, newFaction } from './model';
 
 const STORAGE_KEY = 'scythe-faction-editor';
@@ -93,6 +94,8 @@ function render() {
       <button data-act="duplicate">Duplicate</button>
       <button data-act="delete">Delete</button>
       <span class="spacer"></span>
+      <button data-act="add" title="Pick this faction on the new game screen">Add to game</button>
+      <button data-act="file">Save to a file</button>
       <button data-act="export" class="primary">Export…</button>
     </header>
     <div class="details">
@@ -171,6 +174,14 @@ root.addEventListener('click', async (e) => {
       if (state.factions.length === 0) state.factions.push(newFaction('faction-1', 'nw'));
       state = { factions: state.factions, selected: Math.min(state.selected, state.factions.length - 1) };
       break;
+    case 'add':
+    case 'file': {
+      // This faction only: it can be played (or shared) as it is now.
+      const problems = validateFaction(faction());
+      if (problems.length) return tell(`Fix this first: ${problems.join('; ')}.`);
+      const content = { maps: [], factions: [faction()], mats: [] };
+      return btn!.dataset.act === 'add' ? addToGame(content) : exportContent(content);
+    }
     case 'export':
       showExport(
         'Export factions',

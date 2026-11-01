@@ -2,23 +2,18 @@
   // The whole app: the opening menu, the new game screen, saved games and the
   // game. A game in progress stays alive behind the menu, so it can be
   // continued; every game is also kept on the device after every move.
-  import { baseBoard, baseFactions, baseMats } from '@scythe/content';
   import type { GameSetup } from '@scythe/engine';
   import Game from './play/Game.svelte';
   import Home from './menu/Home.svelte';
   import NewGame from './menu/NewGame.svelte';
   import SavedGames from './menu/SavedGames.svelte';
-  import type { Catalog } from './menu/setup';
+  import { BUILT_IN } from './content/catalog';
   import { createSave, restore, type SavedGame } from './saves/save';
   import { SaveStore } from './saves/store';
   import { exportSave, readSaveFile } from './saves/files';
+  import { addToLibrary, catalogWith, EMPTY_LIBRARY, parseContentFile, removeFromLibrary, type Library, type LibraryKind } from './content/library';
 
-  /** What there is to pick from. Maps made in the map editor can join the list later. */
-  const catalog: Catalog = {
-    maps: [{ id: 'standard', name: 'Standard map', board: baseBoard }],
-    factions: baseFactions,
-    mats: baseMats,
-  };
+  const builtIn = BUILT_IN;
 
   const store = new SaveStore();
 
@@ -29,6 +24,10 @@
   /** Every saved game, newest first (refreshed when a menu opens). */
   let saves: SavedGame[] = $state.raw([]);
   let message = $state('');
+  /** The player's own maps, factions and mats, kept on the device. */
+  let library: Library = $state.raw(EMPTY_LIBRARY);
+  /** What there is to pick from on the new game screen. */
+  const catalog = $derived(catalogWith(builtIn, library));
 
   async function refresh() {
     try {
@@ -38,6 +37,7 @@
     }
   }
   void refresh();
+  store.library().then((l) => (library = l), () => {});
 
   /** The game Continue picks up: the one open, or the last one played that isn't finished. */
   const resumable = $derived(current?.save ?? saves.find((s) => !s.finished) ?? null);
@@ -46,7 +46,30 @@
     screen = to;
     message = '';
     if (to === 'home' || to === 'saves') void refresh();
+    // The editors may have added to the library since.
+    if (to === 'new') store.library().then((l) => (library = l), () => {});
   }
+
+  async function keep(next: Library) {
+    library = next;
+    try {
+      await store.putLibrary(next);
+    } catch {
+      message = "That couldn't be kept on this device; it's here until the app is closed.";
+    }
+  }
+
+  async function importContent(file: File) {
+    try {
+      const { library: next, added } = addToLibrary(library, builtIn, parseContentFile(await file.text()));
+      message = added.length ? `Added ${added.join(', ')}.` : 'Nothing new: everything in that file is already here.';
+      await keep(next);
+    } catch (e) {
+      message = e instanceof Error ? e.message : String(e);
+    }
+  }
+
+  const removeContent = (kind: LibraryKind, id: string) => keep(removeFromLibrary(library, kind, id));
 
   function play(save: SavedGame) {
     if (current?.save.id !== save.id) current = { key: ++opened, save };
@@ -57,8 +80,8 @@
     store.put(save).catch(() => alert("This game couldn't be saved on the device. Save it to a file from the game menu to keep it."));
   }
 
-  function start(setup: GameSetup) {
-    const save = createSave(setup, crypto.randomUUID(), new Date());
+  function start(setup: GameSetup, mapName: string) {
+    const save = createSave(setup, crypto.randomUUID(), new Date(), mapName);
     // Ask the browser not to clear saves when space runs low.
     void navigator.storage?.persist?.();
     persist(save);
@@ -100,7 +123,7 @@
 {#if screen === 'home'}
   <Home canContinue={resumable !== null} savedCount={saves.length} onContinue={() => resumable && play(resumable)} onNewGame={() => go('new')} onSaves={() => go('saves')} />
 {:else if screen === 'new'}
-  <NewGame {catalog} onStart={start} onBack={() => go(current ? 'game' : 'home')} backLabel={current ? 'Back to the game' : 'Menu'} />
+  <NewGame {catalog} {library} {message} onStart={start} onImport={importContent} onRemove={removeContent} onBack={() => go(current ? 'game' : 'home')} backLabel={current ? 'Back to the game' : 'Menu'} />
 {:else if screen === 'saves'}
   <SavedGames {saves} {message} onOpen={open} onExport={exportSave} onDelete={remove} onImport={importFile} onBack={() => go('home')} />
 {/if}

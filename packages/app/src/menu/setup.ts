@@ -44,6 +44,26 @@ export function setPlayerCount(choice: SetupChoice, count: number, catalog: Cata
   return { ...choice, players };
 }
 
+/** The same choice, with any map, faction or mat no longer offered swapped for the first unused one (unchanged if all are still there). */
+export function fitChoice(choice: SetupChoice, catalog: Catalog): SetupChoice {
+  const has = <T extends { id: string }>(items: T[], id: string) => items.some((x) => x.id === id);
+  const map = has(catalog.maps, choice.map) ? choice.map : catalog.maps[0]!.id;
+  let changed = map !== choice.map;
+  const players = choice.players.map((p) => ({ ...p }));
+  for (const p of players) {
+    if (!has(catalog.factions, p.faction)) {
+      p.faction = catalog.factions.find((f) => !players.some((q) => q.faction === f.id))?.id ?? p.faction;
+      changed = true;
+    }
+    if (!has(catalog.mats, p.mat)) {
+      p.mat = catalog.mats.find((m) => !players.some((q) => q.mat === m.id))?.id ?? p.mat;
+      changed = true;
+    }
+  }
+  if (players.length > maxPlayers(catalog)) return setPlayerCount({ map, players }, maxPlayers(catalog), catalog);
+  return changed ? { map, players } : choice;
+}
+
 function pick(choice: SetupChoice, seat: number, field: 'faction' | 'mat', id: string): SetupChoice {
   const players = choice.players.map((p) => ({ ...p }));
   const other = players.findIndex((p, i) => i !== seat && p[field] === id);

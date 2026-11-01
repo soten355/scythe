@@ -3,7 +3,9 @@
 // framework (the UI framework hasn't been chosen yet).
 import { baseBoardLayout } from '@scythe/content';
 import { buildBoard } from '@scythe/engine';
-import { ask } from '../shared/editor-utils';
+import { addToGame, ask, askText, tell } from '../shared/editor-utils';
+import { boardProblems } from '../content/library';
+import { exportContent } from '../saves/files';
 import './editor.css';
 import {
   addCol,
@@ -179,6 +181,8 @@ function renderTools() {
     </div></section>
     <section><h2>Map</h2><div class="group">
       <button data-act="undo">Undo</button>
+      <button data-act="add">Add to game…</button>
+      <button data-act="file">Save to a file…</button>
       <button data-act="export">Export…</button>
       <button data-act="reset">Reset to draft</button>
       <button data-act="clear">Clear all</button>
@@ -319,6 +323,12 @@ toolsEl.addEventListener('click', async (e) => {
     case 'col-right': return commit(addCol(map, 'right'));
     case 'undo': return undo();
     case 'export': return openExport();
+    case 'add':
+    case 'file': {
+      const content = await asContent();
+      if (content) await (btn.dataset.act === 'add' ? addToGame(content) : exportContent(content));
+      return;
+    }
     case 'reset':
       if (await ask('Replace your edits with the original draft map?')) commit(draftMap());
       return;
@@ -381,6 +391,29 @@ window.addEventListener('keydown', (e) => {
 });
 
 // ---- export ------------------------------------------------------------------
+
+const NAME_KEY = 'scythe-map-editor-name';
+
+/** The map as it is now, named, to add to the game or save to a file; null if it can't be played or naming was cancelled. */
+async function asContent() {
+  let board;
+  try {
+    board = buildBoard(toLayout(map));
+  } catch (err) {
+    await tell(`Fix this first: ${(err as Error).message}`);
+    return null;
+  }
+  const problems = boardProblems(board);
+  if (problems.length) {
+    await tell(`Fix this first: ${problems.join('; ')}.`);
+    return null;
+  }
+  const name = await askText('Name this map (a map with the same name is replaced):', localStorage.getItem(NAME_KEY) ?? 'My map');
+  if (!name) return null;
+  localStorage.setItem(NAME_KEY, name);
+  const id = `map-${name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'mine'}`;
+  return { maps: [{ id, name, board }], factions: [], mats: [] };
+}
 
 function openExport() {
   const layout = toLayout(map);

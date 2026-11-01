@@ -26,6 +26,8 @@ export interface SavedGame {
    * built-in content don't change a game already under way.
    */
   setup: GameSetup;
+  /** The map's name on the new game screen, for taking the map from a save. */
+  mapName?: string;
   /** Every move, in order; each inner list is applied as one step. */
   steps: Action[][];
   /** Step where undo stops (see Game.svelte). */
@@ -44,9 +46,10 @@ function summarize(state: GameState): SaveSummary {
   };
 }
 
-export function createSave(setup: GameSetup, id: string, now: Date): SavedGame {
+export function createSave(setup: GameSetup, id: string, now: Date, mapName?: string): SavedGame {
   const state = newGame(setup);
   return {
+    ...(mapName ? { mapName } : {}),
     format: FORMAT,
     formatVersion: FORMAT_VERSION,
     id,

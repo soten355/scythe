@@ -14,7 +14,8 @@ import {
   type BottomActionType,
 } from '@scythe/engine';
 import '../shared/forms.css';
-import { ask, esc, showExport } from '../shared/editor-utils';
+import { addToGame, ask, esc, showExport, tell } from '../shared/editor-utils';
+import { exportContent } from '../saves/files';
 import { defaultTop, formatMats, newMat, setBottomAction, setField, setTopAction } from './model';
 
 const STORAGE_KEY = 'scythe-mat-editor';
@@ -141,6 +142,8 @@ function render() {
       <button data-act="duplicate">Duplicate</button>
       <button data-act="delete">Delete</button>
       <span class="spacer"></span>
+      <button data-act="add" title="Pick this mat on the new game screen">Add to game</button>
+      <button data-act="file">Save to a file</button>
       <button data-act="export" class="primary">Export…</button>
     </header>
     <div class="details">
@@ -210,6 +213,14 @@ root.addEventListener('click', async (e) => {
       if (state.mats.length === 0) state.mats.push(newMat('mat-1'));
       state = { mats: state.mats, selected: Math.min(state.selected, state.mats.length - 1) };
       break;
+    case 'add':
+    case 'file': {
+      // This mat only: it can be played (or shared) as it is now.
+      const problems = validateMat(mat());
+      if (problems.length) return tell(`Fix this first: ${problems.join('; ')}.`);
+      const content = { maps: [], factions: [], mats: [mat()] };
+      return btn!.dataset.act === 'add' ? addToGame(content) : exportContent(content);
+    }
     case 'export':
       showExport(
         'Export mats',

@@ -1,13 +1,14 @@
-// Save files: out to the Files app, AirDrop or Downloads, and back in.
+// Files: saves and content out to the Files app, AirDrop or Downloads, and
+// back in.
+import { contentFileName, contentFileText, type Library } from '../content/library';
 import { fileName, parseSaveFile, saveFileText, type SavedGame } from './save';
 
 /**
- * Hands a save to the share sheet where there is one (iPhone: Save to Files,
+ * Hands a file to the share sheet where there is one (iPhone: Save to Files,
  * AirDrop), otherwise downloads it.
  */
-export async function exportSave(save: SavedGame): Promise<void> {
-  const name = fileName(save);
-  const file = new File([saveFileText(save)], name, { type: 'application/json' });
+async function shareFile(name: string, text: string): Promise<void> {
+  const file = new File([text], name, { type: 'application/json' });
   if (navigator.canShare?.({ files: [file] })) {
     try {
       await navigator.share({ files: [file] });
@@ -22,6 +23,10 @@ export async function exportSave(save: SavedGame): Promise<void> {
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+
+export const exportSave = (save: SavedGame) => shareFile(fileName(save), saveFileText(save));
+
+export const exportContent = (content: Library) => shareFile(contentFileName(content), contentFileText(content));
 
 /** Reads and checks a chosen file. Throws, in plain words, if it's not a good save. */
 export async function readSaveFile(file: File): Promise<SavedGame> {

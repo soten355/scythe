@@ -1,16 +1,56 @@
 <script lang="ts">
   // The new game screen: pick the map, how many players, and each seat's
-  // faction and mat (or shuffle them), then start. Only what's been entered
-  // can be picked; the rest shows as coming later.
+  // faction and mat (or shuffle them), then start. The player's own maps,
+  // factions and mats (made in the editors or brought in from files) are
+  // offered after the built-in ones, and can be added or removed here.
   import { untrack } from 'svelte';
   import FactionEmblem from '../play/FactionEmblem.svelte';
   import type { GameSetup } from '@scythe/engine';
-  import { defaultChoice, MAX_PLAYERS, maxPlayers, MIN_PLAYERS, problems, setFaction, setMat, setPlayerCount, shuffleSeats, toSetup, type Catalog } from './setup';
+  import type { Library, LibraryKind } from '../content/library';
+  import { defaultChoice, fitChoice, MAX_PLAYERS, maxPlayers, MIN_PLAYERS, problems, setFaction, setMat, setPlayerCount, shuffleSeats, toSetup, type Catalog } from './setup';
 
-  let { catalog, onStart, onBack, backLabel }: { catalog: Catalog; onStart: (setup: GameSetup) => void; onBack: () => void; backLabel: string } = $props();
+  let {
+    catalog,
+    library,
+    message,
+    onStart,
+    onImport,
+    onRemove,
+    onBack,
+    backLabel,
+  }: {
+    /** Everything to pick from: built-in, then the library. */
+    catalog: Catalog;
+    /** The player's own (also in the catalog), to mark and remove. */
+    library: Library;
+    /** What happened with the last file brought in. */
+    message: string;
+    onStart: (setup: GameSetup, mapName: string) => void;
+    onImport: (file: File) => void;
+    onRemove: (kind: LibraryKind, id: string) => void;
+    onBack: () => void;
+    backLabel: string;
+  } = $props();
 
   // Always starts from the default map and the first factions and mats.
-  let choice = $state(untrack(() => defaultChoice(catalog)));
+  let picked = $state(untrack(() => defaultChoice(catalog)));
+  /** The picks, kept to what's still offered (something picked may have just been removed). */
+  const choice = $derived(fitChoice(picked, catalog));
+  const mine = (kind: LibraryKind, id: string) => (library[kind] as { id: string }[]).some((x) => x.id === id);
+  /** The item whose Remove was tapped once (tap again to remove). */
+  let removing: string | null = $state(null);
+  let picker: HTMLInputElement | undefined = $state();
+  const yours = $derived([
+    ...library.maps.map((x) => ({ kind: 'maps' as const, id: x.id, name: x.name, what: 'Map' })),
+    ...library.factions.map((x) => ({ kind: 'factions' as const, id: x.id, name: x.name, what: 'Faction' })),
+    ...library.mats.map((x) => ({ kind: 'mats' as const, id: x.id, name: x.name, what: 'Mat' })),
+  ]);
+
+  function chosenFile() {
+    const file = picker?.files?.[0];
+    if (file) onImport(file);
+    if (picker) picker.value = '';
+  }
   const most = $derived(maxPlayers(catalog));
   const issues = $derived(problems(choice, catalog));
   const faction = (id: string) => catalog.factions.find((f) => f.id === id)!;
@@ -20,7 +60,7 @@
   const counts = Array.from({ length: MAX_PLAYERS - MIN_PLAYERS + 1 }, (_, i) => MIN_PLAYERS + i);
 
   // The app may use Math.random; the engine never does.
-  const start = () => onStart(toSetup(choice, catalog, Math.floor(Math.random() * 2 ** 31)));
+  const start = () => onStart(toSetup(choice, catalog, Math.floor(Math.random() * 2 ** 31)), catalog.maps.find((m) => m.id === choice.map)!.name);
 </script>
 
 <div class="screen">
@@ -36,12 +76,11 @@
         <h3>Map</h3>
         <div class="maps">
           {#each catalog.maps as m, i (m.id)}
-            <button class="map" class:chosen={choice.map === m.id} onclick={() => (choice = { ...choice, map: m.id })}>
+            <button class="map" class:chosen={choice.map === m.id} onclick={() => (picked = { ...choice, map: m.id })}>
               <b>{m.name}</b>
-              {#if i === 0}<small>Default</small>{/if}
+              {#if i === 0}<small>Default</small>{:else if mine('maps', m.id)}<small>Yours</small>{/if}
             </button>
           {/each}
-          <button class="map" disabled title="Maps made in the map editor will be added here"><b>+ Add a map</b><small>Coming later</small></button>
         </div>
       </section>
 
@@ -49,7 +88,7 @@
         <h3>Players</h3>
         <div class="counts">
           {#each counts as n (n)}
-            <button class:chosen={choice.players.length === n} disabled={n > most} onclick={() => (choice = setPlayerCount(choice, n, catalog))}>{n}</button>
+            <button class:chosen={choice.players.length === n} disabled={n > most} onclick={() => (picked = setPlayerCount(choice, n, catalog))}>{n}</button>
           {/each}
         </div>
         {#if most < MAX_PLAYERS}
@@ -58,12 +97,39 @@
           </p>
         {/if}
       </section>
+
+      <section>
+        <div class="seats-head">
+          <h3>Your maps, factions and mats</h3>
+          <button class="small" onclick={() => picker?.click()}>Import…</button>
+          <input type="file" accept=".json,application/json" bind:this={picker} onchange={chosenFile} hidden />
+        </div>
+        {#if message}<p class="note">{message}</p>{/if}
+        {#if yours.length}
+          <ul class="yours">
+            {#each yours as item (item.kind + item.id)}
+              <li>
+                <small>{item.what}</small>
+                <span>{item.name}</span>
+                {#if removing === item.kind + item.id}
+                  <button class="small" onclick={() => ((removing = null), onRemove(item.kind, item.id))}>Remove</button>
+                  <button class="quiet small" onclick={() => (removing = null)}>Keep</button>
+                {:else}
+                  <button class="quiet small" aria-label="Remove {item.name}" onclick={() => (removing = item.kind + item.id)}>✕</button>
+                {/if}
+              </li>
+            {/each}
+          </ul>
+        {:else}
+          <p class="hint">Import a content file or any saved game's file to play with its map, factions and mats; or add them from the editors. They stay on this device.</p>
+        {/if}
+      </section>
     </div>
 
     <section class="col seats">
       <div class="seats-head">
         <h3>Seats <small>pass-and-play, clockwise</small></h3>
-        <button class="quiet small" onclick={() => (choice = shuffleSeats(choice, catalog, Math.random))}>🔀 Shuffle</button>
+        <button class="quiet small" onclick={() => (picked = shuffleSeats(choice, catalog, Math.random))}>🔀 Shuffle</button>
       </div>
       {#each choice.players as p, seat (seat)}
         {@const f = faction(p.faction)}
@@ -73,14 +139,14 @@
           <div class="picks">
             <label>
               <span>Faction</span>
-              <select value={p.faction} onchange={(e) => (choice = setFaction(choice, seat, e.currentTarget.value))}>
-                {#each catalog.factions as option (option.id)}<option value={option.id}>{option.name}</option>{/each}
+              <select value={p.faction} onchange={(e) => (picked = setFaction(choice, seat, e.currentTarget.value))}>
+                {#each catalog.factions as option (option.id)}<option value={option.id}>{option.name}{mine('factions', option.id) ? ' (yours)' : ''}</option>{/each}
               </select>
             </label>
             <label>
               <span>Mat</span>
-              <select value={p.mat} onchange={(e) => (choice = setMat(choice, seat, e.currentTarget.value))}>
-                {#each catalog.mats as option (option.id)}<option value={option.id}>{option.turnOrder} · {option.name}</option>{/each}
+              <select value={p.mat} onchange={(e) => (picked = setMat(choice, seat, e.currentTarget.value))}>
+                {#each catalog.mats as option (option.id)}<option value={option.id}>{option.turnOrder} · {option.name}{mine('mats', option.id) ? ' (yours)' : ''}</option>{/each}
               </select>
             </label>
             <small class="about">
@@ -145,6 +211,38 @@
   }
   .col:first-child {
     width: 38%;
+    overflow-y: auto;
+  }
+  .note {
+    margin: 0 0 6px;
+    padding: 5px 8px;
+    border-radius: 6px;
+    background: #3a3129;
+    font-size: 12px;
+  }
+  .yours {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .yours li {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .yours small {
+    opacity: 0.55;
+    width: 46px;
+  }
+  .yours span {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .seats {
     flex: 1;

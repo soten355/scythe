@@ -152,6 +152,15 @@ The game saves itself after every action, and any game can be exported as a smal
 
 **Storage safety on iPhone:** installed home-screen apps keep their storage, but iOS can still clear it in rare cases (for example, deleting the app). Regularly exporting saves, or an optional "back up all saves" button, covers this.
 
+## Your own maps, factions and mats
+
+Found along the way: because every save carries the full map, factions and mats it was played with, players can bring their own into the game, not just the built-in ones.
+
+- **Library:** the player's own maps, factions and mats are kept on the device (IndexedDB, next to the saves) and offered on the new game screen after the built-in ones, marked "yours". They can be removed there; games already saved keep their own copies.
+- **Getting them in:** "Import…" on the new game screen takes a content file (`.scythe-content.json`) or any save file, whose map, factions and mats are added. Each editor (map, faction, mat) has "Add to game", which puts the item straight into the library, and "Save to a file", which makes a content file to share or keep.
+- **Duplicates:** anything exactly like what's already there is skipped. Adding one with the same id as one of yours replaces it (a newer version). A changed built-in one is kept alongside the original as "<name> (custom)".
+- **Checks:** imported items are checked before they're added (faction and mat rules, and that a map's rivers and home bases sit on real hexes), with a plain message naming what's wrong.
+
 ## Presentation
 
 The first version is a clean, readable 2D board drawn in SVG, designed for an iPhone in **landscape only** and scaled up for the Mac. Everything visual reads from game state and never changes rules.
@@ -248,6 +257,7 @@ Each phase ends in something playable on the phone. A phase is done when its che
   - Base game done (Nov 1, 2026): Nordic, Rusviet, Polonia, Crimea, Saxony; Industrial, Engineering, Patriotic, Mechanical, Agricultural. Up to 5 players. Still to come: Invaders from Afar's two factions and two mats.
 - [x] Autosave, save slots, export and import
   - Done (Nov 1, 2026): every game is saved on the device after each move and undo; Saved games lists them (play, save to a file, delete) and opens `.scythe.json` files, checking each by replaying its moves. A file of a game already on the device opens as a copy, never overwriting. On iPhone, saving to a file uses the share sheet (Save to Files, AirDrop). Undo picks up where it was after reopening a game.
+- [x] Your own maps, factions and mats: a library on the device, imported from content or save files, or added from the editors (not in the original plan; added Nov 1, 2026)
 - [ ] Done when: a complete 7-faction game can be played to final scoring and reloaded from a file
 
 **Phase 3: Automa bots**

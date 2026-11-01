@@ -1,4 +1,7 @@
-// Helpers shared by the editors: export popup, yes/no questions, HTML escaping, path updates.
+// Helpers shared by the editors: export popup, questions and messages, adding to the game, HTML escaping, path updates.
+import { BUILT_IN } from '../content/catalog';
+import { addToLibrary, type Library } from '../content/library';
+import { SaveStore } from '../saves/store';
 
 let dialog: HTMLDialogElement | null = null;
 
@@ -69,4 +72,64 @@ export function setPath<T>(obj: T, path: string, value: unknown): T {
   for (const k of keys) target = target[k] as Record<string, unknown>;
   target[last] = value;
   return next;
+}
+
+let notice: HTMLDialogElement | null = null;
+
+/** Shows a message in the page with an OK button. */
+export function tell(message: string): Promise<void> {
+  if (!notice) {
+    notice = document.createElement('dialog');
+    notice.style.width = 'min(380px, 90vw)';
+    notice.innerHTML = `<p style="margin-top:0"></p><div class="row"><button data-act="ok">OK</button></div>`;
+    notice.addEventListener('click', (e) => {
+      if ((e.target as HTMLElement).closest('button')) notice!.close();
+    });
+    document.body.append(notice);
+  }
+  const d = notice;
+  d.querySelector('p')!.textContent = message;
+  d.showModal();
+  return new Promise((resolve) => d.addEventListener('close', () => resolve(), { once: true }));
+}
+
+let textQuestion: HTMLDialogElement | null = null;
+
+/** Asks for a line of text in the page. Resolves null on Cancel. */
+export function askText(message: string, value: string): Promise<string | null> {
+  if (!textQuestion) {
+    textQuestion = document.createElement('dialog');
+    textQuestion.style.width = 'min(380px, 90vw)';
+    textQuestion.innerHTML = `
+      <form method="dialog">
+        <p style="margin-top:0"></p>
+        <input type="text" style="width:100%;box-sizing:border-box;margin-bottom:10px">
+        <div class="row"><button value="cancel" formnovalidate>Cancel</button><button value="ok">OK</button></div>
+      </form>`;
+    document.body.append(textQuestion);
+  }
+  const d = textQuestion;
+  const input = d.querySelector('input')!;
+  d.querySelector('p')!.textContent = message;
+  input.value = value;
+  d.returnValue = '';
+  d.showModal();
+  input.select();
+  return new Promise((resolve) => d.addEventListener('close', () => resolve(d.returnValue === 'ok' && input.value.trim() ? input.value.trim() : null), { once: true }));
+}
+
+/** Adds maps, factions or mats to the player's library, for the new game screen, and says what happened. */
+export async function addToGame(content: Library): Promise<void> {
+  const store = new SaveStore();
+  try {
+    const { library, added } = addToLibrary(await store.library(), BUILT_IN, content);
+    await store.putLibrary(library);
+    await tell(
+      added.length
+        ? `Added ${added.join(', ')}. It can be picked on the new game screen.`
+        : 'Already in the game: this is exactly like one there now.',
+    );
+  } catch {
+    await tell("It couldn't be added: this device's storage isn't available.");
+  }
 }

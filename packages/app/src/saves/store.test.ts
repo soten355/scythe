@@ -4,6 +4,7 @@ import { baseBoard, baseFactions, baseMats } from '@scythe/content';
 import type { GameSetup } from '@scythe/engine';
 import { createSave } from './save';
 import { SaveStore } from './store';
+import { EMPTY_LIBRARY } from '../content/library';
 
 const setup: GameSetup = {
   seed: 1,
@@ -46,5 +47,25 @@ describe('save store', () => {
     const idb = new IDBFactory();
     await new SaveStore(idb).put(createSave(setup, 'a', new Date()));
     expect((await new SaveStore(idb).list()).map((s) => s.id)).toEqual(['a']);
+  });
+
+  it('keeps the library of maps, factions and mats', async () => {
+    expect(await store.library()).toEqual(EMPTY_LIBRARY);
+    const lib = { maps: [], factions: [{ ...baseFactions[0]!, id: 'x', name: 'X' }], mats: [] };
+    await store.putLibrary(lib);
+    expect(await store.library()).toEqual(lib);
+    expect(await store.list()).toEqual([]);
+  });
+
+  it('opens a database made before the library existed, keeping its games', async () => {
+    const idb = new IDBFactory();
+    await new Promise<void>((resolve) => {
+      const r = idb.open('scythe', 1);
+      r.onupgradeneeded = () => r.result.createObjectStore('games', { keyPath: 'id' }).put(createSave(setup, 'old', new Date()));
+      r.onsuccess = () => (r.result.close(), resolve());
+    });
+    const s = new SaveStore(idb);
+    expect((await s.list()).map((g) => g.id)).toEqual(['old']);
+    expect(await s.library()).toEqual(EMPTY_LIBRARY);
   });
 });
