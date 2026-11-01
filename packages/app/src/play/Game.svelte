@@ -1,8 +1,8 @@
 <script lang="ts">
-  // Pass-and-play game, from the setup chosen on the new game screen.
-  // The game is its setup plus every state reached so far, so undo just steps
-  // back (within your own turn). Not saved yet: autosave arrives in Phase 2.
-  import { activeSeat, applyAction, isGameOver, legalActions, newGame, type Action, type CombatResult, type GameSetup, type GameState, type Location } from '@scythe/engine';
+  // Pass-and-play game, new or from a save. The game is its setup plus every
+  // state reached so far, and the moves that led to each, so undo just steps
+  // back (within your own turn). It's saved after every change.
+  import { activeSeat, applyAction, isGameOver, legalActions, type Action, type CombatResult, type GameState, type Location } from '@scythe/engine';
   import Board from './Board.svelte';
   import MatDrawer from './MatDrawer.svelte';
   import PlayerBar from './PlayerBar.svelte';
@@ -19,29 +19,40 @@
   import { canSwitchSection, phase, previousSection, sectionChoices } from './turn';
   import { loadSettings } from './settings';
   import { travelOf, type Travel } from './travel';
+  import { restore, updateSave, type SavedGame } from '../saves/save';
+  import { exportSave } from '../saves/files';
 
   let {
-    setup,
+    save,
+    onSave,
     onNewGame,
     onMenu,
   }: {
-    setup: GameSetup;
+    /** The game to play (a new game is a save with no moves yet). */
+    save: SavedGame;
+    /** Called after every change, to keep the save on the device. */
+    onSave: (save: SavedGame) => void;
     /** Go to the new game screen (after "are you sure?"). */
     onNewGame: () => void;
     /** Back to the opening menu; this game stays to continue. */
     onMenu: () => void;
   } = $props();
 
-  // The setup never changes for a game: a new game is a new Game.
-  const start = () => newGame(setup);
-
-  let history: GameState[] = $state.raw([start()]);
+  // The save given never changes for a game: another game is a new Game.
+  // svelte-ignore state_referenced_locally
+  let record = save;
+  const restored = restore(record);
+  let history: GameState[] = $state.raw(restored.history);
+  /** The moves that led to each state after the first (steps[i] leads to history[i + 1]). */
+  let steps: Action[][] = $state.raw(record.steps);
+  /** Off once a test browser has loaded a position with no moves behind it. */
+  let saving = $state(true);
   // Local dev server only (never in the built app): lets a test browser set up a position, e.g. a fight.
   if (import.meta.env.DEV) {
     Object.assign(globalThis, {
       __scythe: {
         state: () => history[history.length - 1],
-        load: (state: GameState) => ((history = [state]), (turnStart = 0), (selection = {})),
+        load: (state: GameState) => ((saving = false), (history = [state]), (steps = []), (turnStart = 0), (selection = {})),
         applyAction,
       },
     });
@@ -50,10 +61,20 @@
    * Index in history where the current player's turn began, or where play
    * last passed to another seat or a fight was revealed: undo stops there.
    */
-  let turnStart = $state(0);
+  let turnStart = $state(restored.turnStart);
   let selection: Selection = $state({});
-  /** Seat being handed the device (and who just played, and why if mid-turn); the board is hidden until they tap. */
-  let handoff: { from: number; to: number; note?: string } | null = $state(null);
+  /**
+   * Seat being handed the device (and who just played, and why if mid-turn); the board is hidden until they tap.
+   * A game picked up again opens on this too, for whoever's turn it is.
+   */
+  let handoff: { from?: number; to: number; note?: string } | null = $state(record.steps.length ? { to: activeSeat(restored.history[restored.history.length - 1]!) } : null);
+
+  // Autosave: every move, undo and new turn.
+  $effect(() => {
+    if (!saving || (steps === record.steps && turnStart === record.turnStart)) return;
+    record = updateSave(record, steps, turnStart, history[history.length - 1]!, new Date());
+    onSave(record);
+  });
   const settings = loadSettings();
   /**
    * Big moments to show (a recruit placed, a star earned, a mech deployed),
@@ -115,6 +136,7 @@
     for (const a of actions) states.push(applyAction(states[states.length - 1]!, a));
     const next = states[states.length - 1]!;
     history = [...history, next];
+    steps = [...steps, actions];
     travel = travelOf(before, next, actions, ++travels) ?? travel;
     const added: Moment[] = [];
     const { faction, mat } = before.setup.players[before.currentPlayer]!;
@@ -171,7 +193,10 @@
 
   /** Pick a section, replacing the one picked earlier if nothing else has happened yet. */
   function choose(action: Action) {
-    if (canSwitch) history = history.slice(0, -1);
+    if (canSwitch) {
+      history = history.slice(0, -1);
+      steps = steps.slice(0, -1);
+    }
     act(action);
   }
 
@@ -232,6 +257,7 @@
   function undo() {
     if (!canUndo) return;
     history = history.slice(0, -1);
+    steps = steps.slice(0, -1);
     selection = {};
     travel = null;
     if (phase(history[history.length - 1]!) === 'choose') matOpen = true;
@@ -240,7 +266,7 @@
   let menuOpen = $state(false);
 
   function restart() {
-    ask('Start a new game? This one is not saved.', onNewGame);
+    ask('Start a new game? This one stays in Saved games.', onNewGame);
   }
 
   const name = (seat: number) => game.setup.players[seat]!.faction.name;
@@ -390,6 +416,7 @@
     <button class="menu-backdrop" aria-label="Close menu" onclick={() => (menuOpen = false)}></button>
     <nav class="menu-list" transition:fade={{ duration: 120 }}>
       <button onclick={() => ((menuOpen = false), restart())}>New game</button>
+      <button onclick={() => ((menuOpen = false), exportSave(record))} disabled={!saving}>Save to a file</button>
       <button onclick={() => ((menuOpen = false), onMenu())}>Main menu</button>
     </nav>
   {/if}
@@ -402,7 +429,7 @@
       <!-- The last player's badge slides off to the left as the next one slides in from the right. -->
       <span class="badges">
         {#key handoff}
-          <span class="badge leaving" style:--f={color(from)}>{name(from)[0]}</span>
+          {#if from !== undefined}<span class="badge leaving" style:--f={color(from)}>{name(from)[0]}</span>{/if}
           <span class="badge arriving" style:--f={color(to)}>{name(to)[0]}</span>
         {/key}
       </span>

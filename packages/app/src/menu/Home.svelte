@@ -1,9 +1,15 @@
 <script lang="ts">
-  // The opening menu: continue the game in progress, start a new one, or open
-  // one of the editors.
+  // The opening menu: continue the last game, start a new one, pick a saved
+  // game, or open one of the editors.
   import { ENGINE_VERSION } from '@scythe/engine';
 
-  let { canContinue, onContinue, onNewGame }: { canContinue: boolean; onContinue: () => void; onNewGame: () => void } = $props();
+  let {
+    canContinue,
+    savedCount,
+    onContinue,
+    onNewGame,
+    onSaves,
+  }: { canContinue: boolean; savedCount: number; onContinue: () => void; onNewGame: () => void; onSaves: () => void } = $props();
   const base = import.meta.env.BASE_URL;
 </script>
 
@@ -16,6 +22,7 @@
     {:else}
       <button class="primary" onclick={onNewGame}>New game</button>
     {/if}
+    <button onclick={onSaves}>Saved games{savedCount ? ` (${savedCount})` : ''}</button>
   </nav>
   <nav class="tools">
     <span>Workshop</span>

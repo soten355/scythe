@@ -246,7 +246,8 @@ Each phase ends in something playable on the phone. A phase is done when its che
 - [ ] Encounters, the Factory, objectives, structure bonus tiles
 - [ ] All 5 base factions and 5 mats; Invaders from Afar factions and mats
   - Base game done (Nov 1, 2026): Nordic, Rusviet, Polonia, Crimea, Saxony; Industrial, Engineering, Patriotic, Mechanical, Agricultural. Up to 5 players. Still to come: Invaders from Afar's two factions and two mats.
-- [ ] Autosave, save slots, export and import
+- [x] Autosave, save slots, export and import
+  - Done (Nov 1, 2026): every game is saved on the device after each move and undo; Saved games lists them (play, save to a file, delete) and opens `.scythe.json` files, checking each by replaying its moves. A file of a game already on the device opens as a copy, never overwriting. On iPhone, saving to a file uses the share sheet (Save to Files, AirDrop). Undo picks up where it was after reopening a game.
 - [ ] Done when: a complete 7-faction game can be played to final scoring and reloaded from a file
 
 **Phase 3: Automa bots**
