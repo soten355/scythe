@@ -8,7 +8,7 @@
   import { fade, fly } from 'svelte/transition';
   import BattleScene from './BattleScene.svelte';
   import FightBackdrop from './FightBackdrop.svelte';
-  import { fightSides, type Battle, type FightSide } from './fight';
+  import { fightSides, lineup, type Battle, type FightSide } from './fight';
   import FighterArt from './FighterArt.svelte';
   import type { Button, Prompt, Selection } from './prompt';
   import type { GameState } from '@scythe/engine';
@@ -41,10 +41,7 @@
   const TERRAIN: Record<string, string> = { farm: 'Farm', forest: 'Forest', mountain: 'Mountain', tundra: 'Tundra', village: 'Village', lake: 'Lake', factory: 'Factory' };
   const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
   /** The lead figure (the character, or else a mech) and up to two more mechs behind it. */
-  const figures = (s: FightSide) => {
-    const kinds: ('character' | 'mech')[] = [...(s.character ? ['character' as const] : []), ...Array<'mech'>(s.mechs).fill('mech')];
-    return kinds.slice(0, 3);
-  };
+  const figures = (s: FightSide) => lineup(s).slice(0, 3);
 </script>
 
 {#if battle || view}

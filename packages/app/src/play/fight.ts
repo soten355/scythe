@@ -90,3 +90,8 @@ export function battleOf(states: GameState[], result: CombatResult): Battle {
     winner: result.winner === result.attacker.seat ? 'attacker' : 'defender',
   };
 }
+
+/** Everyone a side fights with, the lead first: their character if there, then each mech. */
+export function lineup(side: { character: boolean; mechs: number }): ('character' | 'mech')[] {
+  return [...(side.character ? ['character' as const] : []), ...Array<'mech'>(side.mechs).fill('mech')];
+}

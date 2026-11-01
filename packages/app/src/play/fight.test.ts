@@ -1,7 +1,7 @@
 import { baseBoard, baseFactions, baseMats } from '@scythe/content';
 import { applyAction, newGame, type Action, type GameState } from '@scythe/engine';
 import { describe, expect, it } from 'vitest';
-import { battleOf, fightSides } from './fight';
+import { battleOf, fightSides, lineup } from './fight';
 
 const play = (state: GameState, ...actions: Action[]) => actions.reduce(applyAction, state);
 const start = () =>
@@ -73,5 +73,12 @@ describe('the battle', () => {
     const b = battleOf([before, after], after.lastCombat!);
     expect(b.winner).toBe('defender');
     expect(b.attacker).toMatchObject({ character: true, mechs: 1 });
+  });
+});
+
+describe('who stands in the line-up', () => {
+  it('puts the character first, then every mech', () => {
+    expect(lineup({ character: true, mechs: 2 })).toEqual(['character', 'mech', 'mech']);
+    expect(lineup({ character: false, mechs: 1 })).toEqual(['mech']);
   });
 });

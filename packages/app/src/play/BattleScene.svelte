@@ -5,7 +5,7 @@
   // lies wrecked on the ground. Then a big banner names the winner. Tap to
   // skip ahead; tap again (or Continue) to go back to the map.
   import { onMount } from 'svelte';
-  import type { Battle, BattleSide } from './fight';
+  import { lineup, type Battle } from './fight';
   import FighterArt from './FighterArt.svelte';
 
   let { battle, onDone }: { battle: Battle; onDone: () => void } = $props();
@@ -36,7 +36,6 @@
     { s: battle.attacker, side: 'left' as const, won: battle.winner === 'attacker' },
     { s: battle.defender, side: 'right' as const, won: battle.winner === 'defender' },
   ]);
-  const lead = (s: BattleSide) => (s.character ? 'character' : 'mech');
 
   // Dust puffs around the point of impact: [x, y] offsets in % of the cloud, size, delay (ms).
   const PUFFS: [number, number, number, number][] = [
@@ -50,13 +49,19 @@
 <div class="scene" class:shake={from('impact') && !from('aftermath')} role="button" tabindex="0" aria-label="Skip" onclick={tap}>
   {#each sides as { s, side, won } (side)}
     {@const fallen = !won && from('aftermath')}
-    <div class="slot {side}" class:charging={from('charge') && !from('aftermath')} class:standing={won && from('aftermath')} class:fallen style:--c={s.color}>
-      <div class="figure" class:down={fallen}>
-        <FighterArt kind={lead(s)} color={s.color} facing={side === 'left' ? 'right' : 'left'} broken={fallen} />
-      </div>
-      {#if fallen}
-        <div class="wreck-smoke" aria-hidden="true"><i></i><i></i><i></i></div>
-      {/if}
+    {@const group = lineup(s)}
+    <!-- The whole side charges together: the lead in front, the rest close behind it. -->
+    <div class="slot {side}" class:charging={from('charge') && !from('aftermath')} class:standing={won && from('aftermath')} class:fallen style:--c={s.color} style:--n={group.length - 1}>
+      {#each group as kind, i (i)}
+        <div class="member" class:back={i > 0} style:--i={i} style:z-index={-i}>
+          <div class="figure" class:down={fallen}>
+            <FighterArt {kind} color={s.color} facing={side === 'left' ? 'right' : 'left'} broken={fallen} />
+          </div>
+          {#if fallen}
+            <div class="wreck-smoke" aria-hidden="true"><i></i><i></i><i></i></div>
+          {/if}
+        </div>
+      {/each}
     </div>
 
     <!-- What they played: power and each card flip in, then the total. -->
@@ -126,11 +131,29 @@
       right 0.45s cubic-bezier(0.55, 0, 1, 0.6),
       transform 0.45s cubic-bezier(0.55, 0, 1, 0.6);
   }
+  /* Room at the edge for those standing behind the lead. */
   .slot.left {
     left: env(safe-area-inset-left);
+    transform: translateX(calc(var(--n) * 24%));
   }
   .slot.right {
     right: env(safe-area-inset-right);
+    transform: translateX(calc(var(--n) * -24%));
+  }
+  .member {
+    position: absolute;
+    inset: 0;
+  }
+  /* Each one further back: further from the middle, a little higher and smaller. */
+  .left .member.back {
+    transform: translate(calc(var(--i) * -30%), calc(var(--i) * -5%)) scale(calc(1 - var(--i) * 0.1));
+    transform-origin: bottom center;
+    filter: brightness(0.85);
+  }
+  .right .member.back {
+    transform: translate(calc(var(--i) * 30%), calc(var(--i) * -5%)) scale(calc(1 - var(--i) * 0.1));
+    transform-origin: bottom center;
+    filter: brightness(0.85);
   }
   .slot.left.charging {
     left: 50%;
