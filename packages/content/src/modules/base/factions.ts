@@ -74,8 +74,11 @@ export const baseFactions: Faction[] = [
     power: 2,
     combatCards: 3,
     stars: 6,
-    // Waits for encounters (no rule yet).
-    ability: { name: 'Meander', description: 'At an encounter, take up to two of the choices instead of one' },
+    ability: {
+      name: 'Meander',
+      description: 'At an encounter, take up to two of the choices instead of one',
+      rule: { kind: 'encounterOptions', count: 2 },
+    },
     mechAbilities: [
       { name: 'Speed', description: 'Move one more hex per movement', rule: { kind: 'speed', extra: 1 } },
       {
