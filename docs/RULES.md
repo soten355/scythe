@@ -108,6 +108,28 @@ should check it against the rulebook; tick it once confirmed.
 - [x] Fights can happen on a lake when Seaworthy or Submerge mechs meet
       there. (Owner.)
 
+## Encounters
+
+- [ ] Verify: only the character has encounters; mechs and workers move on
+      and off encounter hexes freely.
+- [ ] Verify: reaching an encounter hex ends the character's move (even
+      with Speed); the encounter comes after the whole move and its fights,
+      and only if the character won (or there was no fight).
+- [ ] Verify: an option can only be taken if its whole cost can be paid;
+      if none can, nothing is taken.
+- [ ] Verify: workers and resources an encounter gives go on the
+      encounter's hex; at most 8 workers in all.
+- [x] A free Deploy or Build from an encounter follows the usual rules (on
+      a hex with one of your workers). (Owner, Nov 1, 2026: to verify in the
+      rulebook.)
+- [ ] Verify: a free bottom-row action from an encounter pays no coins and
+      triggers no recruit bonuses (yours or your neighbors'); a free Enlist
+      still gives its one-time bonus.
+- [ ] Verify: Meander takes up to two different options of the same card,
+      paying for each.
+- [ ] Verify: used cards are set aside; the engine shuffles them back into
+      a new deck if the deck runs out (it never should with the full deck).
+
 ## Game end and scoring
 
 - [ ] Verify: the game ends the moment a player places their sixth star,

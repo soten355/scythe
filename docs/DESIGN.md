@@ -248,11 +248,16 @@ Each phase ends in something playable on the phone. A phase is done when its che
 
 - [x] Combat (power dial, combat cards), retreats, popularity loss
 - [ ] Mechs and all mech abilities; faction abilities
-  - Base game done (Nov 1, 2026): every faction and mech ability of the five base factions works, except Polonia's Meander, which waits for encounters. Abilities are rules on the faction data; Invaders from Afar's factions get theirs as they're entered, adding new rule kinds only where needed.
+  - Base game done (Nov 1, 2026): every faction and mech ability of the five base factions works, including Polonia's Meander (since encounters). Abilities are rules on the faction data; Invaders from Afar's factions get theirs as they're entered, adding new rule kinds only where needed.
   - Done from play-testing: a Speed unit can drop off and pick up workers and resources at each hex along the way, using the side panel's pick-up slots, with the map updating live.
 - [x] Stars, triumph track, game end and final scoring
   - Stars are placed on the triumph track as they're earned (shown in the top bar). The sixth ends the game at once; a final scores screen shows each player's coins, stars, territories and resources at their popularity tier, and the winner (with tie-breakers). Objective stars and structure bonus tiles join when those are entered.
 - [ ] Encounters, the Factory, objectives, structure bonus tiles
+  - Encounters (Nov 1, 2026): tokens on the map, a shuffled deck, the card in a pop-up with its three options (greyed out when you can't pay), rewards of every kind (coins, power, popularity, combat cards, workers and resources on the hex, resources of your choice, free Upgrade/Deploy/Build/Enlist), and Meander. New games use a made-up sample deck of 6 cards for now.
+  - [ ] Encounter card editor, to enter the real deck from the physical cards (with "Add to game" / "Save to a file")
+  - [ ] The Factory
+  - [ ] Objectives
+  - [ ] Structure bonus tiles
 - [ ] All 5 base factions and 5 mats; Invaders from Afar factions and mats
   - Base game done (Nov 1, 2026): Nordic, Rusviet, Polonia, Crimea, Saxony; Industrial, Engineering, Patriotic, Mechanical, Agricultural. Up to 5 players. Still to come: Invaders from Afar's two factions and two mats.
 - [x] Autosave, save slots, export and import
