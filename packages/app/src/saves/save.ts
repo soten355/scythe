@@ -20,6 +20,11 @@ export interface SavedGame {
   /** ISO dates. */
   created: string;
   updated: string;
+  /**
+   * The whole map, factions and mats, not just their ids, so a game made with
+   * custom or edited ones opens on any device, and later changes to the
+   * built-in content don't change a game already under way.
+   */
   setup: GameSetup;
   /** Every move, in order; each inner list is applied as one step. */
   steps: Action[][];

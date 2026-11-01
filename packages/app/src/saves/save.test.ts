@@ -68,6 +68,24 @@ describe('save files', () => {
     expect(parseSaveFile(saveFileText(save))).toEqual(save);
   });
 
+  it('carries its own map, factions and mats, so custom ones load without being on the device', () => {
+    const custom: GameSetup = {
+      ...setup,
+      board: { ...baseBoard, rivers: [] },
+      players: [
+        { faction: { ...baseFactions[0]!, name: 'Home-made', color: '#123456', power: 5 }, mat: { ...baseMats[0]!, name: 'My mat', coins: 9 } },
+        setup.players[1]!,
+      ],
+    };
+    const back = parseSaveFile(saveFileText(createSave(custom, 'c1', at)));
+    expect(back.setup).toEqual(custom);
+    const state = restore(back).history[0]!;
+    expect(state.setup.players[0]!.faction.name).toBe('Home-made');
+    expect(state.players[0]!.power).toBe(5);
+    expect(state.players[0]!.coins).toBe(9);
+    expect(back.summary.factions[0]).toEqual({ name: 'Home-made', color: '#123456' });
+  });
+
   it('names the file after the factions and date', () => {
     expect(fileName(createSave(setup, 'g1', at))).toMatch(/^scythe-.+-2026-11-01\.scythe\.json$/);
   });
