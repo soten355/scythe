@@ -13,6 +13,7 @@ import type { Board, HexId } from './board';
 import { bottomActions, applyBottom } from './bottom-actions';
 import { hasRule } from './abilities';
 import { applyCombat, combatActions, combatSeat, COMBAT_DECK, drawCombatCards, type CombatResult } from './combat';
+import { applyEncounter, encounterActions, setupEncounters, type EncounterCard, type EncounterTask } from './encounters';
 import { awardStars, endTurn, SECTIONS, type StarKind } from './state';
 import type { Faction } from './faction';
 import type { PlayerMat, RecruitBonus, Resource, Structure } from './mat';
@@ -26,6 +27,8 @@ export interface GameSetup {
   board: Board;
   /** 1-7 seats, in seating order (clockwise). The lowest mat turn order goes first. */
   players: { faction: Faction; mat: PlayerMat }[];
+  /** The encounter deck. None (as in games saved before encounters): no encounters, and no tokens on the map. */
+  encounters?: EncounterCard[];
 }
 
 /**
@@ -98,6 +101,12 @@ export type TurnStep =
    * `coerced`: a combat card was paid in place of a resource (once a turn).
    */
   | { step: 'bottom'; section: SectionIndex; paid: number; skippedTop?: true; coerced?: true }
+  /**
+   * The character's encounter, after the move and its fights: `picked` are
+   * the options taken so far (Meander: up to two), `todo` what's still to
+   * choose for them (resources, free bottom-row actions).
+   */
+  | { step: 'encounter'; section: SectionIndex; hex: HexId; card: string; picked: number[]; todo: EncounterTask[] }
   /** The bottom-row action is done; only End turn is left. */
   | { step: 'end'; section: SectionIndex; skippedTop?: true };
 
@@ -138,6 +147,11 @@ export interface GameState {
   /** The combat card deck (drawn from the front) and discard pile. */
   combatDeck: number[];
   combatDiscard: number[];
+  /** Hexes whose encounter token is still there. */
+  encounterTokens: HexId[];
+  /** Encounter card IDs still to draw (from the front), and the ones used. */
+  encounterDeck: string[];
+  encounterDiscard: string[];
   /** The most recent fight, as both sides revealed it. */
   lastCombat?: CombatResult;
 }
@@ -173,6 +187,12 @@ export type Action =
   | { type: 'beforeCombat'; use: boolean }
   /** After losing, where the character and mechs go (when there's a choice). */
   | { type: 'retreat'; to: Location }
+  // Encounter: take an option, choose any resources it gives (one at a time)
+  // and its free bottom-row actions (as upgrade, deploy, build or enlist).
+  | { type: 'encounterOption'; option: number }
+  | { type: 'encounterResource'; resource: Resource }
+  /** Take no (more) options: with Meander after the first, or when none can be paid for. */
+  | { type: 'endEncounter' }
   // Bottom row: pay the cost one resource at a time, then the action itself.
   | { type: 'pay'; hex: HexId }
   /** Coercion: a combat card of this value paid in place of one resource. */
@@ -224,8 +244,12 @@ export function newGame(setup: GameSetup): GameState {
     turnsTaken: 0,
     combatDeck,
     combatDiscard: [],
+    encounterTokens: [],
+    encounterDeck: [],
+    encounterDiscard: [],
   };
-  return setup.players.reduce((s, p, seat) => drawCombatCards(s, seat, p.faction.combatCards), state);
+  // The encounter deck is shuffled after the combat deck, so games without encounters deal the same as before.
+  return setup.players.reduce((s, p, seat) => drawCombatCards(s, seat, p.faction.combatCards), setupEncounters(state));
 }
 
 /** Who must act now: the current player, except while the defender in a fight is choosing. */
@@ -249,6 +273,8 @@ export function legalActions(state: GameState, seat: number): Action[] {
       return topActions(state, turn);
     case 'combat':
       return combatActions(state, turn);
+    case 'encounter':
+      return encounterActions(state, turn);
     case 'bottom':
       return [...bottomActions(state, turn), ...(turn.paid === 0 ? [{ type: 'skipBottom' } as const] : [])];
     case 'end':
@@ -289,6 +315,8 @@ function step(state: GameState, action: Action): GameState {
       return applyTop(state, turn, action);
     case 'combat':
       return applyCombat(state, turn, action);
+    case 'encounter':
+      return applyEncounter(state, turn, action);
     case 'bottom':
       if (action.type === 'skipBottom') return endTurn(state);
       return applyBottom(state, turn, action);

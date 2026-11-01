@@ -18,6 +18,7 @@
 import type { HexId } from './board';
 import { neighbors } from './board';
 import { hasRule, rulesOfKind } from './abilities';
+import { afterFights } from './encounters';
 import type { Action, CombatSide, Fight, GameState, Location, PlayerState, Retreat, SectionIndex, TurnStep } from './game';
 import { nextInt, shuffle } from './rng';
 import { MAX_POPULARITY, onBoard, placeStar, updatePlayer } from './state';
@@ -115,9 +116,9 @@ export function afterMove(state: GameState, section: SectionIndex): GameState {
   return nextFight(next, section, fights);
 }
 
-/** Starts the only fight left on its own; with several, the attacker picks; with none, on to the bottom row. */
+/** Starts the only fight left on its own; with several, the attacker picks; with none, on to any encounter, then the bottom row. */
 function nextFight(state: GameState, section: SectionIndex, left: HexId[]): GameState {
-  if (left.length === 0) return { ...state, turn: { step: 'bottom', section, paid: 0 } };
+  if (left.length === 0) return afterFights(state, section);
   if (left.length > 1) return { ...state, turn: { step: 'combat', section, left, fight: null } };
   return startFight(state, section, left, left[0]!);
 }

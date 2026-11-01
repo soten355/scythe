@@ -99,8 +99,9 @@ export function applyTop(state: GameState, turn: TopStep, action: Action): GameS
       const load = withLakeCargo(state, seat, action.unit, from, loadOf(turn, action.unit));
       const next = moveUnit(state, seat, action.unit, action.to, load);
       const left = walking ? walking.left - 1 : extraHexes(state, seat, action.unit);
-      // Moving onto other players' units ends that unit's move.
-      const keepGoing = left > 0 && !enemyUnitHexes(state, seat).has(action.to);
+      // Moving onto other players' units ends that unit's move, and so does the character reaching an encounter.
+      const encounter = action.unit.kind === 'character' && state.encounterTokens.includes(action.to);
+      const keepGoing = left > 0 && !encounter && !enemyUnitHexes(state, seat).has(action.to);
       if (!keepGoing && moved.length >= value('units')) return endOfMove(next);
       const walk = keepGoing ? { walking: { unit: action.unit, left }, ...(load && { load }) } : {};
       return { ...next, turn: { step: 'moving', section, moved, ...walk } };

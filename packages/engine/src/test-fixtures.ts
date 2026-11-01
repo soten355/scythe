@@ -2,11 +2,12 @@
 // can be tested without depending on the content package.
 //
 //   (top):      home "a" (borders A1, A2)
-//   row A:  A1 farm    A2 forest   A3 mountain  A4 tundra (tunnel)
+//   row A:  A1 farm    A2 forest   A3 mountain* A4 tundra (tunnel)
 //   row B:  B1 village B2 lake     B3 factory   B4 farm
-//   row C:  C1 mountain (tunnel) C2 tundra  C3 village   C4 forest
+//   row C:  C1 mountain (tunnel) C2 tundra  C3 village   C4 forest*
 //   (bottom):   home "b" (borders C2, C3)
-// A river runs between A1 and B1.
+// A river runs between A1 and B1. * marks an encounter token (only used when
+// the setup has encounter cards: see testEncounters).
 import { buildBoard } from './board';
 import type { Faction } from './faction';
 import type { GameSetup } from './game';
@@ -15,9 +16,9 @@ import type { PlayerMat } from './mat';
 export const testBoard = buildBoard({
   rows: [
     '--  @a  --  --',
-    'Fa  Fo  Mo  TuT',
+    'Fa  Fo  Mo* TuT',
     'Vi  ~~  FF  Fa',
-    'MoT Tu  Vi  Fo',
+    'MoT Tu  Vi  Fo*',
     '--  --  @b',
   ],
   rivers: ['A1|B1'],

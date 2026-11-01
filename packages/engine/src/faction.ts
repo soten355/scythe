@@ -50,7 +50,9 @@ export type AbilityRule =
   /** Once a turn, a combat card may be paid in place of any one resource. */
   | { kind: 'cardAsResource' }
   /** You may pick the same player mat section as on your last turn. */
-  | { kind: 'repeatSection' };
+  | { kind: 'repeatSection' }
+  /** At an encounter, take up to this many different options of the card (paying for each). */
+  | { kind: 'encounterOptions'; count: number };
 
 export interface Faction {
   id: string;

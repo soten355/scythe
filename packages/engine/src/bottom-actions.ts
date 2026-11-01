@@ -69,35 +69,33 @@ export function applyBottom(state: GameState, turn: BottomStep, action: Action):
 
   // Rewards come first, so a recruit placed by this Enlist doesn't pay out on the same action.
   const next = rewards(state, turn.section);
-  const player = next.players[seat]!;
+  if (action.type === 'takeBottom') return finish(next, turn);
+  return finish(applyEffect(next, seat, action), turn);
+}
+
+/** What an upgrade, deploy, build or enlist does, on its own (no cost, coins or recruit bonuses): encounters use it for free actions. */
+export function applyEffect(state: GameState, seat: number, action: Action): GameState {
+  const player = state.players[seat]!;
   switch (action.type) {
-    case 'takeBottom':
-      return finish(next, turn);
     case 'upgrade':
-      return finish(
-        updatePlayer(next, seat, {
-          upgrades: { top: [...player.upgrades.top, action.top], bottom: [...player.upgrades.bottom, action.bottom] },
-        }),
-        turn,
-      );
+      return updatePlayer(state, seat, {
+        upgrades: { top: [...player.upgrades.top, action.top], bottom: [...player.upgrades.bottom, action.bottom] },
+      });
     case 'deploy':
-      return finish(
-        updatePlayer(next, seat, { mechs: [...player.mechs, action.hex], mechAbilities: [...player.mechAbilities, action.ability] }),
-        turn,
-      );
+      return updatePlayer(state, seat, { mechs: [...player.mechs, action.hex], mechAbilities: [...player.mechAbilities, action.ability] });
     case 'build':
-      return finish(updatePlayer(next, seat, { structures: { ...player.structures, [action.structure]: action.hex } }), turn);
+      return updatePlayer(state, seat, { structures: { ...player.structures, [action.structure]: action.hex } });
     case 'enlist': {
-      const { faction } = current(next);
+      const faction = state.setup.players[seat]!.faction;
       const amount = faction.recruitBonuses.find((r) => r.bonus === action.bonus)?.amount ?? 0;
-      const enlisted = updatePlayer(next, seat, {
+      const enlisted = updatePlayer(state, seat, {
         recruits: [...player.recruits, action.section],
         recruitBonusesTaken: [...player.recruitBonusesTaken, action.bonus],
       });
-      return finish(giveBonus(enlisted, seat, action.bonus, amount), turn);
+      return giveBonus(enlisted, seat, action.bonus, amount);
     }
     default:
-      throw new Error(`unreachable: ${action.type} during the bottom row`);
+      throw new Error(`unreachable: ${action.type} as a bottom-row action`);
   }
 }
 
@@ -117,8 +115,8 @@ function rewards(state: GameState, section: SectionIndex): GameState {
   return next;
 }
 
-/** Choices for what the bottom-row action does, once it's paid for. */
-function effectOptions(state: GameState, kind: BottomActionType): Action[] {
+/** Choices for what the current player's bottom-row action does, once it's paid for. */
+export function effectOptions(state: GameState, kind: BottomActionType): Action[] {
   const { player, mat, faction } = current(state);
   // Workers on a lake ride on a mech: nothing is deployed or built there.
   const workerHexes = [...new Set(onBoard(player.workers))].filter((h) => state.setup.board.hexes[h]?.terrain !== 'lake');
