@@ -239,9 +239,8 @@ Each phase ends in something playable on the phone. A phase is done when its che
 
 - [x] Combat (power dial, combat cards), retreats, popularity loss
 - [ ] Mechs and all mech abilities; faction abilities
-  - Done for Nordic and Rusviet; Polonia, Crimea and Saxony entered (Nov 1, 2026) with every ability working except Meander, which waits for encounters. Abilities are rules on the faction data (crossing rivers, lakes, Speed, village-Factory link, draining power before a fight, an extra combat card, repeating a section); the other factions get theirs as they're entered, adding new rule kinds only where needed.
-  - Note from play-testing: a mech moving more than one hex (Speed) can drop off and pick up any number of workers and resources at each hex along the way, then keep moving.
-  - Note from play-testing: drop-offs along the way should use the same pick-up slots in the side panel, with the map updating live as things are dropped off.
+  - Base game done (Nov 1, 2026): every faction and mech ability of the five base factions works, except Polonia's Meander, which waits for encounters. Abilities are rules on the faction data; Invaders from Afar's factions get theirs as they're entered, adding new rule kinds only where needed.
+  - Done from play-testing: a Speed unit can drop off and pick up workers and resources at each hex along the way, using the side panel's pick-up slots, with the map updating live.
 - [x] Stars, triumph track, game end and final scoring
   - Stars are placed on the triumph track as they're earned (shown in the top bar). The sixth ends the game at once; a final scores screen shows each player's coins, stars, territories and resources at their popularity tier, and the winner (with tie-breakers). Objective stars and structure bonus tiles join when those are entered.
 - [ ] Encounters, the Factory, objectives, structure bonus tiles
