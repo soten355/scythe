@@ -9,9 +9,9 @@ export const SECTIONS: SectionIndex[] = [0, 1, 2, 3];
 export const MAX_POPULARITY = 18;
 export const MAX_WORKERS = 8;
 
-export type StarKind = 'upgrades' | 'mechs' | 'structures' | 'recruits' | 'workers' | 'popularity' | 'power' | 'combat';
+export type StarKind = 'upgrades' | 'mechs' | 'structures' | 'recruits' | 'workers' | 'popularity' | 'power' | 'combat' | 'objective';
 
-/** What earns each star, in the order they're checked. Combat stars are placed when a fight is won; objective stars arrive with objectives. */
+/** What earns each star, in the order they're checked. Combat stars are placed when a fight is won, objective stars when a card is completed (see objectives.ts). */
 const STAR_GOALS: [StarKind, (p: PlayerState) => boolean][] = [
   ['upgrades', (p) => p.upgrades.top.length >= 6],
   ['mechs', (p) => p.mechs.length >= 4],

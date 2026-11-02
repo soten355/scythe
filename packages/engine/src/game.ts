@@ -15,6 +15,7 @@ import { hasRule } from './abilities';
 import { applyCombat, combatActions, combatSeat, COMBAT_DECK, drawCombatCards, type CombatResult } from './combat';
 import { applyEncounter, encounterActions, setupEncounters, type EncounterCard, type EncounterTask } from './encounters';
 import { applyFactory, factoryActions, setupFactory, type FactoryCard } from './factory';
+import { completeObjective, objectiveActions, setupObjectives, type ObjectiveCard } from './objectives';
 import { awardStars, endTurn, SECTIONS, toBottomRow, type StarKind } from './state';
 import type { Faction } from './faction';
 import type { BottomActionType, PlayerMat, RecruitBonus, Resource, Structure } from './mat';
@@ -36,6 +37,8 @@ export interface GameSetup {
   encounters?: EncounterCard[];
   /** The Factory deck. None (as in games saved before the Factory): no Factory cards. */
   factory?: FactoryCard[];
+  /** The objective deck (none: no objectives). */
+  objectives?: ObjectiveCard[];
 }
 
 /**
@@ -83,6 +86,9 @@ export interface PlayerState {
   recruitBonusesTaken: RecruitBonus[];
   /** The Factory card this player took, if any (one a game). */
   factoryCard?: string;
+  /** Objective cards in hand (hidden from the other players), and the ones completed (revealed). */
+  objectives: string[];
+  objectivesDone?: string[];
   /** Stars placed so far, in the order earned (one of each kind but two for combat, and the faction's star count in all). */
   stars: StarKind[];
 }
@@ -166,6 +172,8 @@ export interface GameState {
   encounterTokens: HexId[];
   /** Factory card IDs still to draw, from the front. */
   factoryDeck: string[];
+  /** Objective card IDs not dealt. */
+  objectiveDeck: string[];
   /** Encounter card IDs still to draw (from the front), and the ones used. */
   encounterDeck: string[];
   encounterDiscard: string[];
@@ -215,6 +223,8 @@ export type Action =
   | { type: 'takeFactoryCard'; card: string }
   | { type: 'factoryPay'; hex: HexId; resource: Resource }
   | { type: 'factoryUse' }
+  // On your own turn, whenever its conditions hold: reveal an objective card and place a star.
+  | { type: 'completeObjective'; card: string }
   // Bottom row: pay the cost one resource at a time, then the action itself.
   | { type: 'pay'; hex: HexId }
   /** Coercion: a combat card of this value paid in place of one resource. */
@@ -251,6 +261,7 @@ export function newGame(setup: GameSetup): GameState {
     upgrades: { top: [], bottom: [] },
     recruits: [],
     recruitBonusesTaken: [],
+    objectives: [],
     stars: [],
   }));
 
@@ -270,9 +281,10 @@ export function newGame(setup: GameSetup): GameState {
     encounterDeck: [],
     encounterDiscard: [],
     factoryDeck: [],
+    objectiveDeck: [],
   };
-  // The encounter deck is shuffled after the combat deck, so games without encounters deal the same as before.
-  return setup.players.reduce((s, p, seat) => drawCombatCards(s, seat, p.faction.combatCards), setupFactory(setupEncounters(state)));
+  // The encounter, Factory and objective decks are shuffled after the combat deck (each only if the game has one), so older games deal the same as before.
+  return setup.players.reduce((s, p, seat) => drawCombatCards(s, seat, p.faction.combatCards), setupObjectives(setupFactory(setupEncounters(state))));
 }
 
 /** Who must act now: the current player, except while the defender in a fight is choosing. */
@@ -282,6 +294,11 @@ export function activeSeat(state: GameState): number {
 
 export function legalActions(state: GameState, seat: number): Action[] {
   if (seat !== activeSeat(state) || isGameOver(state)) return [];
+  // Objectives can be completed at any point of your own turn, alongside whatever else you can do.
+  return [...stepActions(state, seat), ...objectiveActions(state, seat)];
+}
+
+function stepActions(state: GameState, seat: number): Action[] {
   const turn = state.turn;
   switch (turn.step) {
     case 'chooseSection': {
@@ -325,7 +342,7 @@ export function applyAction(state: GameState, action: Action): GameState {
     throw new Error(`action ${JSON.stringify(action)} is not legal now`);
   }
   // Whatever the action, anyone may have earned stars (a defender can gain power, say).
-  const next = step(state, action);
+  const next = action.type === 'completeObjective' ? completeObjective(state, action.card) : step(state, action);
   return next.players.reduce((s, _p, seat) => awardStars(s, seat), next);
 }
 

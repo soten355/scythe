@@ -43,7 +43,7 @@ export type AbilityRule =
   | { kind: 'disarmOnTunnels'; loss: number }
   /** When a fight starts, take one of the other side's combat cards at random. */
   | { kind: 'stealCard' }
-  /** Combat stars aren't limited to two (objective stars too, once objectives arrive). */
+  /** Combat stars aren't limited to two, nor objective stars to one. */
   | { kind: 'unlimitedCombatStars' }
   /** The character and mechs may move from anywhere to your own home base or any home base no faction uses. */
   | { kind: 'toHomeBases' }
