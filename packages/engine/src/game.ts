@@ -346,6 +346,15 @@ export function applyAction(state: GameState, action: Action): GameState {
   if (!legalActions(state, activeSeat(state)).some((a) => canonical(a) === key)) {
     throw new Error(`action ${JSON.stringify(action)} is not legal now`);
   }
+  return applyLegal(state, action);
+}
+
+/**
+ * applyAction without checking the action is legal, for bots searching
+ * ahead (checking costs as much as the move itself). Only for actions just
+ * taken from legalActions(state, activeSeat(state)).
+ */
+export function applyLegal(state: GameState, action: Action): GameState {
   // Whatever the action, anyone may have earned stars (a defender can gain power, say).
   const next = action.type === 'completeObjective' ? completeObjective(state, action.card) : step(state, action);
   return next.players.reduce((s, _p, seat) => awardStars(s, seat), next);

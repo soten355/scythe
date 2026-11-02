@@ -297,7 +297,8 @@ Each phase ends in something playable on the phone. A phase is done when its che
 
 **Phase 3: Bots with faction personalities** (replaces the Automa plan, Nov 2, 2026)
 
-- [ ] Turn planner: list a bot's complete turns from the engine's small steps
+- [x] Turn planner: list a bot's complete turns from the engine's small steps
+  - Done (Nov 2, 2026): `packages/bots/src/planner.ts`. A plan runs to the end of the turn, or stops where something new comes into view (a fight, an encounter card, Factory cards) or the game ends; the bot plans again from there. Simplifications: a unit takes all the resources on its hex or none, and mechs and workers are interchangeable, so the same position reached two ways counts once. Early turns have about 50–200 distinct plans; late turns with 4 mechs and 7 workers, tens of thousands (up to 15 seconds to list), so bots will use a beam: keep the best few unfinished turns of each section at every step, by the position score (item 2). With 10 per section, the slowest late turn plans in about 0.35 s on the Mac (roughly 1 s on the phone). Combat cards drawn during a plan are visible in it: the score must count them, not read them. The engine gained `applyLegal` (applyAction without re-checking legality, for search).
 - [ ] Position score with adjustable weights
 - [ ] A bot that plays whole games by trying each turn and keeping the best (no personality yet), beating random play in simulations
 - [ ] Faction personalities for all 5 base factions

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { activeSeat, applyAction, isGameOver, legalActions, newGame, replay, type Action, type GameState } from './game';
+import { activeSeat, applyAction, applyLegal, isGameOver, legalActions, newGame, replay, type Action, type GameState } from './game';
 import { nextInt, seedRng } from './rng';
 import { MAX_POPULARITY, MAX_WORKERS, unitHexes } from './state';
 import { factionA, factionB, testMatA, testMatB, testSetup as setup } from './test-fixtures';
@@ -87,6 +87,19 @@ describe('turn structure', () => {
     const state = play(newGame(setup), [{ type: 'chooseSection', section: 2 }]);
     const reordered = { to: 'A1', unit: { kind: 'character' }, type: 'moveUnit' } as Action;
     expect(applyAction(state, reordered).players[0]!.character).toBe('A1');
+  });
+
+  it('has a fast path for bots that skips the check and gives the same result', () => {
+    let state = newGame(setup);
+    let rng = seedRng(9);
+    for (let i = 0; i < 300 && !isGameOver(state); i++) {
+      const options = legalActions(state, activeSeat(state));
+      let pick: number;
+      [pick, rng] = nextInt(rng, options.length);
+      const checked = applyAction(state, options[pick]!);
+      expect(applyLegal(state, options[pick]!)).toEqual(checked);
+      state = checked;
+    }
   });
 
   it('never changes the state it was given', () => {
