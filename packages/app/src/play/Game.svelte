@@ -2,7 +2,7 @@
   // Pass-and-play game, new or from a save. The game is its setup plus every
   // state reached so far, and the moves that led to each, so undo just steps
   // back (within your own turn). It's saved after every change.
-  import { activeSeat, applyAction, isGameOver, legalActions, type Action, type CombatResult, type GameState, type Location } from '@scythe/engine';
+  import { activeSeat, applyAction, isGameOver, legalActions, structureBonusTile, type Action, type CombatResult, type GameState, type Location } from '@scythe/engine';
   import Board from './Board.svelte';
   import MatDrawer from './MatDrawer.svelte';
   import PlayerBar from './PlayerBar.svelte';
@@ -21,6 +21,7 @@
   import { canSwitchSection, phase, previousSection, sectionChoices } from './turn';
   import { loadSettings } from './settings';
   import { travelOf, type Travel } from './travel';
+  import { countText, paysText } from './structure-bonus-text';
   import { restore, updateSave, type SavedGame } from '../saves/save';
   import { exportSave } from '../saves/files';
 
@@ -298,6 +299,9 @@
   const color = (seat: number) => game.setup.players[seat]!.faction.color;
   /** Round 1 until everyone has had a turn, and so on. */
   const round = $derived(Math.floor(game.turnsTaken / game.players.length) + 1);
+  /** This game's structure bonus tile, scored at the end; tap it for its payouts. */
+  const tile = $derived(structureBonusTile(game));
+  let tileOpen = $state(false);
 </script>
 
 {#snippet current()}
@@ -384,7 +388,17 @@
   <main>
     <div class="board" bind:this={boardArea}>
       <!-- Where we are in the story, like a date on the map. -->
-      <div class="round"><small>Round</small><b>{round}</b></div>
+      <div class="corner">
+        <div class="round"><small>Round</small><b>{round}</b></div>
+        {#if tile}
+          <!-- The structure bonus tile, for all to see: what it counts; tap for the coins it pays at the end. -->
+          <button class="tile" class:open={tileOpen} onclick={() => (tileOpen = !tileOpen)} aria-expanded={tileOpen}>
+            <small>🏛️ Structure bonus</small>
+            <span>{countText(tile.count)}</span>
+            {#if tileOpen}<span class="pays">{paysText(tile.pays)}<br /><i>at the end of the game</i></span>{/if}
+          </button>
+        {/if}
+      </div>
       <Board game={shown} {prompt} onTap={tap} onPick={(sel) => (selection = sel)} guideTo={guide(game, prompt)} paused={handoff !== null} {travel} moveMs={settings.moveMs} /></div>
     <aside style:--c={color(seatNow)}>
       <!-- Whoever acts now: their crest shows, then fades behind the text as it appears (again each time play passes, once the pass screen is gone). -->
@@ -845,12 +859,43 @@
     flex: 1;
     text-align: center;
   }
-  .round {
+  .corner {
     position: absolute;
     top: 8px;
     right: 10px;
     z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
     pointer-events: none;
+  }
+  .tile {
+    pointer-events: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    max-width: 150px;
+    padding: 4px 8px 5px;
+    border: 1px solid #8a7a5c;
+    border-radius: 4px;
+    background: #d9cba8;
+    color: #2a241e;
+    box-shadow: 0 2px 6px rgb(0 0 0 / 0.4);
+    font: 11px/1.25 Georgia, 'Times New Roman', serif;
+    text-align: left;
+  }
+  .tile small {
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .tile .pays {
+    padding-top: 3px;
+    border-top: 1px solid #8a7a5c;
+  }
+  .round {
     display: flex;
     flex-direction: column;
     align-items: center;

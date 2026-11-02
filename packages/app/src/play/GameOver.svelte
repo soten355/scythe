@@ -1,9 +1,11 @@
 <script lang="ts">
   // The final scores, once someone places their sixth star: who won, and
   // how each player's coins add up (coins in hand, then stars, territories
-  // and resources at their popularity tier's rates). The board can still be
+  // and resources at their popularity tier's rates, and any structure bonus
+  // tile). The board can still be
   // looked at behind it.
-  import { standings, type GameState, type ScoreLine } from '@scythe/engine';
+  import { standings, structureBonusTile, type GameState, type ScoreLine } from '@scythe/engine';
+  import { countText } from './structure-bonus-text';
   import { fade, fly } from 'svelte/transition';
   import FactionEmblem from './FactionEmblem.svelte';
   import { STAR_KIND_ICONS } from './icons';
@@ -32,6 +34,7 @@
   const PLACES = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th'];
   const tier = (popularity: number) => (popularity >= 13 ? 'top' : popularity >= 7 ? 'middle' : 'bottom');
   const sum = (l: ScoreLine, per = '') => `${l.count}${per} × ${l.rate}`;
+  const tile = $derived(structureBonusTile(game));
 </script>
 
 <div class="over" style:--c={faction(rows[0]!.seat).color} transition:fade={{ duration: 300 }}>
@@ -53,6 +56,7 @@
           <th>Stars</th>
           <th>Territories</th>
           <th>Resources</th>
+          {#if tile}<th>Structures</th>{/if}
           <th class="total">Total</th>
         </tr>
       </thead>
@@ -75,13 +79,14 @@
             </td>
             <td><b>{r.territories.coins}</b><small>{sum(r.territories)}</small></td>
             <td><b>{r.resources.coins}</b><small>{r.resources.count} ÷ 2 × {r.resources.rate}</small></td>
+            {#if tile}<td><b>{r.structureBonus.coins}</b><small>{r.structureBonus.count} counted</small></td>{/if}
             <td class="total"><b>{r.total}</b></td>
           </tr>
         {/each}
       </tbody>
     </table>
   </div>
-  <p class="note">The Factory counts as 3 territories. Ties go to more workers, mechs, structures and recruits, then power, then popularity.</p>
+  <p class="note">{#if tile}Structure bonus: {countText(tile.count).toLowerCase()}.{" "}{/if}The Factory counts as 3 territories. Ties go to more workers, mechs, structures and recruits, then power, then popularity.</p>
 
   <div class="buttons">
     {#if canUndo}<button class="quiet" onclick={onUndo}>↶ Undo last move</button>{/if}
