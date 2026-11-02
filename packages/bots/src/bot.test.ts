@@ -1,7 +1,7 @@
 import { baseBoard, baseFactions, baseMats, sampleEncounters, sampleFactoryCards, sampleObjectives, sampleStructureBonuses } from '@scythe/content';
 import { applyAction, legalActions, newGame, playerView, standings, type GameSetup, type GameState } from '@scythe/engine';
 import { describe, expect, it } from 'vitest';
-import { planningBot } from './bot';
+import { LEVELS, planningBot, type Level } from './bot';
 import { playMatch, randomSeat } from './match';
 
 const setup = (seed: number, players: number): GameSetup => ({
@@ -59,5 +59,47 @@ describe('planning bot', () => {
       state = applyAction(state, action);
     }
     expect(state.turnsTaken).toBe(1);
+  });
+
+  describe('difficulty levels', () => {
+    it('think harder at each level', () => {
+      const { easy, medium, hard } = LEVELS;
+      expect(easy.width).toBeLessThan(medium.width);
+      expect(medium.width).toBeLessThan(hard.width);
+      expect(easy.slack).toBeGreaterThan(medium.slack);
+      expect(hard.slack).toBe(0);
+      expect(easy.fightSamples).toBeLessThan(hard.fightSamples);
+      expect(hard.lookahead).toBeGreaterThan(0);
+      expect(medium.lookahead).toBe(0);
+    });
+
+    /** The actions a bot takes over its first whole turn. */
+    async function firstTurn(level: Level, seed: number): Promise<string> {
+      let state = newGame(setup(2, 2));
+      const bot = planningBot({ level, seed });
+      const seat = state.currentPlayer;
+      const taken: unknown[] = [];
+      while (state.currentPlayer === seat) {
+        const action = await bot.chooseAction(playerView(state, seat), legalActions(state, seat));
+        taken.push(action);
+        state = applyAction(state, action);
+      }
+      return JSON.stringify(taken);
+    }
+
+    it('plays a legal turn at every level', async () => {
+      for (const level of ['easy', 'medium', 'hard'] as Level[]) expect(await firstTurn(level, 1)).toContain('chooseSection');
+    });
+
+    it('Hard always takes its best turn; Easy sometimes settles for another good one', async () => {
+      const hard = new Set<string>();
+      const easy = new Set<string>();
+      for (let seed = 1; seed <= 6; seed++) {
+        hard.add(await firstTurn('hard', seed));
+        easy.add(await firstTurn('easy', seed));
+      }
+      expect(hard.size).toBe(1);
+      expect(easy.size).toBeGreaterThan(1);
+    }, 60_000);
   });
 });

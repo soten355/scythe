@@ -10,23 +10,49 @@
 //
 // Unless told otherwise, it plays with its faction's personality
 // (personalities.ts), found from the game the first time it's asked.
-import { activeSeat, applyLegal, seedRng, type Action, type GameState, type RngState, type Seat } from '@scythe/engine';
+//
+// Difficulty (LEVELS) changes only how well it thinks, never its
+// personality: how many turns it keeps while planning, how carefully it
+// picks among them (Easy settles for good enough), how many imagined hands
+// it tries in a fight, and whether it looks ahead to its next turn (Hard).
+import { activeSeat, applyLegal, nextInt, seedRng, type Action, type GameState, type RngState, type Seat } from '@scythe/engine';
 import { chooseFight, expectedFightScore, type FightThinking } from './fight';
-import { planTurns } from './planner';
+import { planTurns, type TurnPlan } from './planner';
 import { BALANCED, personalityFor, weightsOf, type Personality } from './personalities';
 import { positionScore, type Weights } from './score';
 
-export interface BotOptions {
+export type Level = 'easy' | 'medium' | 'hard';
+
+/** How each difficulty thinks (any of it can be overridden in BotOptions). */
+export interface Thinking {
   /** How many unfinished turns of each section the planner keeps at each step: more is stronger but slower. */
-  width?: number;
+  width: number;
+  /** How far below its best turn (in score) a turn can be and still be picked sometimes. 0: always the best. */
+  slack: number;
+  /** How many imagined hands each fight choice is tried against. */
+  fightSamples: number;
+  /** How far from its best fight choice (in score) it may stray, to be hard to read. 0: never. */
+  bluff: number;
+  /** Its few best turns also get its next turn planned, and count what that sets up (0: no looking ahead). */
+  lookahead: number;
+}
+
+export const LEVELS: Record<Level, Thinking> = {
+  easy: { width: 3, slack: 6, fightSamples: 4, bluff: 3, lookahead: 0 },
+  medium: { width: 6, slack: 1.5, fightSamples: 8, bluff: 1.5, lookahead: 0 },
+  hard: { width: 10, slack: 0, fightSamples: 16, bluff: 1.5, lookahead: 4 },
+};
+
+/** How much what a turn sets up for the next one counts, against what it gets now. */
+const NEXT_TURN = 0.6;
+
+export interface BotOptions extends Partial<Thinking> {
+  /** Difficulty (the default: medium). */
+  level?: Level;
   /** 'faction' (the default): its faction's personality; 'balanced': none in particular; or one given. */
   personality?: 'faction' | 'balanced' | Personality;
-  /** Seeds its own randomness (its bluffing and imagined hands), so games can be replayed. */
+  /** Seeds its own randomness (its bluffing, imagined hands and Easy's slips), so games can be replayed. */
   seed?: number;
-  /** How many imagined hands each fight choice is tried against. */
-  fightSamples?: number;
-  /** How far from its best fight choice (in score) it may stray, to be hard to read. 0: never. */
-  bluff?: number;
 }
 
 /** Actions compare equal whatever order their fields were written in. */
@@ -35,7 +61,8 @@ const canonical = (value: unknown): string =>
   JSON.stringify(value, (_k, v: unknown) => (v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => (a < b ? -1 : 1))) : v));
 
 export function planningBot(options: BotOptions = {}): Seat {
-  const width = options.width ?? 8;
+  const level = LEVELS[options.level ?? 'medium'];
+  const { width, slack, fightSamples, bluff, lookahead } = { ...level, ...Object.fromEntries(Object.entries(options).filter(([, v]) => v !== undefined)) } as Thinking;
   const chosen = options.personality ?? 'faction';
   let personality: Personality | null = typeof chosen === 'object' ? chosen : chosen === 'balanced' ? BALANCED : null;
   let weights: Weights = personality ? weightsOf(personality) : weightsOf(BALANCED);
@@ -43,8 +70,6 @@ export function planningBot(options: BotOptions = {}): Seat {
   /** The rest of its choice in the fight under way. */
   let fightQueue: Action[] = [];
   const thinking = (samples: number, spread: number): FightThinking => ({ weights, boldness: personality!.boldness, samples, spread });
-  const fightSamples = options.fightSamples ?? 12;
-  const bluff = options.bluff ?? 1.5;
   /**
    * A plan's score. A plan that starts a fight is judged by how the fight is
    * likely to go: its score plus the fight's likely gain or loss. Plans that
@@ -93,17 +118,32 @@ export function planningBot(options: BotOptions = {}): Seat {
     if (planFor === view.turnsTaken && queue[0] && legal.some((a) => same(a, queue[0]!))) return queue.shift()!;
     const { plans } = planTurns(view, seat, { beam: { width, score: (s) => positionScore(s, seat, weights) } });
     if (plans.length === 0) return legal[0]!;
-    let best = plans[0]!;
-    let bestScore = -Infinity;
     const fights = new Map<string, number>();
-    for (const plan of plans) {
-      const s = planScore(plan.state, seat, plan.stop, fights);
-      if (s > bestScore) [best, bestScore] = [plan, s];
-    }
+    let scored = plans.map((plan) => ({ plan, score: planScore(plan.state, seat, plan.stop, fights) }));
+    if (lookahead > 0) scored = lookAhead(scored, seat);
+    let best: TurnPlan;
+    [best, rng] = pick(scored, slack, rng);
     queue = [...best.actions];
     planFor = view.turnsTaken;
     const first = queue.shift()!;
     return legal.find((a) => same(a, first)) ?? legal[0]!;
+  }
+
+  /**
+   * Its `lookahead` best turns that end its turn: plan its next turn from
+   * each (as if the others changed nothing, with a narrow search), and count
+   * part of what the best of those adds. So it sees, say, that gaining
+   * power now lets it produce next turn.
+   */
+  function lookAhead(scored: { plan: TurnPlan; score: number }[], seat: number): { plan: TurnPlan; score: number }[] {
+    const top = scored.filter((x) => x.plan.stop === 'endTurn').sort((a, b) => b.score - a.score).slice(0, lookahead);
+    return scored.map((x) => {
+      if (!top.includes(x)) return x;
+      const again: GameState = { ...x.plan.state, currentPlayer: seat, turn: { step: 'chooseSection' } };
+      const next = planTurns(again, seat, { beam: { width: 3, score: (s) => positionScore(s, seat, weights) } }).plans;
+      const follow = Math.max(x.score, ...next.map((p) => positionScore(p.state, seat, weights)));
+      return { plan: x.plan, score: x.score + NEXT_TURN * (follow - x.score) };
+    });
   }
 
   /**
@@ -147,4 +187,20 @@ function fightKey(state: GameState): string {
       [hex, ...state.players.map((p) => `${(p.character === hex ? 1 : 0) + p.mechs.filter((m) => m === hex).length}:${p.workers.filter((w) => w === hex).length}:${p.power}:${p.combatCards.length}`)].join('|'),
     )
     .join(';');
+}
+
+/** Picks a plan: the best, or with `slack`, any within that much of it, the closer the likelier. */
+function pick(scored: { plan: TurnPlan; score: number }[], slack: number, rng: RngState): [TurnPlan, RngState] {
+  const top = scored.reduce((a, b) => (b.score > a.score ? b : a));
+  if (slack <= 0) return [top.plan, rng];
+  const near = scored.filter((x) => x.score > top.score - slack);
+  const weights = near.map((x) => 1 - (top.score - x.score) / slack);
+  let roll: number;
+  [roll, rng] = nextInt(rng, 1_000_000);
+  let at = (roll / 1_000_000) * weights.reduce((a, b) => a + b, 0);
+  for (let i = 0; i < near.length; i++) {
+    if (at < weights[i]!) return [near[i]!.plan, rng];
+    at -= weights[i]!;
+  }
+  return [top.plan, rng];
 }

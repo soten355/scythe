@@ -8,3 +8,4 @@ export { DEFAULT_WEIGHTS, playerValue, positionScore, type Valuation, type Weigh
 export { planningBot, type BotOptions } from './bot';
 export { playMatch, randomSeat, type MatchResult } from './match';
 export { BALANCED, PERSONALITIES, personalityFor, weightsOf, type Personality } from './personalities';
+export { LEVELS, type Level, type Thinking } from './bot';
