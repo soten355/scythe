@@ -4,12 +4,14 @@
 //
 // It plans when its turn starts, then plays the plan out one action at a
 // time; where the plan stops (a fight, an encounter card, Factory cards) it
-// plans again from what it then sees. Fights use a stand-in rule for now
-// (fights get their own thinking, with bluffing, in a later step).
+// plans again from what it then sees. Fights are thought through in
+// fight.ts: a plan that starts one is judged by the fight's likely outcome,
+// and in the fight it picks its cards and dial against imagined hands.
 //
 // Unless told otherwise, it plays with its faction's personality
 // (personalities.ts), found from the game the first time it's asked.
-import { activeSeat, applyLegal, type Action, type GameState, type Seat } from '@scythe/engine';
+import { activeSeat, applyLegal, seedRng, type Action, type GameState, type RngState, type Seat } from '@scythe/engine';
+import { chooseFight, expectedFightScore, type FightThinking } from './fight';
 import { planTurns } from './planner';
 import { BALANCED, personalityFor, weightsOf, type Personality } from './personalities';
 import { positionScore, type Weights } from './score';
@@ -19,6 +21,12 @@ export interface BotOptions {
   width?: number;
   /** 'faction' (the default): its faction's personality; 'balanced': none in particular; or one given. */
   personality?: 'faction' | 'balanced' | Personality;
+  /** Seeds its own randomness (its bluffing and imagined hands), so games can be replayed. */
+  seed?: number;
+  /** How many imagined hands each fight choice is tried against. */
+  fightSamples?: number;
+  /** How far from its best fight choice (in score) it may stray, to be hard to read. 0: never. */
+  bluff?: number;
 }
 
 /** Actions compare equal whatever order their fields were written in. */
@@ -31,6 +39,29 @@ export function planningBot(options: BotOptions = {}): Seat {
   const chosen = options.personality ?? 'faction';
   let personality: Personality | null = typeof chosen === 'object' ? chosen : chosen === 'balanced' ? BALANCED : null;
   let weights: Weights = personality ? weightsOf(personality) : weightsOf(BALANCED);
+  let rng: RngState = seedRng(options.seed ?? 1);
+  /** The rest of its choice in the fight under way. */
+  let fightQueue: Action[] = [];
+  const thinking = (samples: number, spread: number): FightThinking => ({ weights, boldness: personality!.boldness, samples, spread });
+  const fightSamples = options.fightSamples ?? 12;
+  const bluff = options.bluff ?? 1.5;
+  /**
+   * A plan's score. A plan that starts a fight is judged by how the fight is
+   * likely to go: its score plus the fight's likely gain or loss. Plans that
+   * start the same fight (same hex, units, power and cards) share that
+   * gain or loss, worked out once (`fights`, fresh for each decision).
+   */
+  const planScore = (state: GameState, seat: number, stop: string, fights: Map<string, number>): number => {
+    const now = positionScore(state, seat, weights);
+    if (stop !== 'combat') return now;
+    const key = fightKey(state);
+    let gain = fights.get(key);
+    if (gain === undefined) {
+      gain = expectedFightScore(state, seat, thinking(Math.max(3, fightSamples >> 2), 0), rng) - now;
+      fights.set(key, gain);
+    }
+    return now + gain;
+  };
   /** The rest of the current plan, and the turn it was made for. */
   let queue: Action[] = [];
   let planFor = -1;
@@ -42,7 +73,10 @@ export function planningBot(options: BotOptions = {}): Seat {
   };
 
   function choose(view: GameState, legal: Action[]): Action {
+    // A fight's leftover choice never carries into the next one.
+    if (view.turn.step !== 'combat' || !view.turn.fight) fightQueue = [];
     if (legal.length === 1) {
+      if (fightQueue[0] && same(fightQueue[0], legal[0]!)) fightQueue.shift();
       if (queue[0] && same(queue[0], legal[0]!)) queue.shift();
       return legal[0]!;
     }
@@ -53,7 +87,7 @@ export function planningBot(options: BotOptions = {}): Seat {
     }
     if (view.turn.step === 'combat') {
       queue = [];
-      return fightAction(view, seat, legal, weights, personality.boldness);
+      return fightAction(view, seat, legal);
     }
     // Carry on with the plan while it still fits; otherwise plan afresh.
     if (planFor === view.turnsTaken && queue[0] && legal.some((a) => same(a, queue[0]!))) return queue.shift()!;
@@ -61,8 +95,9 @@ export function planningBot(options: BotOptions = {}): Seat {
     if (plans.length === 0) return legal[0]!;
     let best = plans[0]!;
     let bestScore = -Infinity;
+    const fights = new Map<string, number>();
     for (const plan of plans) {
-      const s = positionScore(plan.state, seat, weights);
+      const s = planScore(plan.state, seat, plan.stop, fights);
       if (s > bestScore) [best, bestScore] = [plan, s];
     }
     queue = [...best.actions];
@@ -70,29 +105,46 @@ export function planningBot(options: BotOptions = {}): Seat {
     const first = queue.shift()!;
     return legal.find((a) => same(a, first)) ?? legal[0]!;
   }
-}
 
-/**
- * A stand-in for fighting, until fights get their own thinking: retreat
- * wherever scores best, use abilities before the dials, add the best card
- * the fight allows, then dial a share of its power: a quarter for the most
- * careful, three quarters for the boldest.
- */
-function fightAction(view: GameState, seat: number, legal: Action[], weights: Weights, boldness: number): Action {
-  const turn = view.turn;
-  if (turn.step !== 'combat') return legal[0]!;
-  if (legal[0]!.type === 'retreat' || legal[0]!.type === 'fight') {
-    return legal.reduce((a, b) => (scoreAfter(view, seat, b, weights) > scoreAfter(view, seat, a, weights) ? b : a));
+  /**
+   * In a fight: which fight first and where to retreat by the score after;
+   * abilities before the dials if they help; then its cards and dial (chosen
+   * once, then played out one action at a time).
+   */
+  function fightAction(view: GameState, seat: number, legal: Action[]): Action {
+    if (fightQueue[0] && legal.some((a) => same(a, fightQueue[0]!))) return fightQueue.shift()!;
+    fightQueue = [];
+    const kind = legal[0]!.type;
+    if (kind === 'retreat') return best(legal, (a) => positionScore(applyLegal(view, a), seat, weights));
+    if (kind === 'fight' || kind === 'beforeCombat') return best(legal, (a) => expectedFightScore(applyLegal(view, a), seat, thinking(Math.max(3, fightSamples >> 2), 0), rng));
+    let actions: Action[];
+    [actions, rng] = chooseFight(view, seat, thinking(fightSamples, bluff), rng);
+    const first = actions[0] && legal.find((a) => same(a, actions[0]!));
+    if (!first) return legal[0]!;
+    fightQueue = actions.slice(1);
+    return first;
   }
-  const use = legal.find((a) => a.type === 'beforeCombat' && a.use);
-  if (use) return use;
-  const side = turn.fight && (turn.fight.attacker.seat === seat ? turn.fight.attacker : turn.fight.defender);
-  const card = legal.find((a) => a.type === 'combatCard');
-  if (card && side && side.cards.length === 0) return card;
-  const dials = legal.filter((a): a is Extract<Action, { type: 'combatPower' }> => a.type === 'combatPower');
-  const want = Math.ceil(view.players[seat]!.power * (0.25 + 0.5 * boldness));
-  return dials.reduce((a, b) => (Math.abs(b.power - want) < Math.abs(a.power - want) ? b : a), dials[0]!) ?? legal[0]!;
 }
 
-/** The score after one action, for choices that need no planning (which fight first, where to retreat). */
-const scoreAfter = (view: GameState, seat: number, action: Action, weights: Weights): number => positionScore(applyLegal(view, action), seat, weights);
+/** The action that scores best. */
+const best = (actions: Action[], score: (a: Action) => number): Action => {
+  let top = actions[0]!;
+  let topScore = -Infinity;
+  for (const a of actions) {
+    const s = score(a);
+    if (s > topScore) [top, topScore] = [a, s];
+  }
+  return top;
+};
+
+/** What decides a fight about to start: where, and each side's fighting units, power and number of cards. */
+function fightKey(state: GameState): string {
+  const turn = state.turn;
+  if (turn.step !== 'combat') return '';
+  const hexes = turn.fight ? [turn.fight.hex, ...turn.left] : turn.left;
+  return hexes
+    .map((hex) =>
+      [hex, ...state.players.map((p) => `${(p.character === hex ? 1 : 0) + p.mechs.filter((m) => m === hex).length}:${p.workers.filter((w) => w === hex).length}:${p.power}:${p.combatCards.length}`)].join('|'),
+    )
+    .join(';');
+}
