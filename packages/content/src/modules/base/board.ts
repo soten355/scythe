@@ -12,7 +12,7 @@ export const baseBoardLayout: BoardLayout = {
   rows: [
     /*   */ '--  @nw --  --  @ne',
     /* A */ '--  Mo  Fa  Vi* Fo  Tu  Vi',
-    /* B */ '~~  Tu* ~~  TuT Mo* Fa  Mo*',
+    /* B */ '~~  Tu* ~~  TuT Mo* Fa  Fa*',
     /* C */ '@w  Fo  MoT Fo  ~~  FoT Vi  @e',
     /* D */ 'Fa  Vi* ~~  FF  Mo  Tu* Fa',
     /* E */ 'Fo* Fo  FaT Tu  ~~  ViT ~~',
