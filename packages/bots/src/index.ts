@@ -7,3 +7,4 @@ export { planTurns, stateKey, type PlanOptions, type PlanResult, type PlanStop, 
 export { DEFAULT_WEIGHTS, playerValue, positionScore, type Valuation, type Weights } from './score';
 export { planningBot, type BotOptions } from './bot';
 export { playMatch, randomSeat, type MatchResult } from './match';
+export { BALANCED, PERSONALITIES, personalityFor, weightsOf, type Personality } from './personalities';

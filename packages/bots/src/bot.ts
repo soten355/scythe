@@ -6,14 +6,19 @@
 // time; where the plan stops (a fight, an encounter card, Factory cards) it
 // plans again from what it then sees. Fights use a stand-in rule for now
 // (fights get their own thinking, with bluffing, in a later step).
+//
+// Unless told otherwise, it plays with its faction's personality
+// (personalities.ts), found from the game the first time it's asked.
 import { activeSeat, applyLegal, type Action, type GameState, type Seat } from '@scythe/engine';
 import { planTurns } from './planner';
-import { DEFAULT_WEIGHTS, positionScore, type Weights } from './score';
+import { BALANCED, personalityFor, weightsOf, type Personality } from './personalities';
+import { positionScore, type Weights } from './score';
 
 export interface BotOptions {
   /** How many unfinished turns of each section the planner keeps at each step: more is stronger but slower. */
   width?: number;
-  weights?: Weights;
+  /** 'faction' (the default): its faction's personality; 'balanced': none in particular; or one given. */
+  personality?: 'faction' | 'balanced' | Personality;
 }
 
 /** Actions compare equal whatever order their fields were written in. */
@@ -23,7 +28,9 @@ const canonical = (value: unknown): string =>
 
 export function planningBot(options: BotOptions = {}): Seat {
   const width = options.width ?? 8;
-  const weights = options.weights ?? DEFAULT_WEIGHTS;
+  const chosen = options.personality ?? 'faction';
+  let personality: Personality | null = typeof chosen === 'object' ? chosen : chosen === 'balanced' ? BALANCED : null;
+  let weights: Weights = personality ? weightsOf(personality) : weightsOf(BALANCED);
   /** The rest of the current plan, and the turn it was made for. */
   let queue: Action[] = [];
   let planFor = -1;
@@ -40,9 +47,13 @@ export function planningBot(options: BotOptions = {}): Seat {
       return legal[0]!;
     }
     const seat = activeSeat(view);
+    if (!personality) {
+      personality = personalityFor(view.setup.players[seat]!.faction.id);
+      weights = weightsOf(personality);
+    }
     if (view.turn.step === 'combat') {
       queue = [];
-      return fightAction(view, seat, legal, weights);
+      return fightAction(view, seat, legal, weights, personality.boldness);
     }
     // Carry on with the plan while it still fits; otherwise plan afresh.
     if (planFor === view.turnsTaken && queue[0] && legal.some((a) => same(a, queue[0]!))) return queue.shift()!;
@@ -64,9 +75,10 @@ export function planningBot(options: BotOptions = {}): Seat {
 /**
  * A stand-in for fighting, until fights get their own thinking: retreat
  * wherever scores best, use abilities before the dials, add the best card
- * the fight allows, then dial half its power (rounded up).
+ * the fight allows, then dial a share of its power: a quarter for the most
+ * careful, three quarters for the boldest.
  */
-function fightAction(view: GameState, seat: number, legal: Action[], weights: Weights): Action {
+function fightAction(view: GameState, seat: number, legal: Action[], weights: Weights, boldness: number): Action {
   const turn = view.turn;
   if (turn.step !== 'combat') return legal[0]!;
   if (legal[0]!.type === 'retreat' || legal[0]!.type === 'fight') {
@@ -78,7 +90,7 @@ function fightAction(view: GameState, seat: number, legal: Action[], weights: We
   const card = legal.find((a) => a.type === 'combatCard');
   if (card && side && side.cards.length === 0) return card;
   const dials = legal.filter((a): a is Extract<Action, { type: 'combatPower' }> => a.type === 'combatPower');
-  const want = Math.ceil(view.players[seat]!.power / 2);
+  const want = Math.ceil(view.players[seat]!.power * (0.25 + 0.5 * boldness));
   return dials.reduce((a, b) => (Math.abs(b.power - want) < Math.abs(a.power - want) ? b : a), dials[0]!) ?? legal[0]!;
 }
 

@@ -5,7 +5,7 @@
 // stars, territories and resources at their popularity's rates, plus the
 // structure bonus), plus what should pay off before the end: upgrades, mechs,
 // structures, recruits, workers, power, combat cards and the character's
-// distance to encounters and the Factory, which count for less as the game
+// pull toward encounters and the Factory, which count for less as the game
 // nears its end (judged from the pace of the player nearest their last star); and what leads to stars
 // (closeness to each, resources to spend, workers ready to produce them, a
 // ready objective), which doesn't, since near the end the next star may
@@ -80,8 +80,12 @@ export interface Weights {
   closestStar: number;
   /** One of your own objectives whose conditions hold now. */
   objectiveReady: number;
-  /** Per hex the character stands from the nearest encounter, or from the Factory before taking a card (subtracted). */
-  distance: number;
+  /** Pull toward the nearest encounter: this times how many hexes closer than 10 the character is. */
+  encounterPull: number;
+  /** Pull toward the Factory, before taking a Factory card: this times how many hexes closer than 10 the character is. */
+  factoryPull: number;
+  /** Extra per territory controlled, on top of its end-of-game coins (for personalities that like to spread out). */
+  territory: number;
   /** How much the best other player's value counts against yours (0: ignore the others; 1: only the lead matters). */
   rivalry: number;
   /** A finished game: this for winning (and minus this for not), plus the winning margin, so a bot ends the game when it's ahead and never when it's behind. */
@@ -105,7 +109,9 @@ export const DEFAULT_WEIGHTS: Weights = {
   nearStar: 3,
   closestStar: 8,
   objectiveReady: 3,
-  distance: 0.4,
+  encounterPull: 0.4,
+  factoryPull: 0.4,
+  territory: 0,
   rivalry: 0.5,
   win: 1000,
 };
@@ -153,6 +159,7 @@ export function playerValue(state: GameState, seat: number, viewer: number, weig
     structureBonus: tile ? structureBonusCoins(tile, structureBonusCount(state, seat, tile)) : 0,
     popularity: player.popularity * weights.popularity,
   };
+  if (weights.territory) parts.territoryBias = territories(state, seat) * weights.territory;
 
   if (left > 0) {
     // What pays off over the rest of the game, worth less as the end nears.
@@ -165,7 +172,7 @@ export function playerValue(state: GameState, seat: number, viewer: number, weig
       recruits: player.recruits.length * weights.recruit,
       workers: player.workers.length * weights.worker,
       factoryCard: player.factoryCard ? weights.factoryCard : 0,
-      distance: -characterDistance(state, seat) * weights.distance,
+      pull: characterPull(state, seat, weights),
     };
     for (const [k, v] of Object.entries(future)) parts[k] = v * left;
     // What leads to stars: worth as much at the end, when the next star may win the game.
@@ -307,17 +314,17 @@ function readyObjectives(state: GameState, seat: number): number {
   return player.objectives.filter((id) => objectiveMet(state, seat, objectiveCard(state, id))).length > 0 ? 1 : 0;
 }
 
-/** Hexes from the character to the nearest encounter token, or to the Factory while it has no Factory card (whichever is nearer). */
-function characterDistance(state: GameState, seat: number): number {
+/** How far the character is drawn toward an encounter or the Factory: the stronger of the two pulls (see Weights). */
+function characterPull(state: GameState, seat: number, weights: Weights): number {
   const player = state.players[seat]!;
   const board = state.setup.board;
-  const targets: HexId[] = [...state.encounterTokens];
-  if (!player.factoryCard) targets.push(...Object.values(board.hexes).filter((h) => h.terrain === 'factory').map((h) => h.id));
-  if (targets.length === 0) return 0;
-  const from: HexId[] = player.character in board.hexes ? [player.character] : [...(board.homeBases[state.setup.players[seat]!.faction.homeBase] ?? [])];
-  const start = player.character in board.hexes ? 0 : 1;
+  const onBoard = player.character in board.hexes;
+  const from: HexId[] = onBoard ? [player.character] : [...(board.homeBases[state.setup.players[seat]!.faction.homeBase] ?? [])];
   const dist = distances(board);
-  return start + Math.min(...from.flatMap((a) => targets.map((b) => dist(a, b))));
+  const nearest = (targets: HexId[]) => (targets.length ? (onBoard ? 0 : 1) + Math.min(...from.flatMap((a) => targets.map((b) => dist(a, b)))) : Infinity);
+  const pull = (targets: HexId[], weight: number) => weight * Math.max(0, 10 - nearest(targets));
+  const factories = player.factoryCard ? [] : Object.values(board.hexes).filter((h) => h.terrain === 'factory').map((h) => h.id);
+  return Math.max(pull(state.encounterTokens, weights.encounterPull), pull(factories, weights.factoryPull));
 }
 
 const distanceCache = new WeakMap<Board, (a: HexId, b: HexId) => number>();
