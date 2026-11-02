@@ -21,6 +21,10 @@ import {
   bottomCost,
   encounterCard,
   encounterOptionLimit,
+  factoryCard,
+  FACTORY,
+  heldFactoryCard,
+  unitsToMove,
   maxCombatCards,
   MAX_DIAL,
   RESOURCES,
@@ -34,6 +38,7 @@ import {
   type CombatResult,
   type EncounterCost,
   type EncounterGain,
+  type FactoryCard,
   type GameState,
   type HexId,
   type Location,
@@ -144,6 +149,8 @@ export interface Prompt {
     /** Take nothing (more): after a first option with Meander, or when none can be paid for. */
     stop?: Button;
   };
+  /** Factory cards to choose one from, shown in a pop-up: each card's top part and move, and the action keeping it. */
+  factoryOffer?: { cards: { name: string; top: string; move: string; action: Action }[] };
   /** A choice to make in a pop-up (a structure to build; a recruit's spot, then its one-time bonus); cancel goes back, when there's somewhere to go back to. */
   choice?: { message: string; options: { label: string; icon: Icon; select: Selection }[]; cancel?: Selection };
   /**
@@ -233,14 +240,24 @@ export function label(state: GameState, action: Action): string {
   const { faction, mat } = state.setup.players[state.currentPlayer]!;
   const player = state.players[state.currentPlayer]!;
   const turn = state.turn;
-  const section = turn.step === 'chooseSection' ? 0 : turn.section;
+  // Values from the mat only come up for a mat section (never the Factory card).
+  const section = (turn.step === 'chooseSection' ? 0 : turn.section) as SectionIndex;
+  const onFactory = turn.step !== 'chooseSection' && turn.section === FACTORY;
   switch (action.type) {
     case 'chooseSection': {
+      if (action.section === FACTORY) return 'Factory card';
       const s = mat.sections[action.section as 0]!;
       return `${TOP_NAMES[s.top.action]} / ${BOTTOM_NAMES[s.bottom.action]}`;
     }
     case 'skipTop':
-      return 'Skip the top action';
+      if (turn.step === 'factoryTop') return 'Skip to the move';
+      return onFactory ? 'Skip the move' : 'Skip the top action';
+    case 'takeFactoryCard':
+      return `Keep ${factoryCard(state, action.card).name}`;
+    case 'factoryPay':
+      return `Pay 1 ${action.resource} from ${action.hex}`;
+    case 'factoryUse':
+      return 'Pay and use it';
     case 'skipBottom':
       return 'End turn';
     case 'gainCoins':
@@ -268,6 +285,7 @@ export function label(state: GameState, action: Action): string {
     case 'pay':
       return `Pay 1 ${bottomCost(player, mat, section).resource} from ${action.hex}`;
     case 'payWithCard':
+      if (onFactory) return `Pay a ${action.value} combat card instead of a resource`;
       return `Pay a ${action.value} combat card instead of 1 ${bottomCost(player, mat, section).resource}`;
     case 'upgrade': {
       const top = mat.sections[action.top.section]!.top.action;
@@ -318,6 +336,16 @@ export type RowStatus = 'waiting' | 'now' | 'done' | 'skipped';
 export function sectionHeadings(state: GameState): { top: string; bottom: string; status: { top: RowStatus; bottom: RowStatus } } | null {
   const turn = state.turn;
   if (turn.step === 'chooseSection') return null;
+  if (turn.section === FACTORY) {
+    // The card's top part, then its move (in place of a bottom row).
+    const card = heldFactoryCard(state, state.currentPlayer)!;
+    const onTop = turn.step === 'factoryTop' || turn.step === 'factoryRewards';
+    return {
+      top: `Factory card · ${costText(card.cost)} → ${gainText(card.gain, '')}`,
+      bottom: `Then ${moveText(card)}`,
+      status: { top: onTop ? 'now' : 'done', bottom: turn.step === 'end' ? 'done' : onTop ? 'waiting' : 'now' },
+    };
+  }
   const { mat } = state.setup.players[state.currentPlayer]!;
   const { top, bottom } = mat.sections[turn.section]!;
   const cost = bottomCost(state.players[state.currentPlayer]!, mat, turn.section);
@@ -330,6 +358,12 @@ export function sectionHeadings(state: GameState): { top: string; bottom: string
       bottom: turn.step === 'end' ? 'done' : onBottom ? 'now' : 'waiting',
     },
   };
+}
+
+/** A Factory card's move in words: "move 1 unit up to 2 hexes". */
+export function moveText(card: FactoryCard): string {
+  const { units, hexes } = card.move;
+  return `move ${plural(units, 'unit')}${hexes > 1 ? ` up to ${hexes} hexes${units > 1 ? ' each' : ''}` : ' 1 hex'}`;
 }
 
 /** How to pick what a bottom-row action does. */
@@ -347,21 +381,40 @@ export function title(state: GameState): string {
   const turn = state.turn;
   const who = faction.name;
   if (turn.step === 'chooseSection') return `${who}: select an action from your mat`;
-  const { top, bottom } = mat.sections[turn.section]!;
-  const short = shortfall(state, state.currentPlayer, turn.section);
+  if (turn.step === 'factoryCard') return `${who} · The Factory: choose a Factory card to keep`;
+  if (turn.section === FACTORY) {
+    const card = heldFactoryCard(state, state.currentPlayer)!;
+    switch (turn.step) {
+      case 'factoryTop': {
+        const pays = legalActions(state, state.currentPlayer);
+        if (pays.every((a) => a.type === 'skipTop')) return `${who} · Factory card: can't pay ${costText(card.cost).toLowerCase()}; skip to the move`;
+        if (pays.some((a) => a.type === 'factoryUse')) return `${who} · Factory card: paid; use it for ${gainText(card.gain, '')}`;
+        return `${who} · Factory card: tap glowing hexes you control to pay ${costText(card.cost).replace(/^Pay /, '')}`;
+      }
+      case 'factoryRewards':
+        return `${who} · Factory card: free ${BOTTOM_NAMES[turn.todo[0]!]}: ${EFFECT_HOW[turn.todo[0]!]}`;
+      case 'top':
+        return `${who} · Factory move: tap a unit (${moveText(card)})`;
+      case 'end':
+        return `${who} · Factory move done: end your turn`;
+    }
+  }
+  const sec = turn.section === FACTORY ? undefined : mat.sections[turn.section];
+  const { top, bottom } = sec ?? mat.sections[0];
+  const short = turn.section === FACTORY ? { top: [], bottom: [] } : shortfall(state, state.currentPlayer, turn.section);
   switch (turn.step) {
     case 'top':
       if (short.top.length) return `${who} · ${TOP_NAMES[top.action]}: can't ${top.action}, need ${needText(short.top)}`;
       switch (top.action) {
         case 'move':
-          return `${who} · Move: tap a unit to move it (up to ${topValue(player, mat, turn.section, 'units')})`;
+          return `${who} · Move: tap a unit to move it (up to ${unitsToMove(state, turn.section)})`;
         case 'trade':
           return `${who} · Trade: pay ${top.cost} coin for resources (tap a worker's hex) or popularity`;
         case 'produce': {
           const cost = produceCost(player);
           const costs = (['power', 'popularity', 'coins'] as const).filter((k) => cost[k]).map((k) => `1 ${k}`);
           const pay = costs.length ? `, paying ${costs.join(' + ')}` : '';
-          return `${who} · Produce: tap up to ${topValue(player, mat, turn.section, 'hexes')} hexes${pay}`;
+          return `${who} · Produce: tap up to ${topValue(player, mat, turn.section as SectionIndex, 'hexes')} hexes${pay}`;
         }
         case 'bolster':
           return `${who} · Bolster: pay ${top.cost} coin`;
@@ -370,7 +423,7 @@ export function title(state: GameState): string {
     case 'moving':
       if (turn.walking) return `${who} · Move: it can go ${plural(turn.walking.left, 'more hex')}${turn.walking.left === 1 ? '' : 'es'}: tap where, or move another unit`;
       if (turn.load) return `${who} · Move: tap where it goes, or pick up more first`;
-      return `${who} · Move: ${turn.moved.length} of ${topValue(player, mat, turn.section, 'units')} moved`;
+      return `${who} · Move: ${turn.moved.length} of ${unitsToMove(state, turn.section)} moved`;
     case 'trading':
       return `${who} · Trade: ${turn.left} more resource${turn.left > 1 ? 's' : ''} to take`;
     case 'producing':
@@ -425,6 +478,9 @@ export function buildPrompt(state: GameState, actions: Action[], selection: Sele
     return { title: title(state), buttons: [], highlights, tapActions, tapSelects, end: { label: 'End turn', action: { type: 'endTurn' }, primary: true } };
   }
   if (turn.step === 'encounter') return encounterPrompt(state, actions, selection);
+  if (turn.step === 'factoryCard') return factoryOfferPrompt(state, actions);
+  if (turn.step === 'factoryTop') return factoryTopPrompt(state, actions);
+  if (turn.step === 'factoryRewards') return bottomPrompt(state, actions, selection, turn.todo[0]);
   if (actions.some((a) => a.type === 'produce')) return producePrompt(state, actions, selection.produce ?? []);
   if (turn.step === 'top' && actions.some((a) => a.type === 'tradePopularity')) return tradePrompt(state, actions, selection.trade);
   if (turn.step === 'bottom') return bottomPrompt(state, actions, selection);
@@ -783,10 +839,11 @@ const isEffect = (a: Action): a is Effect => (EFFECTS as readonly string[]).incl
 function bottomPrompt(state: GameState, actions: Action[], selection: Selection, free?: BottomActionType): Prompt {
   const { mat } = state.setup.players[state.currentPlayer]!;
   const turn = state.turn as { section: SectionIndex; paid: number };
-  const bottom = mat.sections[turn.section]!.bottom;
+  // A free action (from an encounter or the Factory card) has no section of its own to pay for.
+  const bottom = mat.sections[turn.section]?.bottom ?? mat.sections[0].bottom;
   const kind = free ?? bottom.action;
   const name = BOTTOM_NAMES[kind];
-  const cost = bottomCost(state.players[state.currentPlayer]!, mat, turn.section);
+  const cost = bottomCost(state.players[state.currentPlayer]!, mat, (free ? 0 : turn.section) as SectionIndex);
   const owed = free ? 0 : cost.amount - turn.paid;
   const canAfford = owed <= 0 || actions.some((a) => a.type === 'pay' || a.type === 'payWithCard');
   // Ending the turn asks first if the bottom-row action could still be taken.
@@ -1027,15 +1084,14 @@ function tradePrompt(state: GameState, actions: Action[], trade: Selection['trad
   return { title: title(state), buttons, highlights, tapActions: new Map(), tapSelects, selected: hex, marked: new Set(hex ? [hex] : []), slots };
 }
 
-const COST_NAMES = { coins: 'coin', popularity: 'popularity', power: 'power' } as const;
-
-/** An encounter option's cost in words: "Free", "Pay 2 coins", "Lose 2 popularity". */
-export function costText(cost: EncounterCost): string {
-  const parts = (['coins', 'power', 'popularity'] as const).flatMap((k) => {
-    const n = cost[k];
-    if (!n) return [];
-    return [k === 'coins' ? `pay ${plural(n, 'coin')}` : `${k === 'power' ? 'pay' : 'lose'} ${n} ${COST_NAMES[k]}`];
-  });
+/** An encounter option's or Factory card's cost in words: "Free", "Pay 2 coins", "Lose 2 popularity", "Pay 1 wood and 1 coin". */
+export function costText(cost: EncounterCost & { resources?: ResourcePile }): string {
+  const pays = [
+    ...RESOURCES.filter((r) => cost.resources?.[r]).map((r) => `${cost.resources![r]} ${r}`),
+    ...(cost.coins ? [plural(cost.coins, 'coin')] : []),
+    ...(cost.power ? [`${cost.power} power`] : []),
+  ];
+  const parts = [...(pays.length ? [`pay ${pays.join(' and ')}`] : []), ...(cost.popularity ? [`lose ${cost.popularity} popularity`] : [])];
   if (!parts.length) return 'Free';
   const text = parts.join(' and ');
   return text[0]!.toUpperCase() + text.slice(1);
@@ -1052,7 +1108,7 @@ export function gainText(gain: EncounterGain, hex: HexId): string {
   if (gain.workers) onHex.push(plural(gain.workers, 'worker'));
   for (const r of RESOURCES) if (gain.resources?.[r]) onHex.push(`${gain.resources[r]} ${r}`);
   if (gain.anyResources) onHex.push(`${gain.anyResources} resource${gain.anyResources === 1 ? '' : 's'} of your choice`);
-  if (onHex.length) parts.push(`${onHex.join(', ')} on ${hex}`);
+  if (onHex.length) parts.push(hex ? `${onHex.join(', ')} on ${hex}` : onHex.join(', '));
   for (const a of gain.actions ?? []) parts.push(`a free ${BOTTOM_NAMES[a]}`);
   return parts.join(', ') || 'Nothing';
 }
@@ -1094,4 +1150,41 @@ function encounterPrompt(state: GameState, actions: Action[], selection: Selecti
       ...(stop && { stop: { label: turn.picked.length ? 'Done' : 'Take nothing', action: stop, quiet: true } }),
     },
   };
+}
+
+const emptyPrompt = (state: GameState) => ({
+  title: title(state),
+  highlights: new Set<Location>(),
+  tapActions: new Map<Location, Action>(),
+  tapSelects: new Map<Location, Selection>(),
+});
+
+/** The Factory cards on offer, in a pop-up: tap one to keep it. */
+function factoryOfferPrompt(state: GameState, actions: Action[]): Prompt {
+  const cards = actions.flatMap((a) => {
+    if (a.type !== 'takeFactoryCard') return [];
+    const card = factoryCard(state, a.card);
+    return [{ name: card.name, top: `${costText(card.cost)} → ${gainText(card.gain, '')}`, move: moveText(card), action: a }];
+  });
+  return { ...emptyPrompt(state), buttons: [], factoryOffer: { cards } };
+}
+
+/**
+ * Using the Factory card's top part: tap glowing hexes you control to pay
+ * each resource (a hex with several kinds pays them in turn), or a combat
+ * card with Coercion; then one button pays the rest and takes the reward.
+ */
+function factoryTopPrompt(state: GameState, actions: Action[]): Prompt {
+  const prompt: Prompt = { ...emptyPrompt(state), buttons: [] };
+  for (const a of actions) {
+    if (a.type === 'factoryPay') {
+      prompt.highlights.add(a.hex);
+      if (!prompt.tapActions.has(a.hex)) prompt.tapActions.set(a.hex, a);
+    } else if (a.type === 'factoryUse') {
+      prompt.buttons.push({ label: label(state, a), action: a, primary: true });
+    } else {
+      prompt.buttons.push({ label: label(state, a), action: a, quiet: a.type === 'skipTop' });
+    }
+  }
+  return prompt;
 }

@@ -72,6 +72,7 @@ export function catalogWith(builtIn: Catalog, library: Library): Catalog {
     factions: [...builtIn.factions, ...library.factions],
     mats: [...builtIn.mats, ...library.mats],
     ...(encounters && { encounters }),
+    ...(builtIn.factory && { factory: builtIn.factory }),
   };
 }
 

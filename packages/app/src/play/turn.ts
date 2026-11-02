@@ -1,13 +1,16 @@
 // Where the current player is in their turn, for the side panel and the mat.
 // Choosing a section isn't binding: until you take your first action you can
 // tap another section on the mat to switch.
-import { legalActions, type Action, type GameState, type SectionIndex } from '@scythe/engine';
+import { FACTORY, legalActions, type Action, type GameState, type Section } from '@scythe/engine';
 
 export type Phase = 'choose' | 'top' | 'bottom';
 
 export function phase(state: GameState): Phase {
-  const step = state.turn.step;
-  return step === 'chooseSection' ? 'choose' : step === 'bottom' || step === 'end' ? 'bottom' : 'top';
+  const turn = state.turn;
+  if (turn.step === 'chooseSection') return 'choose';
+  // The Factory card's move stands in for a bottom row.
+  if (turn.section === FACTORY) return turn.step === 'factoryTop' || turn.step === 'factoryRewards' ? 'top' : 'bottom';
+  return turn.step === 'bottom' || turn.step === 'end' ? 'bottom' : 'top';
 }
 
 /**
@@ -28,5 +31,5 @@ export function sectionChoices(history: GameState[], turnStart: number): Action[
 }
 
 /** The section the player can't pick this turn (the one they used last turn). */
-export const previousSection = (history: GameState[], turnStart: number): SectionIndex | null =>
+export const previousSection = (history: GameState[], turnStart: number): Section | null =>
   history[turnStart]!.players[history[turnStart]!.currentPlayer]!.lastSection;

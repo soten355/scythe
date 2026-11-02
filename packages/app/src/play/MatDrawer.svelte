@@ -7,13 +7,14 @@
   // until your first action (to switch). While upgrading, the drawer opens
   // fully and the top-row values and bottom-row costs that can be upgraded
   // glow; tap one of each. That doesn't grey out last turn's section. An action you can't pay for
-  // is struck out, with what you still need below it.
+  // is struck out, with what you still need below it. A Factory card, once
+  // taken, sits after the four sections and is picked the same way.
   import { slide } from 'svelte/transition';
   import { cubicInOut, cubicOut } from 'svelte/easing';
-  import { bottomCost, shortfall, topValue, upgradeables, type Action, type GameState, type SectionIndex } from '@scythe/engine';
+  import { bottomCost, FACTORY, heldFactoryCard, shortfall, topValue, upgradeables, type Action, type GameState, type Section, type SectionIndex } from '@scythe/engine';
   import { BONUS_ICONS, STRUCTURE_ICONS } from './icons';
   import InlineIcon from './InlineIcon.svelte';
-  import { needText, type Prompt, type Selection } from './prompt';
+  import { costText, gainText, moveText, needText, type Prompt, type Selection } from './prompt';
 
   let {
     game,
@@ -27,7 +28,7 @@
     game: GameState;
     choices: Action[];
     /** The section used last turn, shown dimmed. */
-    previous: SectionIndex | null;
+    previous: Section | null;
     open: boolean;
     onChoose: (a: Action) => void;
     upgrade?: Prompt['upgrade'];
@@ -60,6 +61,8 @@
   const { mat } = $derived(game.setup.players[seat]!);
   const player = $derived(game.players[seat]!);
   const active = $derived(game.turn.step === 'chooseSection' ? null : game.turn.section);
+  const factory = $derived(heldFactoryCard(game, seat));
+  const chooseFactory = $derived(choices.find((a) => a.type === 'chooseSection' && a.section === FACTORY));
 
   const sections = $derived(
     mat.sections.map((s, i) => {
@@ -150,6 +153,32 @@
         <div class="section" class:active={active === x.section} class:last={!picking && previous === x.section}>{@render content(x)}</div>
       {/if}
     {/each}
+    {#if factory}
+      <!-- The Factory card: its top part, then its move. -->
+      {@const card = factory}
+      {#snippet factoryContent()}
+        <div class="half">
+          <div class="head"><b>🏭 {card.name}</b></div>
+          {#if shown}
+            <div class="info" in:slide={opening} out:slide={closing}><span>{costText(card.cost)} → {gainText(card.gain, '')}</span></div>
+          {/if}
+        </div>
+        <div class="half bottom">
+          <div class="head"><b>Move</b></div>
+          {#if shown}
+            <div class="info" in:slide={opening} out:slide={closing}><span>{moveText(card)}</span></div>
+          {/if}
+        </div>
+      {/snippet}
+      {#if chooseFactory}
+        {@const choose = chooseFactory}
+        <button class="section factory choosable" class:active={active === FACTORY} class:last={!picking && previous === FACTORY} onclick={() => onChoose(choose)}
+          >{@render factoryContent()}</button
+        >
+      {:else}
+        <div class="section factory" class:active={active === FACTORY} class:last={!picking && previous === FACTORY}>{@render factoryContent()}</div>
+      {/if}
+    {/if}
   </div>
 </div>
 
@@ -202,6 +231,9 @@
     50% {
       border-color: rgba(255, 246, 200, 0.3);
     }
+  }
+  .section.factory {
+    background: #241e28;
   }
   .section.choosable {
     border-color: #fff6c8;

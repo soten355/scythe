@@ -507,6 +507,26 @@
     {/if}
   {/if}
 
+  {#if prompt.factoryOffer && !handoff && !battle && !revealed}
+    {@const f = prompt.factoryOffer}
+    <!-- The Factory: keep one of the cards on offer. -->
+    <div class="ask" role="dialog" aria-modal="true" style:--c={color(game.currentPlayer)}>
+      <div class="box encounter">
+        <p class="heading"><b>🏭 The Factory</b><span class="where">Keep one card for the rest of the game</span></p>
+        <p class="note">It becomes a fifth section beside your mat: its top part, then a move.</p>
+        <div class="options" style:grid-template-columns="repeat({Math.min(f.cards.length, 4)}, 1fr)">
+          {#each f.cards as c (c.name)}
+            <button onclick={() => press({ label: c.name, action: c.action })}>
+              <span class="text">{c.name}</span>
+              <span class="cost">{c.top}</span>
+              <span class="gain">Then {c.move}</span>
+            </button>
+          {/each}
+        </div>
+      </div>
+    </div>
+  {/if}
+
   {#if revealed && !handoff && !battle}
     {@const r = combatSummary(game, revealed)}
     <div class="ask" role="dialog" aria-modal="true" style:--c={color(revealed.winner)}>

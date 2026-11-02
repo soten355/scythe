@@ -1,7 +1,7 @@
-import { baseBoard, baseFactions, baseMats, sampleEncounters } from '@scythe/content';
-import { activeSeat, applyAction, legalActions, newGame, type Action, type GameState } from '@scythe/engine';
+import { baseBoard, baseFactions, baseMats, sampleEncounters, sampleFactoryCards } from '@scythe/content';
+import { activeSeat, applyAction, FACTORY, legalActions, newGame, type Action, type GameState } from '@scythe/engine';
 import { describe, expect, it } from 'vitest';
-import { sectionHeadings, buildPrompt, combatSummary, costText, gainText, label, placeName } from './prompt';
+import { sectionHeadings, buildPrompt, combatSummary, costText, gainText, label, moveText, placeName } from './prompt';
 
 // Nordic (home "ne": workers on A4, A5) on Industrial; Rusviet on Engineering.
 const start = () =>
@@ -613,6 +613,7 @@ describe('encounters', () => {
     expect(costText({})).toBe('Free');
     expect(costText({ coins: 1 })).toBe('Pay 1 coin');
     expect(costText({ popularity: 2, power: 1 })).toBe('Pay 1 power and lose 2 popularity');
+    expect(costText({ coins: 1, power: 2 })).toBe('Pay 1 coin and 2 power');
     expect(gainText({ power: 2, combatCards: 1, workers: 2, resources: { food: 1 }, actions: ['build'] }, 'B2')).toBe(
       '2 power, 1 combat card, 2 workers, 1 food on B2, a free Build',
     );
@@ -653,5 +654,64 @@ describe('encounters', () => {
     expect(after.encounter!.note).toBe('Choose up to one more');
     expect(after.encounter!.options[0]!.taken).toBe(true);
     expect(after.encounter!.stop).toMatchObject({ label: 'Done', action: { type: 'endEncounter' } });
+  });
+});
+
+describe('the Factory', () => {
+  // Nordic (Industrial mat) with the sample Factory deck in its listed order.
+  const withFactory = (p0: Partial<GameState['players'][number]> = {}, resources: GameState['resources'] = {}) => {
+    const state = newGame({
+      seed: 1,
+      board: baseBoard,
+      factory: sampleFactoryCards,
+      players: [
+        { faction: baseFactions[0]!, mat: baseMats[0]! },
+        { faction: baseFactions[1]!, mat: baseMats[1]! },
+      ],
+    });
+    return { ...state, factoryDeck: sampleFactoryCards.map((c) => c.id), resources, players: [{ ...state.players[0]!, ...p0 }, state.players[1]!] } as GameState;
+  };
+
+  it('words costs with resources, and moves', () => {
+    expect(costText({ resources: { wood: 1 }, coins: 1 })).toBe('Pay 1 wood and 1 coin');
+    expect(moveText(sampleFactoryCards[0]!)).toBe('move 1 unit up to 2 hexes');
+    expect(moveText(sampleFactoryCards[1]!)).toBe('move 2 units 1 hex');
+  });
+
+  it('offers the cards in a pop-up', () => {
+    const state = { ...withFactory(), turn: { step: 'factoryCard', section: 2, offered: ['sample-f01', 'sample-f02', 'sample-f03'] } } as GameState;
+    const p = prompt(state);
+    expect(p.title).toBe('Nordic · The Factory: choose a Factory card to keep');
+    expect(p.factoryOffer?.cards.map((c) => [c.name, c.top, c.move])).toEqual([
+      ['Spare boilers', 'Pay 2 power → 3 coins', 'move 1 unit up to 2 hexes'],
+      ['Night shift', 'Lose 1 popularity → 3 power', 'move 2 units 1 hex'],
+      ['Prototype plating', 'Pay 2 metal → 1 power, a free Deploy', 'move 1 unit up to 2 hexes'],
+    ]);
+    expect(p.factoryOffer?.cards[1]!.action).toEqual({ type: 'takeFactoryCard', card: 'sample-f02' });
+  });
+
+  it('is picked from the mat, then paid for by tapping hexes', () => {
+    // Prototype plating: pay 2 metal. Nordic's workers are on A4 and A5.
+    let state = withFactory({ factoryCard: 'sample-f03' }, { A4: { metal: 1 }, A5: { metal: 1 } });
+    expect(legalActions(state, 0)).toContainEqual({ type: 'chooseSection', section: FACTORY });
+    expect(label(state, { type: 'chooseSection', section: FACTORY })).toBe('Factory card');
+    state = applyAction(state, { type: 'chooseSection', section: FACTORY });
+    let p = prompt(state);
+    expect(p.title).toBe('Nordic · Factory card: tap glowing hexes you control to pay 2 metal');
+    expect([...p.highlights].sort()).toEqual(['A4', 'A5']);
+    expect(p.buttons.map((b) => b.label)).toEqual(['Skip to the move']);
+    expect(sectionHeadings(state)).toMatchObject({ top: 'Factory card · Pay 2 metal → 1 power, a free Deploy', bottom: 'Then move 1 unit up to 2 hexes' });
+    state = play(state, p.tapActions.get('A4')!, { type: 'factoryPay', hex: 'A5', resource: 'metal' });
+    p = prompt(state);
+    expect(p.buttons).toEqual([{ label: 'Pay and use it', action: { type: 'factoryUse' }, primary: true }]);
+  });
+
+  it("then moves, with no coins instead, and the move's skip ends the turn", () => {
+    const state = applyAction(withFactory({ factoryCard: 'sample-f01', power: 0 }), { type: 'chooseSection', section: FACTORY });
+    const moving = applyAction(state, { type: 'skipTop' });
+    const p = prompt(moving);
+    expect(p.title).toBe('Nordic · Factory move: tap a unit (move 1 unit up to 2 hexes)');
+    expect(p.buttons.map((b) => b.label)).toEqual(['Skip the move']);
+    expect(prompt(applyAction(moving, { type: 'skipTop' })).end?.label).toBe('End turn');
   });
 });
