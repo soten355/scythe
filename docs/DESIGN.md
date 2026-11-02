@@ -276,6 +276,8 @@ Each phase ends in something playable on the phone. A phase is done when its che
 **Phase 4: Polish**
 
 - [ ] Art pass, animation, sound
+- [ ] Pictures on encounter cards (a picture, a story line, both or neither), chosen in the encounter card editor (owner's request, Nov 2, 2026)
+  - Plan: pictures are shrunk to about 100 KB and stored once on the device; cards hold a short reference, so saves stay small. Deck files carry the pictures; a game opened without them shows the story instead. A built-in deck's pictures ship with the app. Pictures must be original (drawn, photographed or generated), never scans of the printed cards.
 - [ ] Optional 3D board
 - [ ] Done when: it feels like a game, not a prototype
 
