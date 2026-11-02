@@ -110,13 +110,44 @@ export function afterFights(state: GameState, section: Section): GameState {
   };
 }
 
-/** Options not yet taken that the player can pay for, while they may take more. */
+/**
+ * Options not yet taken that the player can pay for, and whose free
+ * bottom-row actions can all be done once its other gains are in (no free
+ * Deploy with all four mechs out), while they may take more.
+ */
 function openOptions(state: GameState, turn: EncounterStep): number[] {
   const seat = state.currentPlayer;
   if (turn.picked.length >= optionLimit(state, seat)) return [];
   return encounterCard(state, turn.card)
-    .options.map((o, i) => (turn.picked.includes(i) || !canPay(state, seat, o.cost) ? -1 : i))
+    .options.map((o, i) => {
+      if (turn.picked.includes(i) || !canPay(state, seat, o.cost)) return -1;
+      const after = takeGains(state, turn, i);
+      return (o.gain.actions ?? []).every((kind) => effectOptions(after, kind).length > 0) ? i : -1;
+    })
     .filter((i) => i >= 0);
+}
+
+/** The game once an option's cost is paid and its gains (all but the free actions) are in. */
+function takeGains(state: GameState, turn: EncounterStep, option: number): GameState {
+  const seat = state.currentPlayer;
+  const { cost, gain: g } = encounterCard(state, turn.card).options[option]!;
+  const p = state.players[seat]!;
+  let next = updatePlayer(state, seat, {
+    coins: p.coins - (cost.coins ?? 0),
+    popularity: p.popularity - (cost.popularity ?? 0),
+    power: p.power - (cost.power ?? 0),
+  });
+  next = updatePlayer(next, seat, gain(next.players[seat]!, g));
+  if (g.combatCards) next = drawCombatCards(next, seat, g.combatCards);
+  for (const [resource, n] of Object.entries(g.resources ?? {}) as [Resource, number][]) {
+    if (n > 0) next = addResources(next, turn.hex, resource, n);
+  }
+  if (g.workers) {
+    const workers = next.players[seat]!.workers;
+    const n = Math.min(g.workers, MAX_WORKERS - workers.length);
+    next = updatePlayer(next, seat, { workers: [...workers, ...Array<HexId>(n).fill(turn.hex)] });
+  }
+  return next;
 }
 
 function taskActions(state: GameState, task: EncounterTask): Action[] {
@@ -138,23 +169,8 @@ export function applyEncounter(state: GameState, turn: EncounterStep, action: Ac
     case 'endEncounter':
       return finish(state, turn);
     case 'encounterOption': {
-      const { cost, gain: g } = encounterCard(state, turn.card).options[action.option]!;
-      const p = state.players[seat]!;
-      let next = updatePlayer(state, seat, {
-        coins: p.coins - (cost.coins ?? 0),
-        popularity: p.popularity - (cost.popularity ?? 0),
-        power: p.power - (cost.power ?? 0),
-      });
-      next = updatePlayer(next, seat, gain(next.players[seat]!, g));
-      if (g.combatCards) next = drawCombatCards(next, seat, g.combatCards);
-      for (const [resource, n] of Object.entries(g.resources ?? {}) as [Resource, number][]) {
-        if (n > 0) next = addResources(next, turn.hex, resource, n);
-      }
-      if (g.workers) {
-        const workers = next.players[seat]!.workers;
-        const n = Math.min(g.workers, MAX_WORKERS - workers.length);
-        next = updatePlayer(next, seat, { workers: [...workers, ...Array<HexId>(n).fill(turn.hex)] });
-      }
+      const g = encounterCard(state, turn.card).options[action.option]!.gain;
+      const next = takeGains(state, turn, action.option);
       const todo: EncounterTask[] = [
         ...(g.anyResources ? [{ kind: 'resources' as const, left: g.anyResources }] : []),
         ...(g.actions ?? []).map((kind) => ({ kind })),

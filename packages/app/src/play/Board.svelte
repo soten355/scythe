@@ -527,7 +527,12 @@
     {@const tappable = lit || prompt.tapSelects.has(home.key)}
     {#if home.mine && home.faction}
       <!-- The current player's home base glows in their colour. -->
-      <circle cx={home.c[0]} cy={home.c[1]} r={SIZE * 0.55} fill="none" stroke={home.faction.color} class="home-glow" />
+      <!-- Soft rings rather than a blur: a blur redrawn every frame slows the phone. -->
+      <g class="home-glow" stroke={home.faction.color}>
+        <circle cx={home.c[0]} cy={home.c[1]} r={SIZE * 0.55} stroke-width="14" stroke-opacity="0.2" />
+        <circle cx={home.c[0]} cy={home.c[1]} r={SIZE * 0.55} stroke-width="7" stroke-opacity="0.35" />
+        <circle cx={home.c[0]} cy={home.c[1]} r={SIZE * 0.55} stroke-width="2.5" />
+      </g>
     {/if}
     <circle
       cx={home.c[0]}
@@ -709,14 +714,13 @@
     cursor: pointer;
   }
   .home-glow {
-    stroke-width: 10;
+    fill: none;
     pointer-events: none;
-    filter: blur(3px);
     animation: home-glow 1.6s ease-in-out infinite;
   }
   @keyframes home-glow {
     50% {
-      stroke-opacity: 0.25;
+      opacity: 0.35;
     }
   }
   .outline {
@@ -726,9 +730,8 @@
   .outline.lit,
   .home.lit {
     stroke: #fff6c8;
-    stroke-width: 3;
-    /* Easy to spot even zoomed out (unused bases are a dull grey). */
-    filter: drop-shadow(0 0 5px #fff6c8);
+    /* Easy to spot even zoomed out (unused bases are a dull grey); no glow filter, which is slow to redraw as it pulses. */
+    stroke-width: 3.5;
     cursor: pointer;
     animation: pulse 1.4s ease-in-out infinite;
   }

@@ -45,7 +45,8 @@ export function tellTurn(history: GameState[], steps: Action[][], turn: Turn): s
   for (let i = turn.start; i < turn.end; i++) {
     let s = history[i]!;
     for (const a of steps[i]!) {
-      const next = i === turn.end - 1 && steps[i]!.length === 1 ? history[i + 1]! : applyAction(s, a);
+      // One action a step (as bots play): the state it led to is already in the history.
+      const next = steps[i]!.length === 1 ? history[i + 1]! : applyAction(s, a);
       if (activeSeat(s) === seat) {
         if (a.type === 'chooseSection') chose.push(`Chose ${label(s, a)}`);
         else if (a.type === 'moveUnit') {
@@ -108,16 +109,21 @@ function changesBetween(before: GameState, after: GameState, seat: number): stri
   return counts.filter(([, , n]) => n !== 0).map(([one, many, n]) => `${n > 0 ? '+' : '−'}${Math.abs(n)} ${Math.abs(n) === 1 ? one : many}`);
 }
 
-/** The bots' turns since a person last finished one (oldest first), told; the last may be under way. */
+/** The bots' turns since a person last finished one (oldest first), told; the last may be under way. Looks back from the end only as far as it needs. */
 export function botTurnsSince(history: GameState[], steps: Action[][], bots: Bots): { seat: number; lines: string[] }[] {
-  const turns = turnsOf(history.slice(0, steps.length + 1));
-  const now = history[steps.length]!;
   const out: { seat: number; lines: string[] }[] = [];
-  for (let i = turns.length - 1; i >= 0; i--) {
-    const t = turns[i]!;
-    const underWay = i === turns.length - 1 && now.turnsTaken === history[t.start]!.turnsTaken;
-    if (isBot(bots, t.seat)) out.push({ seat: t.seat, lines: tellTurn(history, steps, t) });
+  const now = history[steps.length]!;
+  let end = steps.length;
+  while (end > 0) {
+    // The turn holding step end - 1.
+    const key = history[end - 1]!.turnsTaken;
+    let start = end - 1;
+    while (start > 0 && history[start - 1]!.turnsTaken === key) start--;
+    const turn = { seat: history[start]!.currentPlayer, start, end };
+    const underWay = end === steps.length && now.turnsTaken === key;
+    if (isBot(bots, turn.seat)) out.push({ seat: turn.seat, lines: tellTurn(history, steps, turn) });
     else if (!underWay) break;
+    end = start;
   }
   return out.reverse();
 }

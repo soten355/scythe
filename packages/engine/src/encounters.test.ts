@@ -173,9 +173,23 @@ describe('having an encounter', () => {
     expect(state.turn.step).toBe('bottom');
   });
 
-  it('skips a free action there is nothing left to do for', () => {
-    const state = play(encounter({ popularity: 5, mechs: ['A1', 'A1', 'A1', 'A1'], mechAbilities: [0, 1, 2, 3] }), pick(2));
-    expect(state.turn.step).toBe('bottom');
+  it("can't take an option whose free action can't be done (all four mechs already out)", () => {
+    const state = encounter({ popularity: 5, mechs: ['A1', 'A1', 'A1', 'A1'], mechAbilities: [0, 1, 2, 3] });
+    expect(options(state)).toEqual([0, 1]);
+    expect(() => play(state, pick(2))).toThrow();
+  });
+
+  it('counts what the option itself gives before judging its free action (workers to deploy from)', () => {
+    const deck: EncounterCard[] = [{ ...cards[0]!, options: [cards[0]!.options[0], cards[0]!.options[1], option('w', {}, { workers: 1, actions: ['deploy'] })] }];
+    // No workers anywhere, so nowhere to deploy, until the option's worker arrives on A3.
+    const state = encounter({ workers: [] }, {}, { deck });
+    expect(options(state)).toContain(2);
+  });
+
+  it('may stop when no option can be taken', () => {
+    const deck: EncounterCard[] = [{ ...cards[0]!, options: [option('a', { coins: 99 }, {}), option('b', { coins: 99 }, {}), option('c', {}, { actions: ['deploy'] })] }];
+    const state = encounter({ mechs: ['A1', 'A1', 'A1', 'A1'], mechAbilities: [0, 1, 2, 3] }, {}, { deck });
+    expect(legalActions(state, 0)).toEqual([{ type: 'endEncounter' }]);
   });
 
   it('takes several free actions in order', () => {

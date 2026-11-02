@@ -19,6 +19,7 @@ import {
   activeSeat,
   applyAction,
   bottomCost,
+  canPayEncounter,
   encounterCard,
   encounterOptionLimit,
   factoryCard,
@@ -39,6 +40,7 @@ import {
   type CombatResult,
   type EncounterCost,
   type EncounterGain,
+  type EncounterOption,
   type FactoryCard,
   type GameState,
   type HexId,
@@ -146,7 +148,8 @@ export interface Prompt {
     hex: HexId;
     /** "Choose one" or, with Meander, "Choose up to two". */
     note: string;
-    options: { text: string; cost: string; gain: string; taken: boolean; action?: Action }[];
+    /** `why`: what stops an option being taken now, if anything does (other than having taken enough). */
+    options: { text: string; cost: string; gain: string; taken: boolean; action?: Action; why?: string }[];
     /** Take nothing (more): after a first option with Meander, or when none can be paid for. */
     stop?: Button;
   };
@@ -1130,6 +1133,27 @@ export function gainText(gain: EncounterGain, hex: HexId): string {
 
 const NUMBER_WORDS = ['none', 'one', 'two', 'three'];
 
+const ALL_DONE: Record<BottomActionType, string> = {
+  deploy: 'All your mechs are out',
+  build: 'All your structures are built',
+  enlist: 'All your recruits are out',
+  upgrade: 'No upgrades left',
+};
+
+/** Why an encounter option can't be taken: its cost, or a free action with nothing left to do it with. */
+function whyNot(state: GameState, option: EncounterOption): string {
+  if (!canPayEncounter(state, state.currentPlayer, option.cost)) return "Can't pay";
+  const p = state.players[state.currentPlayer]!;
+  const done: Record<BottomActionType, boolean> = {
+    deploy: p.mechs.length >= 4,
+    build: Object.keys(p.structures).length >= 4,
+    enlist: p.recruits.length >= 4,
+    upgrade: p.upgrades.top.length >= 6,
+  };
+  const kind = (option.gain.actions ?? []).find((k) => done[k]);
+  return kind ? ALL_DONE[kind] : "Can't be done now";
+}
+
 /**
  * An encounter. With nothing left to choose for the options taken, the card
  * shows in a pop-up with one button per option (greyed out when it can't be
@@ -1155,13 +1179,12 @@ function encounterPrompt(state: GameState, actions: Action[], selection: Selecti
       story: card.story,
       hex: turn.hex,
       note: limit === 1 ? 'Choose one' : turn.picked.length ? `Choose up to ${NUMBER_WORDS[limit - turn.picked.length] ?? limit - turn.picked.length} more` : `Choose up to ${NUMBER_WORDS[limit] ?? limit}`,
-      options: card.options.map((o, i) => ({
-        text: o.text,
-        cost: costText(o.cost),
-        gain: gainText(o.gain, turn.hex),
-        taken: turn.picked.includes(i),
-        action: actions.find((a) => a.type === 'encounterOption' && a.option === i),
-      })),
+      options: card.options.map((o, i) => {
+        const action = actions.find((a) => a.type === 'encounterOption' && a.option === i);
+        const taken = turn.picked.includes(i);
+        const why = action || taken || turn.picked.length >= limit ? undefined : whyNot(state, o);
+        return { text: o.text, cost: costText(o.cost), gain: gainText(o.gain, turn.hex), taken, ...(action && { action }), ...(why && { why }) };
+      }),
       ...(stop && { stop: { label: turn.picked.length ? 'Done' : 'Take nothing', action: stop, quiet: true } }),
     },
   };

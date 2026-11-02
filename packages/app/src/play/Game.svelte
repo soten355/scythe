@@ -14,6 +14,7 @@
   import FactionEmblem from './FactionEmblem.svelte';
   import FightScreen from './FightScreen.svelte';
   import GameOver from './GameOver.svelte';
+  import GameOverMoment from './GameOverMoment.svelte';
   import { battleOf, type Battle } from './fight';
   import { fade } from 'svelte/transition';
   import { guide } from './camera';
@@ -166,7 +167,17 @@
   const over = $derived(isGameOver(game));
   /** The final scores are put aside to look at the board. */
   let viewingBoard = $state(false);
-  const showScores = $derived(over && !viewingBoard && !battle && !revealed && !handoff && !moments.length && !showingMoment);
+  /** The game-over moment is still to be shown (not for a game that was already over when opened). */
+  let endingToShow = $state(!isGameOver(opened));
+  $effect(() => {
+    // Undoing the last move and finishing again shows it again.
+    if (!over) endingToShow = true;
+  });
+  const settled = $derived(!battle && !revealed && !handoff && !moments.length && !showingMoment);
+  const showEnding = $derived(over && endingToShow && settled);
+  const showScores = $derived(over && !endingToShow && !viewingBoard && settled);
+  /** Who placed the last star. */
+  const finisher = $derived(game.players.findIndex((p, seat) => p.stars.length >= game.setup.players[seat]!.faction.stars));
   const headings = $derived(seatNow === game.currentPlayer ? sectionHeadings(game) : null);
   const choices = $derived(sectionChoices(history, turnStart));
   const canSwitch = $derived(canSwitchSection(history, turnStart));
@@ -336,7 +347,6 @@
     if (!botNow || botBusy || botTrouble || handoff || battle || revealed || moments.length || showingMoment) return;
     const state = game;
     const seat = seatNow;
-    const at = history.length;
     const started = performance.now();
     botBusy = true;
     botSeats[seat]!.chooseAction(playerView(state, seat), legalActions(state, seat)).then(
@@ -344,7 +354,8 @@
         const wait = skipping ? 0 : BOT_PACE[paceOf(action)] - (performance.now() - started);
         if (wait > 0) await new Promise((done) => setTimeout(done, wait));
         botBusy = false;
-        if (history.length === at) act(action);
+        // Only if the game is still where the bot was asked (nothing else has moved it on).
+        if (game === state) act(action);
       },
       (e: unknown) => {
         botBusy = false;
@@ -354,7 +365,7 @@
   });
   const botLabel = (seat: number) => `${name(seat)} (${botName(bots![seat]!)})`;
   /** What the bots have done since a person last finished a turn, told in plain lines; the last may be under way. */
-  const stories = $derived(bots ? botTurnsSince(history, steps, bots) : []);
+  const stories = $derived(bots && (botNow || storiesOpen) ? botTurnsSince(history, steps, bots) : []);
   const playing = $derived(botNow ? stories.findLast((t) => t.seat === game.currentPlayer) : undefined);
 
   let menuOpen = $state(false);
@@ -519,13 +530,17 @@
       {/if}
       <div class="footer">
         <button class="quiet" onclick={undo} disabled={!canUndo}>↶ Undo</button>
-        {#if stories.length && !botNow}<button class="quiet" onclick={() => (storiesOpen = true)}>📜 Bots' turns</button>{/if}
+        {#if bots?.some(Boolean) && game.turnsTaken > 0 && !botNow}<button class="quiet" onclick={() => (storiesOpen = true)}>📜 Bots' turns</button>{/if}
       </div>
     </aside>
   </main>
 
   <!-- A fight takes over the screen until it's decided. -->
   <FightScreen game={shown} {prompt} seat={seatNow} waiting={botNow ? `${botLabel(seatNow)} is choosing…` : null} {canUndo} onUndo={undo} onSelect={(sel) => (selection = sel)} onPress={press} {battle} onBattleDone={() => (battle = null)} />
+
+  {#if showEnding && finisher >= 0}
+    <GameOverMoment name={name(finisher)} color={color(finisher)} stars={game.setup.players[finisher]!.faction.stars} onDone={() => (endingToShow = false)} />
+  {/if}
 
   {#if showScores}
     <GameOver {game} {canUndo} onUndo={undo} onBoard={() => (viewingBoard = true)} {onNewGame} {onMenu} />
@@ -590,6 +605,7 @@
                 <span class="text">{o.taken ? '✓ ' : ''}{o.text}</span>
                 <span class="cost">{o.cost}</span>
                 <span class="gain">{o.gain}</span>
+                {#if o.why}<span class="why">{o.why}</span>{/if}
               </button>
             {/each}
           </div>
@@ -1187,6 +1203,10 @@
   }
   .encounter .options button:disabled {
     opacity: 0.4;
+  }
+  .encounter .why {
+    font-size: 12px;
+    font-style: italic;
   }
   .encounter .options button.taken {
     opacity: 0.7;

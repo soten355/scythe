@@ -631,6 +631,16 @@ describe('encounters', () => {
     expect(p.encounter!.stop).toBeUndefined();
   });
 
+  it("says why an option can't be taken: can't pay, or its free action can't be done", () => {
+    let p = prompt(atEncounter());
+    expect(p.encounter!.options.map((o) => o.why)).toEqual([undefined, undefined, "Can't pay"]);
+    const s = atEncounter();
+    const allOut = { ...s, players: s.players.map((pl, i) => (i === 0 ? { ...pl, mechs: ['A4', 'A4', 'A4', 'A4'], mechAbilities: [0, 1, 2, 3] } : pl)) } as GameState;
+    p = prompt(allOut);
+    expect(p.encounter!.options.map((o) => !!o.action)).toEqual([true, false, false]);
+    expect(p.encounter!.options[1]!.why).toBe('All your mechs are out');
+  });
+
   it('then picks the free mech like a Deploy, with nothing to pay', () => {
     const state = applyAction(atEncounter(), { type: 'encounterOption', option: 1 });
     let p = prompt(state);
