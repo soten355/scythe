@@ -4,13 +4,16 @@
 // A player's value is what they'd score if the game ended now (coins, plus
 // stars, territories and resources at their popularity's rates, plus the
 // structure bonus), plus what should pay off before the end: upgrades, mechs,
-// structures, recruits, workers, power, combat cards, closeness to each
-// star, and the character's distance to encounters and the Factory. Those
-// count for less as the game nears its end (when the leader nears 6 stars),
-// and for nothing once it's over.
+// structures, recruits, workers, power, combat cards and the character's
+// distance to encounters and the Factory, which count for less as the game
+// nears its end (judged from the pace of the player nearest their last star); and what leads to stars
+// (closeness to each, resources to spend, workers ready to produce them, a
+// ready objective), which doesn't, since near the end the next star may
+// win the game. None of it counts once the game is over.
 //
 // The score is a seat's value minus a share (`rivalry`) of the best other
-// player's. It reads only what that seat could know: everyone's combat cards
+// player's. Once the game is over, only the result counts: winning, by how
+// much (or losing, by how much). It reads only what that seat could know: everyone's combat cards
 // count by number, not value (so a plan that draws cards doesn't peek at
 // them), and only the seat's own objective cards are looked at.
 //
@@ -26,12 +29,14 @@ import {
   MAX_WORKERS,
   neighbors,
   onBoard,
+  produceCost,
   RESOURCES,
   TERRAIN_PRODUCES,
   objectiveCard,
   objectiveMet,
   structureBonusCoins,
   structureBonusCount,
+  standings,
   structureBonusTile,
   territories,
   tierOf,
@@ -59,6 +64,8 @@ export interface Weights {
   resource: number;
   /** Per kind of resource still needed that a worker of yours can produce (a village counts while you have fewer than 8 workers). */
   produces: number;
+  /** Having the power (and popularity and coins) to pay for producing. */
+  canProduce: number;
   // Worth of what pays off over the rest of the game, at the start of it (falling to nothing by its end):
   upgrade: number;
   mech: number;
@@ -69,12 +76,16 @@ export interface Weights {
   factoryCard: number;
   /** Most of a star's worth for being close to it: this times (how close, 0-1) squared. */
   nearStar: number;
+  /** For the closest star still to place: this times how close (0-1) times the share of stars already placed. */
+  closestStar: number;
   /** One of your own objectives whose conditions hold now. */
   objectiveReady: number;
   /** Per hex the character stands from the nearest encounter, or from the Factory before taking a card (subtracted). */
   distance: number;
   /** How much the best other player's value counts against yours (0: ignore the others; 1: only the lead matters). */
   rivalry: number;
+  /** A finished game: this for winning (and minus this for not), plus the winning margin, so a bot ends the game when it's ahead and never when it's behind. */
+  win: number;
 }
 
 export const DEFAULT_WEIGHTS: Weights = {
@@ -84,6 +95,7 @@ export const DEFAULT_WEIGHTS: Weights = {
   combatCard: 0.6,
   resource: 0.5,
   produces: 2,
+  canProduce: 6,
   upgrade: 2.5,
   mech: 3,
   structure: 2,
@@ -91,9 +103,11 @@ export const DEFAULT_WEIGHTS: Weights = {
   worker: 1.5,
   factoryCard: 3,
   nearStar: 3,
+  closestStar: 8,
   objectiveReady: 3,
   distance: 0.4,
   rivalry: 0.5,
+  win: 1000,
 };
 
 /** A player's value, part by part (the parts add up to the total). */
@@ -104,6 +118,13 @@ export interface Valuation {
 
 /** The score of `seat`'s position, as seen by that seat: higher is better. */
 export function positionScore(state: GameState, seat: number, weights: Weights = DEFAULT_WEIGHTS): number {
+  if (isGameOver(state) && state.players.length > 1) {
+    // Over: all that matters is the result (with the tie-breakers), then by how much.
+    const final = standings(state);
+    const me = final.find((s) => s.seat === seat)!;
+    const best = Math.max(...final.filter((s) => s.seat !== seat).map((s) => s.total));
+    return (me.place === 1 ? weights.win : -weights.win) + me.total - best;
+  }
   const mine = playerValue(state, seat, seat, weights).total;
   const others = state.players.map((_p, i) => i).filter((i) => i !== seat);
   if (others.length === 0) return mine;
@@ -115,8 +136,7 @@ export function positionScore(state: GameState, seat: number, weights: Weights =
 export function playerValue(state: GameState, seat: number, viewer: number, weights: Weights = DEFAULT_WEIGHTS): Valuation {
   const player = state.players[seat]!;
   const { faction, mat } = state.setup.players[seat]!;
-  // How much of the game is left: 1 at the start, 0 once someone places their last star.
-  const left = isGameOver(state) ? 0 : 1 - Math.max(...state.players.map((p, i) => p.stars.length / state.setup.players[i]!.faction.stars));
+  const left = gameLeft(state);
   const rates = blendedRates(player.popularity, left);
   const stock = resourcesControlled(state, seat);
   const resources = RESOURCES.reduce((n, r) => n + stock[r], 0);
@@ -135,11 +155,8 @@ export function playerValue(state: GameState, seat: number, viewer: number, weig
   };
 
   if (left > 0) {
-    // What pays off before the end, worth less as it nears.
+    // What pays off over the rest of the game, worth less as the end nears.
     const future: Record<string, number> = {
-      // Resources as fuel: only as many as the bottom-row actions still to take can use.
-      fuel: RESOURCES.reduce((n, r) => n + Math.min(stock[r], need[r]), 0) * weights.resource,
-      produces: producible(state, player, stock, need) * weights.produces,
       power: player.power * weights.power,
       combatCards: player.combatCards.length * weights.combatCard,
       upgrades: player.upgrades.top.length * weights.upgrade,
@@ -148,15 +165,47 @@ export function playerValue(state: GameState, seat: number, viewer: number, weig
       recruits: player.recruits.length * weights.recruit,
       workers: player.workers.length * weights.worker,
       factoryCard: player.factoryCard ? weights.factoryCard : 0,
-      nearStars: nearStars(player, structures, faction.stars) * weights.nearStar,
-      objectives: seat === viewer ? readyObjectives(state, seat) * weights.objectiveReady : 0,
       distance: -characterDistance(state, seat) * weights.distance,
     };
     for (const [k, v] of Object.entries(future)) parts[k] = v * left;
+    // What leads to stars: worth as much at the end, when the next star may win the game.
+    const near = nearStars(player, structures, faction.stars);
+    const placed = player.stars.length / faction.stars;
+    Object.assign(parts, {
+      // Resources as fuel: only as many as the bottom-row actions still to take can use.
+      fuel: RESOURCES.reduce((n, r) => n + Math.min(stock[r], need[r]), 0) * weights.resource,
+      produces: producible(state, player, stock, need) * weights.produces,
+      // Producing costs power (and then popularity and a coin) once you have 4 or more workers: being unable to pay for it stalls everything.
+      canProduce: canPayToProduce(player) ? weights.canProduce : 0,
+      nearStars: near.sum * weights.nearStar,
+      // The closest star still to place, more so the more stars are already down.
+      closestStar: near.best * placed * weights.closestStar,
+      objectives: seat === viewer ? readyObjectives(state, seat) * weights.objectiveReady : 0,
+    });
   }
 
   const total = Object.values(parts).reduce((a, b) => a + b, 0);
   return { total, parts };
+}
+
+/** Rounds the game is expected to go on for at most, counted as "all of it" by gameLeft. */
+const LONG_GAME = 15;
+
+/**
+ * How much of the game is left, 0-1: 1 while it's expected to last another
+ * LONG_GAME rounds or more, 0 once someone places their last star. The
+ * rounds left are judged from the pace of the player nearest the end:
+ * stars still to place, at the rate they've been placing them.
+ */
+export function gameLeft(state: GameState): number {
+  if (isGameOver(state)) return 0;
+  const rounds = state.turnsTaken / state.players.length;
+  const nearest = state.players
+    .map((p, i) => ({ placed: p.stars.length, still: state.setup.players[i]!.faction.stars - p.stars.length }))
+    .reduce((a, b) => (b.still < a.still ? b : a));
+  if (nearest.placed === 0) return 1;
+  const pace = nearest.placed / Math.max(1, rounds);
+  return Math.min(1, nearest.still / pace / LONG_GAME);
 }
 
 /**
@@ -231,9 +280,9 @@ function paidThisTurn(state: GameState, seat: number): Partial<Stock> {
   return {};
 }
 
-/** How close a player is to each star they haven't placed, as (fraction of the way) squared, added up. */
-function nearStars(player: PlayerState, structures: number, starsAllowed: number): number {
-  if (player.stars.length >= starsAllowed) return 0;
+/** How close a player is to each star they haven't placed (0-1 each): squared and added up, and the closest. */
+function nearStars(player: PlayerState, structures: number, starsAllowed: number): { sum: number; best: number } {
+  if (player.stars.length >= starsAllowed) return { sum: 0, best: 0 };
   const goals: [string, number][] = [
     ['upgrades', player.upgrades.top.length / 6],
     ['mechs', player.mechs.length / 4],
@@ -243,7 +292,13 @@ function nearStars(player: PlayerState, structures: number, starsAllowed: number
     ['popularity', player.popularity / MAX_POPULARITY],
     ['power', player.power / MAX_POWER],
   ];
-  return goals.filter(([kind]) => !player.stars.includes(kind as PlayerState['stars'][number])).reduce((n, [, f]) => n + Math.min(1, f) ** 2, 0);
+  const open = goals.filter(([kind]) => !player.stars.includes(kind as PlayerState['stars'][number])).map(([, f]) => Math.min(1, f));
+  return { sum: open.reduce((n, f) => n + f ** 2, 0), best: Math.max(0, ...open) };
+}
+
+function canPayToProduce(player: PlayerState): boolean {
+  const cost = produceCost(player);
+  return player.power >= cost.power && player.popularity >= cost.popularity && player.coins >= cost.coins;
 }
 
 function readyObjectives(state: GameState, seat: number): number {

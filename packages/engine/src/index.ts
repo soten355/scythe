@@ -18,3 +18,4 @@ export { objectiveCard, objectiveMet, validateObjectiveCard, OBJECTIVE_PROGRESS,
 export { structureBonusCoins, structureBonusCount, structureBonusTile, validateStructureBonus, STRUCTURE_FEATURES, type StructureBonusTile, type StructureCount, type StructureFeature } from './structure-bonus';
 export { factoryCard, heldFactoryCard, validateFactoryCard, type FactoryCard, type FactoryCost, type FactoryGain } from './factory';
 export { unitsToMove } from './top-actions';
+export * from './view';

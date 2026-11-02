@@ -1,8 +1,8 @@
 import { baseBoard, baseFactions, baseMats, sampleEncounters, sampleFactoryCards, sampleObjectives, sampleStructureBonuses } from '@scythe/content';
-import { activeSeat, applyAction, isGameOver, legalActions, neighbors, newGame, nextInt, score, seedRng, type GameState, type HexId, type PlayerState } from '@scythe/engine';
+import { activeSeat, applyAction, isGameOver, legalActions, neighbors, newGame, nextInt, score, seedRng, standings, type GameState, type HexId, type PlayerState } from '@scythe/engine';
 import { describe, expect, it } from 'vitest';
 import { planTurns } from './planner';
-import { DEFAULT_WEIGHTS, playerValue, positionScore } from './score';
+import { DEFAULT_WEIGHTS, gameLeft, playerValue, positionScore } from './score';
 
 const game = (seed = 1, players = 2) =>
   newGame({
@@ -89,6 +89,27 @@ describe('position score', () => {
         const extra = p.stars.length * DEFAULT_WEIGHTS.star + p.popularity * DEFAULT_WEIGHTS.popularity;
         expect(value(end, seat)).toBeCloseTo(score(end)[seat]!.total + extra);
       }
+    }
+  });
+
+  it("judges how much of the game is left from the pace of the player nearest their last star", () => {
+    expect(gameLeft(start)).toBe(1);
+    // 4 stars in 10 rounds (2 players: 20 turns): 2 more at that pace is 5 rounds, a third of a long game.
+    const quick: GameState = { ...withPlayer(start, me, { stars: ['power', 'mechs', 'workers', 'upgrades'] }), turnsTaken: 20 };
+    expect(gameLeft(quick)).toBeCloseTo(5 / 15);
+    // The same 4 stars over 40 rounds: the game is going slowly, with plenty left.
+    expect(gameLeft({ ...quick, turnsTaken: 80 })).toBe(1);
+    expect(gameLeft(randomGame(1))).toBe(0);
+  });
+
+  it('scores a finished game by the result: winning beats anything, losing is worse than anything', () => {
+    for (const seed of [1, 2, 3]) {
+      const end = randomGame(seed);
+      const [winner, loser] = standings(end).map((s) => s.seat) as [number, number];
+      expect(positionScore(end, winner)).toBeGreaterThan(500);
+      expect(positionScore(end, loser)).toBeLessThan(-500);
+      // Rich as could be, but not yet over: still less than having won.
+      expect(positionScore(withPlayer(start, me, { coins: 300 }), me)).toBeLessThan(positionScore(end, winner));
     }
   });
 

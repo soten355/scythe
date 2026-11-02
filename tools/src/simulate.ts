@@ -1,56 +1,64 @@
-// Simulation runner (Node). For now: plays random legal turns with the real
-// board, Nordic + Rusviet on the Industrial + Engineering mats, and prints
-// them, as a quick look at the actions.
-import { baseBoard, baseFactions, baseMats } from '@scythe/content';
-import { activeSeat, applyAction, ENGINE_VERSION, legalActions, newGame, nextInt, type Action } from '@scythe/engine';
+// Simulation runner (Node): plays whole games between planning bots and
+// random players on the real board, with the base factions and mats (and the
+// sample decks), and reports who wins.
+//
+//   npm run sim -- --games 10 --players 5 --bots 1 --width 8
+//
+// --bots is how many seats are bots (the first ones; the rest play at random).
+// Factions and mats rotate between games, so each seat gets a mix.
+import { baseBoard, baseFactions, baseMats, sampleEncounters, sampleFactoryCards, sampleObjectives, sampleStructureBonuses } from '@scythe/content';
+import { ENGINE_VERSION, standings, type GameSetup, type Seat } from '@scythe/engine';
+import { planningBot, playMatch, randomSeat } from '@scythe/bots';
 
-const turns = 12;
-let state = newGame({
-  seed: 1,
-  board: baseBoard,
-  players: [
-    { faction: baseFactions[0]!, mat: baseMats[0]! },
-    { faction: baseFactions[1]!, mat: baseMats[1]! },
-  ],
-});
-let rng = state.rng;
-
-const describe = (a: Action): string => {
-  switch (a.type) {
-    case 'chooseSection': return `section ${a.section + 1}`;
-    case 'moveUnit': return `moves ${a.unit.kind} to ${a.to}`;
-    case 'tradeResource': return `trades for ${a.resource} on ${a.hex}`;
-    case 'produce': return `produces on ${a.hex}`;
-    case 'bolster': return `bolsters ${a.gain}`;
-    case 'pay': return `pays from ${a.hex}`;
-    case 'upgrade': return `upgrades section ${a.top.section + 1} ${a.top.field}`;
-    case 'deploy': return `deploys a mech on ${a.hex}`;
-    case 'build': return `builds a ${a.structure} on ${a.hex}`;
-    case 'enlist': return `enlists for ${a.bonus}`;
-    case 'fight': return `fights on ${a.hex}`;
-    case 'combatCard': return `card ${a.value}`;
-    case 'combatPower': return `dials ${a.power}`;
-    default: return a.type;
-  }
+const arg = (name: string, fallback: number) => {
+  const i = process.argv.indexOf(`--${name}`);
+  return i >= 0 ? Number(process.argv[i + 1]) : fallback;
 };
+const games = arg('games', 10);
+const players = arg('players', 5);
+const bots = arg('bots', 1);
+const width = arg('width', 8);
 
-console.log(`engine ${ENGINE_VERSION}: ${turns} random turns\n`);
-while (state.turnsTaken < turns) {
-  const seat = state.currentPlayer;
-  const steps: string[] = [];
-  do {
-    // Usually the player whose turn it is; in a fight, the defender chooses too.
-    const actor = activeSeat(state);
-    const options = legalActions(state, actor);
-    let pick: number;
-    [pick, rng] = nextInt(rng, options.length);
-    const action = options[pick]!;
-    steps.push(actor === seat ? describe(action) : `(player ${actor + 1} ${describe(action)})`);
-    const before = state.lastCombat;
-    state = applyAction(state, action);
-    if (state.lastCombat !== before) steps.push(`player ${state.lastCombat!.winner + 1} wins on ${state.lastCombat!.hex}`);
-  } while (state.currentPlayer === seat);
-  const p = state.players[seat]!;
-  console.log(`turn ${state.turnsTaken}: player ${seat + 1} → ${steps.join(', ')}`);
-  console.log(`   coins ${p.coins}, power ${p.power}, popularity ${p.popularity}, workers ${p.workers.length}`);
+const setup = (game: number): GameSetup => ({
+  seed: 1000 + game,
+  board: baseBoard,
+  players: Array.from({ length: players }, (_, i) => ({ faction: baseFactions[(i + game) % 5]!, mat: baseMats[(i + 2 * game) % 5]! })),
+  encounters: sampleEncounters,
+  factory: sampleFactoryCards,
+  objectives: sampleObjectives,
+  structureBonuses: sampleStructureBonuses,
+});
+
+/** Times each decision, to report how long a bot thinks. */
+function timed(seat: Seat, times: number[]): Seat {
+  return {
+    async chooseAction(view, legal) {
+      const start = performance.now();
+      const action = await seat.chooseAction(view, legal);
+      times.push(performance.now() - start);
+      return action;
+    },
+  };
 }
+
+console.log(`engine ${ENGINE_VERSION}: ${games} games, ${players} players, ${bots} bot${bots === 1 ? '' : 's'} (width ${width}), the rest random\n`);
+let botWins = 0;
+let turns = 0;
+const times: number[] = [];
+for (let game = 0; game < games; game++) {
+  const s = setup(game);
+  const seats = s.players.map((_p, i) => (i < bots ? timed(planningBot({ width }), times) : randomSeat(game * 10 + i)));
+  const { state, finished } = await playMatch(s, seats);
+  const ranked = standings(state);
+  const winner = ranked[0]!.seat;
+  if (winner < bots) botWins++;
+  turns += state.turnsTaken / players;
+  const line = ranked
+    .map((r) => `${r.seat < bots ? 'bot' : 'random'} ${s.players[r.seat]!.faction.id} ${r.total} (${state.players[r.seat]!.stars.length}★)`)
+    .join(', ');
+  console.log(`game ${game + 1}${finished ? '' : ' (unfinished)'}: ${line}; ${Math.round(state.turnsTaken / players)} turns each`);
+}
+times.sort((a, b) => a - b);
+const pct = (p: number) => Math.round(times[Math.min(times.length - 1, Math.floor(p * times.length))] ?? 0);
+console.log(`\nbots won ${botWins} of ${games}; ${Math.round(turns / games)} turns each on average`);
+if (times.length) console.log(`bot thinking: median ${pct(0.5)} ms, 99th percentile ${pct(0.99)} ms, slowest ${Math.round(times.at(-1)!)} ms (this machine)`);
