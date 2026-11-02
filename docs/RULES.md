@@ -148,6 +148,22 @@ should check it against the rulebook; tick it once confirmed.
 - [ ] Verify: free bottom-row actions from a Factory card give no coins and
       no recruit bonuses (as with encounters).
 
+## Objectives
+
+- [x] Once one objective is completed, the other card stays in hand but
+      can't be completed (Saxony's Dominate excepted). (Owner, Nov 2, 2026.)
+- [x] The player chooses when to reveal a completed objective (a button,
+      not automatic). (Owner.)
+- [ ] Verify: when an objective can be completed. The app allows it at any
+      point of your own turn, and some cards only at the end of your turn
+      (owner: "I think it can happen anytime, but sometimes only at the end
+      of that player's turn"). Not on other players' turns: check whether
+      the rulebook allows that.
+- [ ] Verify: completing an end-of-turn objective before taking the
+      bottom-row action gives up that action (the app treats it as ending
+      the turn).
+- [ ] Verify: Dominate (Saxony) lets it complete both of its objectives.
+
 ## Game end and scoring
 
 - [ ] Verify: the game ends the moment a player places their sixth star,
