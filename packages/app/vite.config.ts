@@ -9,8 +9,8 @@ export default defineConfig({
   base,
   build: {
     rollupOptions: {
-      // play.html is the game; editor.html, mats.html, factions.html and encounters.html are the map, player mat, faction and encounter card editors.
-      input: { main: 'index.html', play: 'play.html', editor: 'editor.html', mats: 'mats.html', factions: 'factions.html', encounters: 'encounters.html' },
+      // play.html is the game; editor.html, mats.html, factions.html, encounters.html and factory.html are the map, player mat, faction, encounter card and Factory card editors.
+      input: { main: 'index.html', play: 'play.html', editor: 'editor.html', mats: 'mats.html', factions: 'factions.html', encounters: 'encounters.html', factory: 'factory.html' },
     },
   },
   plugins: [

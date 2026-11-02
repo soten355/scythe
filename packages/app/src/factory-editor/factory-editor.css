@@ -1,0 +1,13 @@
+/* The card's two parts side by side, as on the card. */
+.factory-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(260px, 1fr));
+  gap: 8px;
+  padding: 0 10px;
+  overflow-x: auto;
+}
+
+.factory-grid .card .preview,
+.factory-grid .card .part:first-of-type {
+  margin-top: 0;
+}

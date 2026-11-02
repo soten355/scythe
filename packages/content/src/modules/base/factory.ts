@@ -1,7 +1,7 @@
 import type { FactoryCard } from '@scythe/engine';
 
 // A SAMPLE Factory deck, made up for play-testing until the real cards are
-// entered from the physical game (with a Factory card editor, still to come).
+// entered from the physical game (with the Factory card editor, factory.html).
 // The effects and names here are invented, not the published cards'. Each
 // has a top part (pay this to gain that) and a bottom part (a move).
 
