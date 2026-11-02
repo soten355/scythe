@@ -273,7 +273,8 @@ Each phase ends in something playable on the phone. A phase is done when its che
 - [x] Autosave, save slots, export and import
   - Done (Nov 1, 2026): every game is saved on the device after each move and undo; Saved games lists them (play, save to a file, delete) and opens `.scythe.json` files, checking each by replaying its moves. A file of a game already on the device opens as a copy, never overwriting. On iPhone, saving to a file uses the share sheet (Save to Files, AirDrop). Undo picks up where it was after reopening a game.
 - [x] Your own maps, factions and mats: a library on the device, imported from content or save files, or added from the editors (not in the original plan; added Nov 1, 2026)
-- [ ] Done when: a complete 5-faction game can be played to final scoring and reloaded from a file
+- [x] Done when: a complete 5-faction game can be played to final scoring and reloaded from a file
+  - Checked (Nov 2, 2026): a test plays three complete 5-faction games (every deck in: encounters, a Factory card, objectives, a structure bonus tile; about 1,000-1,400 moves each) to final scoring, saves each to a file and reads it back to the same game and scores (`packages/app/src/saves/full-game.test.ts`). In the app, such a file opens straight on its final scores (fixed: it used to ask to pass to the next player first). Random play favours Crimea (19 of 40 games): one free resource a turn from Coercion matters a lot to players who rarely have resources; with Coercion off the wins even out, so it's not a rules bug.
 
 **Phase 3: Automa bots**
 
