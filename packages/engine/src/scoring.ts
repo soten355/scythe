@@ -2,12 +2,13 @@
 // (sixth) star. Each player then counts coins in hand, plus coins for each
 // star placed, each territory controlled, and each 2 resources controlled,
 // at rates set by their popularity tier. The Factory counts as three
-// territories; home bases don't count. Structure bonus tiles arrive with
-// that content. Ties are broken by units and recruits, then power, then
+// territories; home bases don't count. The game's structure bonus tile, if
+// any, adds coins whatever the popularity (see structure-bonus.ts). Ties are broken by units and recruits, then power, then
 // popularity, then resources, territories and stars.
 import type { HexId } from './board';
 import type { GameState } from './game';
 import { controlledHexes } from './state';
+import { structureBonusCoins, structureBonusCount, structureBonusTile } from './structure-bonus';
 
 export interface Rates {
   star: number;
@@ -41,6 +42,8 @@ export interface PlayerScore {
   stars: ScoreLine;
   territories: ScoreLine;
   resources: ScoreLine;
+  /** What the structure bonus tile counts, and its coins (none without a tile). */
+  structureBonus: { count: number; coins: number };
   total: number;
 }
 
@@ -56,6 +59,7 @@ const resourceCount = (state: GameState, hexes: HexId[]) =>
 
 /** Each player's score, in seat order. */
 export function score(state: GameState): PlayerScore[] {
+  const tile = structureBonusTile(state);
   return state.players.map((player, seat) => {
     const rates = tierOf(player.popularity);
     const hexes = [...controlledHexes(state, seat)];
@@ -63,6 +67,8 @@ export function score(state: GameState): PlayerScore[] {
     const stars = line(player.stars.length, rates.star);
     const land = line(territoryCount(state, hexes), rates.territory);
     const resources = line(resourceCount(state, hexes), rates.resources, 2);
+    const built = tile ? structureBonusCount(state, seat, tile) : 0;
+    const structureBonus = { count: built, coins: tile ? structureBonusCoins(tile, built) : 0 };
     return {
       seat,
       coins: player.coins,
@@ -70,7 +76,8 @@ export function score(state: GameState): PlayerScore[] {
       stars,
       territories: land,
       resources,
-      total: player.coins + stars.coins + land.coins + resources.coins,
+      structureBonus,
+      total: player.coins + stars.coins + land.coins + resources.coins + structureBonus.coins,
     };
   });
 }

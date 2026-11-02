@@ -16,6 +16,7 @@ import { applyCombat, combatActions, combatSeat, COMBAT_DECK, drawCombatCards, t
 import { applyEncounter, encounterActions, setupEncounters, type EncounterCard, type EncounterTask } from './encounters';
 import { applyFactory, factoryActions, setupFactory, type FactoryCard } from './factory';
 import { completeObjective, objectiveActions, setupObjectives, type ObjectiveCard } from './objectives';
+import { setupStructureBonus, type StructureBonusTile } from './structure-bonus';
 import { awardStars, endTurn, SECTIONS, toBottomRow, type StarKind } from './state';
 import type { Faction } from './faction';
 import type { BottomActionType, PlayerMat, RecruitBonus, Resource, Structure } from './mat';
@@ -39,6 +40,8 @@ export interface GameSetup {
   factory?: FactoryCard[];
   /** The objective deck (none: no objectives). */
   objectives?: ObjectiveCard[];
+  /** Structure bonus tiles, one drawn for the game (none: no tile). */
+  structureBonuses?: StructureBonusTile[];
 }
 
 /**
@@ -174,6 +177,8 @@ export interface GameState {
   factoryDeck: string[];
   /** Objective card IDs not dealt. */
   objectiveDeck: string[];
+  /** The structure bonus tile drawn for this game, if any. */
+  structureBonus?: string;
   /** Encounter card IDs still to draw (from the front), and the ones used. */
   encounterDeck: string[];
   encounterDiscard: string[];
@@ -283,8 +288,8 @@ export function newGame(setup: GameSetup): GameState {
     factoryDeck: [],
     objectiveDeck: [],
   };
-  // The encounter, Factory and objective decks are shuffled after the combat deck (each only if the game has one), so older games deal the same as before.
-  return setup.players.reduce((s, p, seat) => drawCombatCards(s, seat, p.faction.combatCards), setupObjectives(setupFactory(setupEncounters(state))));
+  // The encounter, Factory and objective decks (and the structure bonus tile) are shuffled after the combat deck (each only if the game has one), so older games deal the same as before.
+  return setup.players.reduce((s, p, seat) => drawCombatCards(s, seat, p.faction.combatCards), setupStructureBonus(setupObjectives(setupFactory(setupEncounters(state)))));
 }
 
 /** Who must act now: the current player, except while the defender in a fight is choosing. */
