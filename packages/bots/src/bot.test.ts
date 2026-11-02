@@ -61,6 +61,36 @@ describe('planning bot', () => {
     expect(state.turnsTaken).toBe(1);
   });
 
+  describe('time limit', () => {
+    it('wraps up with a legal turn when the time runs out', async () => {
+      // A clock that runs fast: every look at it is half a second later, so a 1-second limit is up almost at once.
+      let t = 0;
+      const clock = () => (t += 500);
+      let state = newGame(setup(2, 5));
+      const bot = planningBot({ level: 'hard', timeLimit: 1000, clock });
+      const seat = state.currentPlayer;
+      while (state.currentPlayer === seat) {
+        const legal = legalActions(state, seat);
+        const action = await bot.chooseAction(playerView(state, seat), legal);
+        expect(legal).toContainEqual(action);
+        state = applyAction(state, action);
+      }
+    });
+
+    it('thinks less when it has less time', async () => {
+      const state = newGame(setup(2, 2));
+      const seat = state.currentPlayer;
+      const looks = async (timeLimit: number) => {
+        let n = 0;
+        const clock = () => (n += 1);
+        await planningBot({ level: 'hard', timeLimit, clock }).chooseAction(playerView(state, seat), legalActions(state, seat));
+        return n;
+      };
+      // Each look at the clock is a step of thinking; with almost no time, far fewer.
+      expect(await looks(2)).toBeLessThan(await looks(1_000_000));
+    });
+  });
+
   describe('difficulty levels', () => {
     it('think harder at each level', () => {
       const { easy, medium, hard } = LEVELS;

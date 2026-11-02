@@ -33,6 +33,7 @@
     <a href="{base}factory.html">Factory card editor</a>
     <a href="{base}objectives.html">Objective card editor</a>
     <a href="{base}structure-bonuses.html">Structure bonus tile editor</a>
+    <a href="{base}bot-check.html">Bot speed check</a>
   </nav>
   <p class="meta">engine v{ENGINE_VERSION}</p>
 </div>

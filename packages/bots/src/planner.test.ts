@@ -198,6 +198,18 @@ describe('turn planner', () => {
       for (const plan of beam.plans) expect(replayPlan(start, plan)).toEqual(plan.state);
     });
 
+    it('in a hurry, narrows to one turn per section but still finishes plans in every section', () => {
+      const start = randomGame(3, 200);
+      const seat = activeSeat(start);
+      const score = (s: GameState) => s.players[seat]!.coins + s.players[seat]!.power;
+      const relaxed = planTurns(start, seat, { beam: { width: 6, score } });
+      const hurried = planTurns(start, seat, { beam: { width: 6, score }, hurry: () => true });
+      expect(hurried.plans.length).toBeGreaterThan(0);
+      expect(hurried.plans.length).toBeLessThan(relaxed.plans.length);
+      const sections = (plans: TurnPlan[]) => new Set(plans.filter((p) => p.actions[0]?.type === 'chooseSection').map(sectionOf));
+      expect(sections(hurried.plans)).toEqual(sections(relaxed.plans));
+    });
+
     it('keeps the best-scoring turns', () => {
       const start = game();
       const seat = start.currentPlayer;

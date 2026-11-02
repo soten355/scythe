@@ -39,6 +39,12 @@ export interface PlanOptions {
    * tens of thousands.
    */
   beam?: { width: number; score: (state: GameState) => number };
+  /**
+   * Called between steps: once it says time's up, the beam narrows to the
+   * single best unfinished turn of each section, so the search wraps up
+   * quickly with finished plans rather than stopping empty-handed.
+   */
+  hurry?: () => boolean;
 }
 
 export interface PlanResult {
@@ -80,7 +86,8 @@ export function planTurns(start: GameState, seat: number, options: PlanOptions =
       }
     }
     if (options.beam) {
-      const kept = keepBest(next, options.beam.width, options.beam.score);
+      const width = options.hurry?.() ? 1 : options.beam.width;
+      const kept = keepBest(next, width, options.beam.score);
       if (kept.length < next.length) complete = false;
       next = kept;
     }

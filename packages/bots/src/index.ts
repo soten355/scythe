@@ -9,3 +9,4 @@ export { planningBot, type BotOptions } from './bot';
 export { playMatch, randomSeat, type MatchResult } from './match';
 export { BALANCED, PERSONALITIES, personalityFor, weightsOf, type Personality } from './personalities';
 export { LEVELS, type Level, type Thinking } from './bot';
+export { botHost, BotClient, type BotReply, type BotRequest, type RemoteBotOptions, type RemoteSeat } from './remote';

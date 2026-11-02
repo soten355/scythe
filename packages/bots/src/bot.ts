@@ -53,7 +53,15 @@ export interface BotOptions extends Partial<Thinking> {
   personality?: 'faction' | 'balanced' | Personality;
   /** Seeds its own randomness (its bluffing, imagined hands and Easy's slips), so games can be replayed. */
   seed?: number;
+  /** The most a decision should take, in milliseconds (the default: 2000). Near it, the bot wraps up with the best it has. */
+  timeLimit?: number;
+  /** The clock it times itself by, in milliseconds (the default: performance.now). */
+  clock?: () => number;
 }
+
+/** Shares of the time limit: planning this turn narrows down after this much, looking ahead stops after this much. */
+const PLAN_SHARE = 0.6;
+const LOOKAHEAD_SHARE = 0.85;
 
 /** Actions compare equal whatever order their fields were written in. */
 const same = (a: Action, b: Action) => canonical(a) === canonical(b);
@@ -63,6 +71,11 @@ const canonical = (value: unknown): string =>
 export function planningBot(options: BotOptions = {}): Seat {
   const level = LEVELS[options.level ?? 'medium'];
   const { width, slack, fightSamples, bluff, lookahead } = { ...level, ...Object.fromEntries(Object.entries(options).filter(([, v]) => v !== undefined)) } as Thinking;
+  const timeLimit = options.timeLimit ?? 2000;
+  const clock = options.clock ?? (() => performance.now());
+  /** When the decision under way started. */
+  let started = 0;
+  const past = (share: number) => () => clock() - started > share * timeLimit;
   const chosen = options.personality ?? 'faction';
   let personality: Personality | null = typeof chosen === 'object' ? chosen : chosen === 'balanced' ? BALANCED : null;
   let weights: Weights = personality ? weightsOf(personality) : weightsOf(BALANCED);
@@ -81,6 +94,7 @@ export function planningBot(options: BotOptions = {}): Seat {
     if (stop !== 'combat') return now;
     const key = fightKey(state);
     let gain = fights.get(key);
+    if (gain === undefined && past(LOOKAHEAD_SHARE)()) return now;
     if (gain === undefined) {
       gain = expectedFightScore(state, seat, thinking(Math.max(3, fightSamples >> 2), 0), rng) - now;
       fights.set(key, gain);
@@ -106,6 +120,7 @@ export function planningBot(options: BotOptions = {}): Seat {
       return legal[0]!;
     }
     const seat = activeSeat(view);
+    started = clock();
     if (!personality) {
       personality = personalityFor(view.setup.players[seat]!.faction.id);
       weights = weightsOf(personality);
@@ -116,7 +131,7 @@ export function planningBot(options: BotOptions = {}): Seat {
     }
     // Carry on with the plan while it still fits; otherwise plan afresh.
     if (planFor === view.turnsTaken && queue[0] && legal.some((a) => same(a, queue[0]!))) return queue.shift()!;
-    const { plans } = planTurns(view, seat, { beam: { width, score: (s) => positionScore(s, seat, weights) } });
+    const { plans } = planTurns(view, seat, { beam: { width, score: (s) => positionScore(s, seat, weights) }, hurry: past(PLAN_SHARE) });
     if (plans.length === 0) return legal[0]!;
     const fights = new Map<string, number>();
     let scored = plans.map((plan) => ({ plan, score: planScore(plan.state, seat, plan.stop, fights) }));
@@ -137,10 +152,11 @@ export function planningBot(options: BotOptions = {}): Seat {
    */
   function lookAhead(scored: { plan: TurnPlan; score: number }[], seat: number): { plan: TurnPlan; score: number }[] {
     const top = scored.filter((x) => x.plan.stop === 'endTurn').sort((a, b) => b.score - a.score).slice(0, lookahead);
+    const hurry = past(LOOKAHEAD_SHARE);
     return scored.map((x) => {
-      if (!top.includes(x)) return x;
+      if (!top.includes(x) || hurry()) return x;
       const again: GameState = { ...x.plan.state, currentPlayer: seat, turn: { step: 'chooseSection' } };
-      const next = planTurns(again, seat, { beam: { width: 3, score: (s) => positionScore(s, seat, weights) } }).plans;
+      const next = planTurns(again, seat, { beam: { width: 3, score: (s) => positionScore(s, seat, weights) }, hurry }).plans;
       const follow = Math.max(x.score, ...next.map((p) => positionScore(p.state, seat, weights)));
       return { plan: x.plan, score: x.score + NEXT_TURN * (follow - x.score) };
     });
