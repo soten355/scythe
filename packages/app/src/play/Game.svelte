@@ -70,7 +70,9 @@
    * Seat being handed the device (and who just played, and why if mid-turn); the board is hidden until they tap.
    * A game picked up again opens on this too, for whoever's turn it is.
    */
-  let handoff: { from?: number; to: number; note?: string } | null = $state(record.steps.length ? { to: activeSeat(restored.history[restored.history.length - 1]!) } : null);
+  // Opening a game partway through: pass to whoever acts next (not for a finished game, which opens on its final scores).
+  const opened = restored.history[restored.history.length - 1]!;
+  let handoff: { from?: number; to: number; note?: string } | null = $state(record.steps.length && !isGameOver(opened) ? { to: activeSeat(opened) } : null);
 
   // Autosave: every move, undo and new turn.
   $effect(() => {
