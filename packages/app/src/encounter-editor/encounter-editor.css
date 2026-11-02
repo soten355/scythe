@@ -1,0 +1,62 @@
+.story {
+  padding: 0 10px 8px;
+}
+
+.story textarea {
+  font: inherit;
+  font-size: 0.85rem;
+  color: var(--fg);
+  background: #3a322a;
+  border: 1px solid #fff2;
+  border-radius: 6px;
+  padding: 6px 8px;
+  resize: vertical;
+}
+
+/* The three options side by side, as on the card; stacked on a narrow screen. */
+.options-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(220px, 1fr));
+  gap: 8px;
+  padding: 0 10px;
+  overflow-x: auto;
+}
+
+.card .part {
+  margin: 4px 0 0;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.6;
+}
+
+.amounts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.amounts .amount {
+  font-size: 0.7rem;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+
+.check {
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.8rem;
+}
+
+.preview {
+  margin: 6px 0 0;
+  padding-top: 6px;
+  border-top: 1px dashed #fff3;
+  font-size: 0.8rem;
+  opacity: 0.85;
+}

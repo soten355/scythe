@@ -1,6 +1,6 @@
 // Helpers shared by the editors: export popup, questions and messages, adding to the game, HTML escaping, path updates.
 import { BUILT_IN } from '../content/catalog';
-import { addToLibrary, type Library } from '../content/library';
+import { addToLibrary, type Library, type LibraryKind } from '../content/library';
 import { SaveStore } from '../saves/store';
 
 let dialog: HTMLDialogElement | null = null;
@@ -118,15 +118,21 @@ export function askText(message: string, value: string): Promise<string | null> 
   return new Promise((resolve) => d.addEventListener('close', () => resolve(d.returnValue === 'ok' && input.value.trim() ? input.value.trim() : null), { once: true }));
 }
 
-/** Adds maps, factions or mats to the player's library, for the new game screen, and says what happened. */
-export async function addToGame(content: Library): Promise<void> {
+/**
+ * Adds maps, factions, mats or encounter cards to the player's library, for
+ * the new game screen, and says what happened (`said` words it, given the
+ * names added, when there's at least one). `replace`: that kind is replaced
+ * as a whole rather than added to (the encounter deck).
+ */
+export async function addToGame(content: Library, said?: (added: string[]) => string, replace?: LibraryKind): Promise<void> {
   const store = new SaveStore();
   try {
-    const { library, added } = addToLibrary(await store.library(), BUILT_IN, content);
+    const before = await store.library();
+    const { library, added } = addToLibrary(replace ? { ...before, [replace]: [] } : before, BUILT_IN, content);
     await store.putLibrary(library);
     await tell(
       added.length
-        ? `Added ${added.join(', ')}. It can be picked on the new game screen.`
+        ? (said?.(added) ?? `Added ${added.join(', ')}. It can be picked on the new game screen.`)
         : 'Already in the game: this is exactly like one there now.',
     );
   } catch {
