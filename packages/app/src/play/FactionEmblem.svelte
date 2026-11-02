@@ -3,6 +3,7 @@
   // Drawn behind the side panel for now; a later art pass can swap in a
   // painted background or the character's portrait here.
   import type { Faction } from '@scythe/engine';
+  import { isLight } from './ink';
 
   let { faction }: { faction: Faction } = $props();
 
@@ -22,7 +23,7 @@
   <path d={cog(60, 58, 46, 55, 14)} fill="none" stroke={faction.color} stroke-width="3" opacity="0.7" />
   <circle cx="60" cy="58" r="38" fill="none" stroke={faction.color} stroke-width="1.5" opacity="0.6" />
   <path d="M60 22 L88 32 V58 C88 78 75 90 60 98 C45 90 32 78 32 58 V32 Z" fill={faction.color} stroke="#e9dcc0" stroke-width="2" />
-  <text x="60" y="72" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="36" font-weight="700" fill="#f4ead2"
+  <text x="60" y="72" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="36" font-weight="700" fill={isLight(faction.color) ? '#1e1a16' : '#f4ead2'}
     >{faction.name[0]}</text
   >
 </svg>

@@ -20,6 +20,7 @@
   import HexIcon from './HexIcon.svelte';
   import { LABEL_Y, MECH, MEEPLE } from './shapes';
   import { ENCOUNTER_ICON, TERRAIN_ICONS, TUNNEL_ICON } from './icons';
+  import { isLight } from './ink';
   import type { Prompt, Selection } from './prompt';
 
   let {
@@ -222,7 +223,7 @@
       .map(([r, n]): [Resource, number] => [r, n - (cargo?.resources[r] ?? 0)])
       .filter(([, n]) => n > 0);
     const chips = [
-      ...(workers ? [{ what: 'worker', fill: host.g.color, n: workers, dark: false }] : []),
+      ...(workers ? [{ what: 'worker', fill: host.g.color, n: workers, dark: isLight(host.g.color) }] : []),
       ...resources.map(([r, n]) => ({ what: r as string, fill: RESOURCE_COLOR[r], n, dark: r === 'food' || r === 'metal' })),
     ];
     return chips.length ? { x: host.x, y: host.y - (cargo?.at === hex ? 24 : 13), chips } : null;
@@ -458,17 +459,17 @@
     />
   {/if}
   {#if kind === 'structure'}
-    <rect x={x - 6} y={y - 6} width="12" height="12" fill={g.color} class="structure" />
-    <text {x} y={y + 2} class="piece-text small">{g.structure}</text>
+    <rect x={x - 6} y={y - 6} width="12" height="12" fill={g.color} class="structure" class:light={isLight(g.color)} />
+    <text {x} y={y + 2} class="piece-text small" class:dark={isLight(g.color)}>{g.structure}</text>
   {:else if kind === 'character'}
     <circle cx={x} cy={y} r="6.5" fill={g.color} class="character" />
-    <text {x} y={y + LABEL_Y.character} class="piece-text">{g.initial}</text>
+    <text {x} y={y + LABEL_Y.character} class="piece-text" class:dark={isLight(g.color)}>{g.initial}</text>
   {:else if kind === 'mechs'}
     <path d={MECH} transform="translate({x} {y})" fill={g.color} class="mech" data-mech="{g.seat}|{at}" />
-    <text {x} y={y + LABEL_Y.mech} class="piece-text small">{g.initial}</text>
+    <text {x} y={y + LABEL_Y.mech} class="piece-text small" class:dark={isLight(g.color)}>{g.initial}</text>
   {:else}
     <path d={MEEPLE} transform="translate({x} {y})" fill={g.color} class="worker" data-spot={g.seat === game.currentPlayer ? `worker|${at}` : undefined} data-x={x} data-y={y} />
-    <text {x} y={y + LABEL_Y.worker} class="piece-text small">{g.workers}</text>
+    <text {x} y={y + LABEL_Y.worker} class="piece-text small" class:dark={isLight(g.color)}>{g.workers}</text>
   {/if}
 {/snippet}
 
@@ -588,7 +589,7 @@
         <!-- What the selected unit has picked up, in a row just above it. -->
         {@const on = placed.find((p) => p.g.seat === game.currentPlayer && p.kind !== 'structure' && pickable(h.id, p.kind).selected)}
         {@const chips = [
-          ...(cargo.workers.length ? [{ what: 'worker', fill: on?.g.color ?? '#fff', n: cargo.workers.length, dark: false }] : []),
+          ...(cargo.workers.length ? [{ what: 'worker', fill: on?.g.color ?? '#fff', n: cargo.workers.length, dark: isLight(on?.g.color ?? '#fff') }] : []),
           ...(Object.entries(cargo.resources) as [Resource, number][]).map(([r, n]) => ({ what: r, fill: RESOURCE_COLOR[r], n, dark: r === 'food' || r === 'metal' })),
         ]}
         {#if on}
@@ -625,19 +626,19 @@
         {@const end = spotOf(travelEnd!, moving.seat)}
         {@const f = game.setup.players[moving.seat]!.faction}
         {@const chips = [
-          ...(moving.workers ? [{ fill: f.color, n: moving.workers, dark: false }] : []),
+          ...(moving.workers ? [{ fill: f.color, n: moving.workers, dark: isLight(f.color) }] : []),
           ...(Object.entries(moving.resources) as [Resource, number][]).map(([r, n]) => ({ fill: RESOURCE_COLOR[r], n, dark: r === 'food' || r === 'metal' })),
         ]}
         <g class="travel" use:walk={moving}>
           {#if moving.kind === 'mechs'}
             <path d={MECH} transform="translate({end[0]} {end[1]})" fill={f.color} class="mech" />
-            <text x={end[0]} y={end[1] + LABEL_Y.mech} class="piece-text small">{f.name[0]}</text>
+            <text x={end[0]} y={end[1] + LABEL_Y.mech} class="piece-text small" class:dark={isLight(f.color)}>{f.name[0]}</text>
           {:else if moving.kind === 'workers'}
             <path d={MEEPLE} transform="translate({end[0]} {end[1]})" fill={f.color} class="worker" />
-            <text x={end[0]} y={end[1] + LABEL_Y.worker} class="piece-text small">1</text>
+            <text x={end[0]} y={end[1] + LABEL_Y.worker} class="piece-text small" class:dark={isLight(f.color)}>1</text>
           {:else}
             <circle cx={end[0]} cy={end[1]} r="6.5" fill={f.color} class="character" />
-            <text x={end[0]} y={end[1] + LABEL_Y.character} class="piece-text">{f.name[0]}</text>
+            <text x={end[0]} y={end[1] + LABEL_Y.character} class="piece-text" class:dark={isLight(f.color)}>{f.name[0]}</text>
           {/if}
           {#each chips as chip, ci (ci)}
             {@const cx = end[0] + (ci - (chips.length - 1) / 2) * 10}
@@ -821,6 +822,10 @@
   }
   .structure {
     stroke: #fff;
+  }
+  /* A light faction's structure (Polonia's white) keeps a dark edge. */
+  .structure.light {
+    stroke: #1e1a16;
   }
   .piece-text {
     font-size: 8px;
