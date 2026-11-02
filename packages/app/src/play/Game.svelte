@@ -1,8 +1,12 @@
 <script lang="ts">
-  // Pass-and-play game, new or from a save. The game is its setup plus every
-  // state reached so far, and the moves that led to each, so undo just steps
-  // back (within your own turn). It's saved after every change.
-  import { activeSeat, applyAction, isGameOver, legalActions, structureBonusTile, type Action, type CombatResult, type GameState, type Location } from '@scythe/engine';
+  // A game, new or from a save: people passing the device, bots, or both.
+  // The game is its setup plus every state reached so far, and the moves that
+  // led to each, so undo just steps back (within your own turn). It's saved
+  // after every change. Bots think in a background thread and play their
+  // moves one at a time; while they do, their cards, objectives and choices
+  // stay hidden and the controls are off.
+  import { onDestroy } from 'svelte';
+  import { activeSeat, applyAction, isGameOver, legalActions, playerView, structureBonusTile, type Action, type CombatResult, type GameState, type Location } from '@scythe/engine';
   import Board from './Board.svelte';
   import MatDrawer from './MatDrawer.svelte';
   import PlayerBar from './PlayerBar.svelte';
@@ -24,6 +28,9 @@
   import { countText, paysText } from './structure-bonus-text';
   import { restore, updateSave, type SavedGame } from '../saves/save';
   import { exportSave } from '../saves/files';
+  import { startBots } from '../bots/client';
+  import type { RemoteSeat } from '@scythe/bots';
+  import { botName, isBot, needsPass } from './seats';
 
   let {
     save,
@@ -72,7 +79,23 @@
    */
   // Opening a game partway through: pass to whoever acts next (not for a finished game, which opens on its final scores).
   const opened = restored.history[restored.history.length - 1]!;
-  let handoff: { from?: number; to: number; note?: string } | null = $state(record.steps.length && !isGameOver(opened) ? { to: activeSeat(opened) } : null);
+  const bots = record.bots;
+  const seats = opened.players.length;
+  const passFirst = record.steps.length > 0 && !isGameOver(opened) && needsPass(bots, seats, null, activeSeat(opened));
+  let handoff: { from?: number; to: number; note?: string } | null = $state(passFirst ? { to: activeSeat(opened) } : null);
+  /** The person who last had the device (null until someone does), so it's only passed between different people. */
+  let viewer: number | null = passFirst || isBot(bots, activeSeat(opened)) ? null : activeSeat(opened);
+
+  /** The bots, one per bot seat, thinking in a background thread started for this game. */
+  const botThread = bots?.some(Boolean) ? startBots() : null;
+  const botSeats: (RemoteSeat | null)[] = (bots ?? []).map((level, seat) =>
+    level && botThread ? botThread.client.seat(`${record.id}:${seat}`, { level, seed: record.setup.seed + seat + 1 }) : null,
+  );
+  onDestroy(() => botThread?.stop());
+  /** A bot's move shows for at least this long before the next (item 9 brings proper playback). */
+  const BOT_PACE = 550;
+  let botBusy = $state(false);
+  let botTrouble: string | null = $state(null);
 
   // Autosave: every move, undo and new turn.
   $effect(() => {
@@ -126,9 +149,11 @@
   /** Who acts now: the current player, or a defender choosing for a fight. */
   const seatNow = $derived(activeSeat(game));
   const actions = $derived(legalActions(game, seatNow));
+  /** A bot acts now: nothing to choose for whoever watches. */
+  const botNow = $derived(isBot(bots, seatNow) && !isGameOver(game));
   /** Changes each time play passes to a seat (once the pass screen is gone): the side panel's crest and text play in again. */
   const intro = $derived(handoff ? -1 : `${seatNow}|${game.turnsTaken}`);
-  const prompt = $derived(buildPrompt(game, actions, selection));
+  const prompt = $derived(buildPrompt(game, botNow ? [] : actions, botNow ? {} : selection));
   /** What the board and top bar draw: the game, with resources picked to pay with already taken off. */
   const shown = $derived(prompt.preview ?? game);
   const canUndo = $derived(history.length - 1 > turnStart);
@@ -146,6 +171,8 @@
   function act(...actions: Action[]) {
     const before = game;
     const seat = seatNow;
+    const byBot = isBot(bots, seat);
+    if (!byBot) viewer = seat;
     if (canSwitch && actions[0]?.type !== 'chooseSection') matOpen = false;
     // Each step along the way: a fight's loser may have gone home by the end, but the battle still shows them.
     const states = [before];
@@ -188,14 +215,17 @@
     if (added.length) moments = [...moments, ...added];
     selection = {};
     const nextSeat = activeSeat(next);
+    // A bot's moves can't be undone.
+    if (byBot) turnStart = history.length - 1;
+    const pass = needsPass(bots, seats, viewer, nextSeat);
     if (next.currentPlayer !== before.currentPlayer) {
       turnStart = history.length - 1;
-      handoff = { from: seat, to: nextSeat };
-      matOpen = true;
+      if (pass) handoff = { from: seat, to: nextSeat };
+      matOpen = !isBot(bots, nextSeat);
     } else if (nextSeat !== seat) {
       // Mid-turn hand-over (to a defender, or back to the attacker): no undoing what the other seat chose.
       turnStart = history.length - 1;
-      handoff = { from: seat, to: nextSeat, note: handoffNote(next, nextSeat) };
+      if (pass) handoff = { from: seat, to: nextSeat, note: handoffNote(next, nextSeat) };
     }
     if (next.lastCombat !== before.lastCombat) {
       // A fight was revealed: it can't be taken back.
@@ -221,6 +251,7 @@
 
   /** Pick a section, replacing the one picked earlier if nothing else has happened yet. */
   function choose(action: Action) {
+    if (botNow) return;
     if (canSwitch) {
       history = history.slice(0, -1);
       steps = steps.slice(0, -1);
@@ -265,6 +296,7 @@
   }
 
   function press(b: Button, sure = false) {
+    if (botNow) return;
     if (b.confirm && !sure) return ask(b.confirm, () => press(b, true));
     if (b.action?.type === 'chooseSection') choose(b.action);
     else if (b.action) act(b.action);
@@ -273,6 +305,7 @@
   }
 
   function tap(at: Location) {
+    if (botNow) return;
     const action = prompt.tapActions.get(at);
     const route = prompt.tapRoutes?.get(at);
     const select = prompt.tapSelects.get(at);
@@ -283,13 +316,36 @@
   }
 
   function undo() {
-    if (!canUndo) return;
+    if (!canUndo || botNow) return;
     history = history.slice(0, -1);
     steps = steps.slice(0, -1);
     selection = {};
     travel = null;
     if (phase(history[history.length - 1]!) === 'choose') matOpen = true;
   }
+
+  // A bot's turn: ask it for each move (once whatever is showing is done), then play it.
+  $effect(() => {
+    if (!botNow || botBusy || botTrouble || handoff || battle || revealed || moments.length || showingMoment) return;
+    const state = game;
+    const seat = seatNow;
+    const at = history.length;
+    const started = performance.now();
+    botBusy = true;
+    botSeats[seat]!.chooseAction(playerView(state, seat), legalActions(state, seat)).then(
+      async (action) => {
+        const wait = BOT_PACE - (performance.now() - started);
+        if (wait > 0) await new Promise((done) => setTimeout(done, wait));
+        botBusy = false;
+        if (history.length === at) act(action);
+      },
+      (e: unknown) => {
+        botBusy = false;
+        botTrouble = e instanceof Error ? e.message : String(e);
+      },
+    );
+  });
+  const botLabel = (seat: number) => `${name(seat)} (${botName(bots![seat]!)})`;
 
   let menuOpen = $state(false);
 
@@ -409,7 +465,13 @@
       {/key}
       <div class="panel" bind:this={panel}>
         {#key intro}<div class="intro">
-        {#if over}
+        {#if botNow}
+          <p class="title">{botLabel(seatNow)} is playing…</p>
+          {#if botTrouble}
+            <p class="hint">Something went wrong while it was thinking: {botTrouble}</p>
+            <button class="primary" onclick={() => (botTrouble = null)}>Try again</button>
+          {/if}
+        {:else if over}
           <p class="title">Game over: a sixth star has been placed.</p>
           <button class="primary" onclick={() => (viewingBoard = false)}>Final scores</button>
         {:else if !headings}
@@ -430,7 +492,7 @@
         {/if}
         </div>{/key}
       </div>
-      {#if prompt.end && !over}
+      {#if prompt.end && !over && !botNow}
         {@const end = prompt.end}
         {#if end.primary}
           <!-- Nothing else to do this turn: End turn is the main button. -->
@@ -446,7 +508,7 @@
   </main>
 
   <!-- A fight takes over the screen until it's decided. -->
-  <FightScreen game={shown} {prompt} seat={seatNow} {canUndo} onUndo={undo} onSelect={(sel) => (selection = sel)} onPress={press} {battle} onBattleDone={() => (battle = null)} />
+  <FightScreen game={shown} {prompt} seat={seatNow} waiting={botNow ? `${botLabel(seatNow)} is choosing…` : null} {canUndo} onUndo={undo} onSelect={(sel) => (selection = sel)} onPress={press} {battle} onBattleDone={() => (battle = null)} />
 
   {#if showScores}
     <GameOver {game} {canUndo} onUndo={undo} onBoard={() => (viewingBoard = true)} {onNewGame} {onMenu} />
@@ -462,11 +524,11 @@
     </nav>
   {/if}
 
-  <MatDrawer {game} {choices} {previous} bind:open={matOpen} onChoose={choose} upgrade={prompt.upgrade} onSelect={(sel) => (selection = sel)} />
+  <MatDrawer {game} {choices} {previous} secret={isBot(bots, game.currentPlayer)} bind:open={matOpen} onChoose={choose} upgrade={prompt.upgrade} onSelect={(sel) => (selection = sel)} />
 
   {#if handoff !== null && !battle}
     {@const { from, to } = handoff}
-    <button class="handoff" style:--c={color(to)} onclick={() => (handoff = null)} transition:fade={{ duration: 350 }}>
+    <button class="handoff" style:--c={color(to)} onclick={() => ((viewer = to), (handoff = null))} transition:fade={{ duration: 350 }}>
       <!-- The last player's badge slides off to the left as the next one slides in from the right. -->
       <span class="badges">
         {#key handoff}
@@ -479,7 +541,7 @@
     </button>
   {/if}
 
-  {#if prompt.choice && !handoff}
+  {#if prompt.choice && !handoff && !botNow}
     {@const c = prompt.choice}
     <div class="ask" role="dialog" aria-modal="true" style:--c={color(game.currentPlayer)}>
       <div class="box">
@@ -494,7 +556,7 @@
     </div>
   {/if}
 
-  {#if prompt.encounter && !handoff && !battle && !revealed}
+  {#if prompt.encounter && !handoff && !battle && !revealed && !botNow}
     {@const e = prompt.encounter}
     {#if peeking}
       <button class="primary back-to-card" onclick={() => (peeking = false)}>⭐ Back to the encounter</button>
@@ -523,7 +585,7 @@
     {/if}
   {/if}
 
-  {#if prompt.factoryOffer && !handoff && !battle && !revealed}
+  {#if prompt.factoryOffer && !handoff && !battle && !revealed && !botNow}
     {@const f = prompt.factoryOffer}
     <!-- The Factory: keep one of the cards on offer. -->
     <div class="ask" role="dialog" aria-modal="true" style:--c={color(game.currentPlayer)}>

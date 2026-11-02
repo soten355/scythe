@@ -1,6 +1,7 @@
 // A saved game: its setup plus every move made, grouped the way they were
 // made (each group is one undo step). Replaying the moves rebuilds the game,
 // so a save is small, and a file can't hold a position the rules don't allow.
+import type { Level } from '@scythe/bots';
 import { applyAction, ENGINE_VERSION, isGameOver, newGame, type Action, type GameSetup, type GameState } from '@scythe/engine';
 
 const FORMAT = 'scythe-save';
@@ -28,6 +29,8 @@ export interface SavedGame {
   setup: GameSetup;
   /** The map's name on the new game screen, for taking the map from a save. */
   mapName?: string;
+  /** Each seat's bot level, or null for a person (none: everyone is a person, as in older saves). */
+  bots?: (Level | null)[];
   /** Every move, in order; each inner list is applied as one step. */
   steps: Action[][];
   /** Step where undo stops (see Game.svelte). */
@@ -46,10 +49,11 @@ function summarize(state: GameState): SaveSummary {
   };
 }
 
-export function createSave(setup: GameSetup, id: string, now: Date, mapName?: string): SavedGame {
+export function createSave(setup: GameSetup, id: string, now: Date, mapName?: string, bots?: (Level | null)[]): SavedGame {
   const state = newGame(setup);
   return {
     ...(mapName ? { mapName } : {}),
+    ...(bots?.some(Boolean) ? { bots } : {}),
     format: FORMAT,
     formatVersion: FORMAT_VERSION,
     id,

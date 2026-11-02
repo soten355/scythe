@@ -68,6 +68,14 @@ describe('save files', () => {
     expect(parseSaveFile(saveFileText(save))).toEqual(save);
   });
 
+  it('remembers which seats are bots, and at what level', () => {
+    const save = createSave(setup, 'b1', at, 'Standard', [null, 'hard']);
+    expect(save.bots).toEqual([null, 'hard']);
+    expect(parseSaveFile(saveFileText(save)).bots).toEqual([null, 'hard']);
+    // Older saves have no bots: everyone is a person.
+    expect(createSave(setup, 'g1', at).bots).toBeUndefined();
+  });
+
   it('carries its own map, factions and mats, so custom ones load without being on the device', () => {
     const custom: GameSetup = {
       ...setup,

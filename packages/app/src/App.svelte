@@ -3,6 +3,7 @@
   // game. A game in progress stays alive behind the menu, so it can be
   // continued; every game is also kept on the device after every move.
   import type { GameSetup } from '@scythe/engine';
+  import type { Level } from '@scythe/bots';
   import Game from './play/Game.svelte';
   import Home from './menu/Home.svelte';
   import NewGame from './menu/NewGame.svelte';
@@ -80,8 +81,8 @@
     store.put(save).catch(() => alert("This game couldn't be saved on the device. Save it to a file from the game menu to keep it."));
   }
 
-  function start(setup: GameSetup, mapName: string) {
-    const save = createSave(setup, crypto.randomUUID(), new Date(), mapName);
+  function start(setup: GameSetup, mapName: string, bots: (Level | null)[]) {
+    const save = createSave(setup, crypto.randomUUID(), new Date(), mapName, bots);
     // Ask the browser not to clear saves when space runs low.
     void navigator.storage?.persist?.();
     persist(save);

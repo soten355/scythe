@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { baseBoard, baseFactions, baseMats } from '@scythe/content';
 import type { Faction, PlayerMat } from '@scythe/engine';
-import { defaultChoice, fitChoice, maxPlayers, MIN_PLAYERS, problems, setFaction, setMat, setPlayerCount, shuffleSeats, toSetup, type Catalog } from './setup';
+import { botsOf, defaultChoice, fitChoice, maxPlayers, MIN_PLAYERS, problems, setBot, setFaction, setMat, setPlayerCount, shuffleSeats, toSetup, type Catalog } from './setup';
 
 const [nordic, rusviet] = baseFactions as [Faction, Faction];
 const [mat1, mat2] = baseMats as [PlayerMat, PlayerMat];
@@ -15,12 +15,12 @@ const more: Catalog = {
 };
 
 describe('the new game choices', () => {
-  it('start with the default map and the first factions and mats, two players', () => {
+  it('start with the default map and the first factions and mats, you against a Medium bot', () => {
     expect(defaultChoice(catalog)).toEqual({
       map: 'standard',
       players: [
-        { faction: nordic.id, mat: mat1.id },
-        { faction: rusviet.id, mat: mat2.id },
+        { faction: nordic.id, mat: mat1.id, bot: null },
+        { faction: rusviet.id, mat: mat2.id, bot: 'medium' },
       ],
     });
     expect(problems(defaultChoice(catalog), catalog)).toEqual([]);
@@ -34,7 +34,7 @@ describe('the new game choices', () => {
 
   it('add seats with unused factions and mats, and drop them from the end', () => {
     const three = setPlayerCount(defaultChoice(more), 3, more);
-    expect(three.players[2]).toEqual({ faction: 'third', mat: 'mat-3' });
+    expect(three.players[2]).toEqual({ faction: 'third', mat: 'mat-3', bot: 'medium' });
     expect(setPlayerCount(three, 2, more).players).toEqual(defaultChoice(more).players);
     // Not past what's available.
     expect(setPlayerCount(defaultChoice(catalog), 3, catalog).players).toHaveLength(2);
@@ -53,8 +53,19 @@ describe('the new game choices', () => {
     expect(problems(c, catalog)).toEqual([]);
   });
 
+  it('any seat can be played by a person or a bot of any level, kept through shuffles and swaps', () => {
+    let c = setBot(defaultChoice(more), 1, 'hard');
+    c = setPlayerCount(c, 3, more);
+    c = setBot(setBot(c, 0, 'easy'), 2, null);
+    expect(botsOf(c)).toEqual(['easy', 'hard', null]);
+    expect(botsOf(shuffleSeats(c, more, () => 0))).toEqual(['easy', 'hard', null]);
+    expect(botsOf(setFaction(c, 0, 'third'))).toEqual(['easy', 'hard', null]);
+    // Every seat a bot is allowed: a game to watch.
+    expect(problems(setBot(c, 2, 'medium'), more)).toEqual([]);
+  });
+
   it('point out what stops a game from starting', () => {
-    const same = { map: 'standard', players: [{ faction: nordic.id, mat: mat1.id }, { faction: nordic.id, mat: mat1.id }] };
+    const same = { map: 'standard', players: [{ faction: nordic.id, mat: mat1.id, bot: null }, { faction: nordic.id, mat: mat1.id, bot: null }] };
     expect(problems(same, catalog)).toEqual(['Two seats have Nordic.', 'Two seats have the Industrial mat.']);
     const sharedHome = { ...more, factions: [nordic, rusviet, { ...nordic, id: 'third', name: 'Third' }] };
     const c = setPlayerCount(defaultChoice(sharedHome), 3, sharedHome);
@@ -74,7 +85,7 @@ describe('the new game choices', () => {
   it('picks that are no longer offered (removed from the library) are swapped for unused ones', () => {
     const extra = { ...baseFactions[0]!, id: 'extra', name: 'Extra' };
     const bigger: Catalog = { ...catalog, factions: [...catalog.factions, extra], maps: [...catalog.maps, { id: 'm2', name: 'M2', board: baseBoard }] };
-    const choice = { map: 'm2', players: [{ faction: 'extra', mat: catalog.mats[0]!.id }, { faction: catalog.factions[0]!.id, mat: catalog.mats[1]!.id }] };
+    const choice = { map: 'm2', players: [{ faction: 'extra', mat: catalog.mats[0]!.id, bot: null }, { faction: catalog.factions[0]!.id, mat: catalog.mats[1]!.id, bot: 'hard' as const }] };
     expect(fitChoice(choice, bigger)).toBe(choice);
     const fitted = fitChoice(choice, catalog);
     expect(fitted.map).toBe(catalog.maps[0]!.id);

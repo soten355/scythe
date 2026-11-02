@@ -1,5 +1,7 @@
 // The new game screen's choices: the map, how many players, and each seat's
-// faction and mat. Picking a faction or mat another seat has swaps the two.
+// faction, mat and who plays it (a person or a bot). Picking a faction or
+// mat another seat has swaps the two.
+import type { Level } from '@scythe/bots';
 import type { Board, EncounterCard, Faction, FactoryCard, GameSetup, ObjectiveCard, PlayerMat, StructureBonusTile } from '@scythe/engine';
 
 /** A map to play on. The standard one comes first and is picked by default; more can be added later. */
@@ -26,11 +28,11 @@ export interface Catalog {
 
 export interface SetupChoice {
   map: string;
-  /** In seating order (clockwise). */
-  players: { faction: string; mat: string }[];
+  /** In seating order (clockwise). `bot` is the level of the bot playing the seat; null for a person. */
+  players: { faction: string; mat: string; bot: Level | null }[];
 }
 
-/** Solo games need the bots, which come later. */
+/** Seats, counting bots: a solo game is you and at least one bot. */
 export const MIN_PLAYERS = 2;
 export const MAX_PLAYERS = 7;
 
@@ -40,14 +42,14 @@ export function defaultChoice(catalog: Catalog): SetupChoice {
   return setPlayerCount({ map: catalog.maps[0]!.id, players: [] }, MIN_PLAYERS, catalog);
 }
 
-/** Adds seats with the first unused faction and mat each, or drops seats from the end. */
+/** Adds seats with the first unused faction and mat each (the first played by you, the others by Medium bots), or drops seats from the end. */
 export function setPlayerCount(choice: SetupChoice, count: number, catalog: Catalog): SetupChoice {
   const n = Math.max(0, Math.min(count, maxPlayers(catalog)));
   const players = choice.players.slice(0, n);
   while (players.length < n) {
     const faction = catalog.factions.find((f) => !players.some((p) => p.faction === f.id))!;
     const mat = catalog.mats.find((m) => !players.some((p) => p.mat === m.id))!;
-    players.push({ faction: faction.id, mat: mat.id });
+    players.push({ faction: faction.id, mat: mat.id, bot: players.length ? 'medium' : null });
   }
   return { ...choice, players };
 }
@@ -95,8 +97,16 @@ export function shuffleSeats(choice: SetupChoice, catalog: Catalog, random: () =
   };
   const factions = shuffled(catalog.factions);
   const mats = shuffled(catalog.mats);
-  return { ...choice, players: choice.players.map((_, i) => ({ faction: factions[i]!.id, mat: mats[i]!.id })) };
+  return { ...choice, players: choice.players.map((p, i) => ({ ...p, faction: factions[i]!.id, mat: mats[i]!.id })) };
 }
+
+/** Who plays a seat: a bot of that level, or a person (null). */
+export function setBot(choice: SetupChoice, seat: number, bot: Level | null): SetupChoice {
+  return { ...choice, players: choice.players.map((p, i) => (i === seat ? { ...p, bot } : p)) };
+}
+
+/** Each seat's bot level, or null for a person, as the game keeps it. */
+export const botsOf = (choice: SetupChoice): (Level | null)[] => choice.players.map((p) => p.bot);
 
 /** What stops the game from starting, in plain words; empty when it's ready. */
 export function problems(choice: SetupChoice, catalog: Catalog): string[] {

@@ -25,6 +25,7 @@
     onChoose,
     upgrade,
     onSelect,
+    secret = false,
   }: {
     game: GameState;
     choices: Action[];
@@ -34,6 +35,8 @@
     onChoose: (a: Action) => void;
     upgrade?: Prompt['upgrade'];
     onSelect: (selection: Selection) => void;
+    /** The current player's objectives are hidden (a bot's turn, watched by a person). */
+    secret?: boolean;
   } = $props();
   /** Picking an upgrade: the mat stays open and nothing is greyed out. */
   const picking = $derived(!!upgrade);
@@ -183,7 +186,7 @@
         <div class="section factory" class:active={active === FACTORY} class:last={!picking && previous === FACTORY}>{@render factoryContent()}</div>
       {/if}
     {/if}
-    {#if objectives.length}
+    {#if objectives.length && !secret}
       <!-- Your objectives: hidden from the others, so only on your own mat. -->
       <div class="section objectives">
         <div class="head"><b>🎯 Objectives</b></div>

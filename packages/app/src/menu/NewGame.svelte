@@ -1,13 +1,16 @@
 <script lang="ts">
   // The new game screen: pick the map, how many players, and each seat's
-  // faction and mat (or shuffle them), then start. The player's own maps,
+  // faction and mat (or shuffle them) and who plays it (you, another person
+  // passed the device, or a bot at Easy, Medium or Hard), then start. The player's own maps,
   // factions and mats (made in the editors or brought in from files) are
   // offered after the built-in ones, and can be added or removed here.
   import { untrack } from 'svelte';
   import FactionEmblem from '../play/FactionEmblem.svelte';
   import type { GameSetup } from '@scythe/engine';
+  import type { Level } from '@scythe/bots';
+  import { botName } from '../play/seats';
   import type { Library, LibraryKind } from '../content/library';
-  import { defaultChoice, fitChoice, MAX_PLAYERS, maxPlayers, MIN_PLAYERS, problems, setFaction, setMat, setPlayerCount, shuffleSeats, toSetup, type Catalog } from './setup';
+  import { botsOf, defaultChoice, fitChoice, MAX_PLAYERS, maxPlayers, MIN_PLAYERS, problems, setFaction, setBot, setMat, setPlayerCount, shuffleSeats, toSetup, type Catalog } from './setup';
 
   let {
     catalog,
@@ -25,7 +28,7 @@
     library: Library;
     /** What happened with the last file brought in. */
     message: string;
-    onStart: (setup: GameSetup, mapName: string) => void;
+    onStart: (setup: GameSetup, mapName: string, bots: (Level | null)[]) => void;
     onImport: (file: File) => void;
     onRemove: (kind: LibraryKind, id: string | string[]) => void;
     onBack: () => void;
@@ -73,7 +76,10 @@
   const counts = Array.from({ length: MAX_PLAYERS - MIN_PLAYERS + 1 }, (_, i) => MIN_PLAYERS + i);
 
   // The app may use Math.random; the engine never does.
-  const start = () => onStart(toSetup(choice, catalog, Math.floor(Math.random() * 2 ** 31)), catalog.maps.find((m) => m.id === choice.map)!.name);
+  const start = () => onStart(toSetup(choice, catalog, Math.floor(Math.random() * 2 ** 31)), catalog.maps.find((m) => m.id === choice.map)!.name, botsOf(choice));
+  const LEVELS: Level[] = ['easy', 'medium', 'hard'];
+  /** People share the device (pass-and-play); the first person is "You" when the rest are bots. */
+  const personCount = $derived(choice.players.filter((p) => !p.bot).length);
 </script>
 
 <div class="screen">
@@ -106,7 +112,7 @@
         </div>
         {#if most < MAX_PLAYERS}
           <p class="hint">
-            {catalog.factions.length} factions and {catalog.mats.length} player mats so far: one of each per player. Solo play arrives with the bots.
+            {catalog.factions.length} factions and {catalog.mats.length} player mats so far: one of each per player.
           </p>
         {/if}
       </section>
@@ -153,7 +159,7 @@
 
     <section class="col seats">
       <div class="seats-head">
-        <h3>Seats <small>pass-and-play, clockwise</small></h3>
+        <h3>Seats <small>clockwise{personCount > 1 ? ' · people pass the device' : ''}</small></h3>
         <button class="quiet small" onclick={() => (picked = shuffleSeats(choice, catalog, Math.random))}>🔀 Shuffle</button>
       </div>
       {#each choice.players as p, seat (seat)}
@@ -162,6 +168,13 @@
         <div class="seat" style:--c={f.color}>
           <div class="crest"><FactionEmblem faction={f} /></div>
           <div class="picks">
+            <label>
+              <span>Played by</span>
+              <select value={p.bot ?? 'person'} onchange={(e) => (picked = setBot(choice, seat, e.currentTarget.value === 'person' ? null : (e.currentTarget.value as Level)))}>
+                <option value="person">{personCount === 1 && !p.bot ? 'You' : 'A person'}</option>
+                {#each LEVELS as level (level)}<option value={level}>{botName(level)}</option>{/each}
+              </select>
+            </label>
             <label>
               <span>Faction</span>
               <select value={p.faction} onchange={(e) => (picked = setFaction(choice, seat, e.currentTarget.value))}>

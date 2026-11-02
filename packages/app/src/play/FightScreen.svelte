@@ -23,6 +23,7 @@
     onPress,
     battle,
     onBattleDone,
+    waiting = null,
   }: {
     game: GameState;
     prompt: Prompt;
@@ -35,6 +36,8 @@
     /** A fight that just ended, to play out before going back to the map. */
     battle: Battle | null;
     onBattleDone: () => void;
+    /** A bot is choosing: what to say instead of showing its power and cards. */
+    waiting?: string | null;
   } = $props();
 
   const view = $derived(fightSides(game));
@@ -91,6 +94,9 @@
 
     <!-- Whoever is choosing: power and cards, or a choice before the fight (Artillery). -->
     <div class="tray" style:--c={game.setup.players[seat]!.faction.color}>
+      {#if waiting}
+      <p class="title">{waiting}</p>
+      {:else}
       <p class="title">{prompt.title}</p>
       {#if prompt.combat}
         {@const c = prompt.combat}
@@ -119,6 +125,7 @@
           <button class:primary={b.primary} class:quiet={b.quiet} onclick={() => onPress(b)}>{b.label}</button>
         {/each}
       </div>
+      {/if}
     </div>
     {/if}
   </div>
