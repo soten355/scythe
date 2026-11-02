@@ -1,4 +1,4 @@
-import { activeSeat, applyAction, isGameOver, legalActions, newGame, nextInt, seedRng, validateObjectiveCard } from '@scythe/engine';
+import { activeSeat, applyAction, isGameOver, legalActions, newGame, nextInt, seedRng, validateObjectiveCard, validateStructureBonus, score } from '@scythe/engine';
 import { describe, expect, it } from 'vitest';
 import { baseBoard } from './board';
 import { baseFactions } from './factions';
@@ -6,6 +6,7 @@ import { baseMats } from './mats';
 import { sampleEncounters } from './encounters';
 import { sampleFactoryCards } from './factory';
 import { sampleObjectives } from './objectives';
+import { sampleStructureBonuses } from './structure-bonuses';
 
 describe('a game with the base content', () => {
   const setup = (seed: number) => ({
@@ -48,6 +49,7 @@ describe('a game with the base content', () => {
         encounters: sampleEncounters,
         factory: sampleFactoryCards,
         objectives: sampleObjectives,
+        structureBonuses: sampleStructureBonuses,
         players: baseFactions.map((faction, i) => ({ faction, mat: baseMats[i]! })),
       });
       expect(state.encounterTokens).toHaveLength(11);
@@ -78,6 +80,9 @@ describe('a game with the base content', () => {
           for (const id of p.objectivesDone ?? []) expect(p.objectives).toContain(id);
         });
       }
+      // A tile was drawn, and every final score adds up.
+      expect(state.structureBonus).toBeDefined();
+      for (const s of score(state)) expect(s.total).toBe(s.coins + s.stars.coins + s.territories.coins + s.resources.coins + s.structureBonus.coins);
     }
     expect(encounters).toBeGreaterThan(0);
     expect(factoryUsed).toBeGreaterThan(0);
@@ -96,5 +101,12 @@ describe('the sample objective deck', () => {
   it('has a unique ID for every card, and every card is complete', () => {
     expect(new Set(sampleObjectives.map((c) => c.id)).size).toBe(sampleObjectives.length);
     for (const c of sampleObjectives) expect(validateObjectiveCard(c), c.id).toEqual([]);
+  });
+});
+
+describe('the sample structure bonus tiles', () => {
+  it('has a unique ID for every tile, and every tile is complete', () => {
+    expect(new Set(sampleStructureBonuses.map((t) => t.id)).size).toBe(sampleStructureBonuses.length);
+    for (const t of sampleStructureBonuses) expect(validateStructureBonus(t), t.id).toEqual([]);
   });
 });
