@@ -252,7 +252,7 @@ Each phase ends in something playable on the phone. A phase is done when its che
   - Done from play-testing: a Speed unit can drop off and pick up workers and resources at each hex along the way, using the side panel's pick-up slots, with the map updating live.
 - [x] Stars, triumph track, game end and final scoring
   - Stars are placed on the triumph track as they're earned (shown in the top bar). The sixth ends the game at once; a final scores screen shows each player's coins, stars, territories and resources at their popularity tier, and the winner (with tie-breakers). Objective stars and structure bonus tiles join when those are entered.
-- [ ] Encounters, the Factory, objectives, structure bonus tiles
+- [x] Encounters, the Factory, objectives, structure bonus tiles
   - Encounters (Nov 1, 2026): tokens on the map, a shuffled deck, the card in a pop-up with its three options (greyed out when you can't pay), rewards of every kind (coins, power, popularity, combat cards, workers and resources on the hex, resources of your choice, free Upgrade/Deploy/Build/Enlist), and Meander. New games use a made-up sample deck of 6 cards for now.
   - [x] Encounter card editor, to enter the real deck from the physical cards (with "Add to game" / "Save to a file")
     - Done (Nov 2, 2026): encounters.html, linked from the main menu. Once your cards are added, new games draw from them in place of the sample deck; the new game screen shows your deck as one line (✕ goes back to the sample). Still to do: enter the real deck.
@@ -266,7 +266,8 @@ Each phase ends in something playable on the phone. A phase is done when its che
     - Done (Nov 2, 2026): `objectives.html`, linked from the home screen. Each card's name, story, "only at the end of your turn", and its conditions (add, remove, change the kind; at least / at most), with the game's wording shown below. "Add deck to game" makes new games deal from it (shown as "Objective deck" on the new game screen, removable there); save to a file or Export to paste into chat.
   - [x] Structure bonus tiles
     - Done (Nov 2, 2026): one tile drawn at random for each game, shown under the round card (tap it for its payouts). At the end, each player's structures are counted as the tile says (tunnels, lakes or encounter spots next to them; on tunnels or certain terrains; the longest straight row) and pay coins by step, whatever their popularity; a Structures column on the final scores. New games use 6 made-up sample tiles for now.
-  - [ ] Structure bonus tile editor, to enter the real tiles (like the card editors)
+  - [x] Structure bonus tile editor, to enter the real tiles (like the card editors)
+    - Done (Nov 2, 2026): `structure-bonuses.html`, linked from the home screen. Each tile's name, what it counts (spots next to your structures; your structures on tunnels or terrains; your longest straight row) and its payout steps, with the game's wording shown below. "Add tiles to game" makes new games draw from them (shown as "Structure bonus tiles" on the new game screen, removable there); save to a file or Export to paste into chat. Still to do across this item: enter the real encounter, Factory and objective cards and the real tiles.
 - [ ] All 5 base factions and 5 mats; Invaders from Afar factions and mats
   - Base game done (Nov 1, 2026): Nordic, Rusviet, Polonia, Crimea, Saxony; Industrial, Engineering, Patriotic, Mechanical, Agricultural. Up to 5 players. Still to come: Invaders from Afar's two factions and two mats.
 - [x] Autosave, save slots, export and import
