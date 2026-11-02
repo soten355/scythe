@@ -69,7 +69,7 @@
     }
   }
 
-  const removeContent = (kind: LibraryKind, id: string) => keep(removeFromLibrary(library, kind, id));
+  const removeContent = (kind: LibraryKind, id: string | string[]) => keep(removeFromLibrary(library, kind, id));
 
   function play(save: SavedGame) {
     if (current?.save.id !== save.id) current = { key: ++opened, save };

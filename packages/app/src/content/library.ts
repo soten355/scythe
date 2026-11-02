@@ -1,8 +1,10 @@
-// The player's own maps, factions and mats: made in the editors or brought in
-// from files (content files, or the map, factions and mats inside any save).
-// Kept on the device and offered on the new game screen next to the built-in
-// ones. Games don't depend on the library: each save carries its own copies.
-import { validateFaction, validateMat, type Board, type Faction, type PlayerMat } from '@scythe/engine';
+// The player's own maps, factions, mats and encounter cards: made in the
+// editors or brought in from files (content files, or what's inside any
+// save). Kept on the device and offered on the new game screen next to the
+// built-in ones. Games don't depend on the library: each save carries its own
+// copies. Encounter cards make one deck: once there are any, new games use
+// them in place of the built-in deck.
+import { validateEncounterCard, validateFaction, validateMat, type Board, type EncounterCard, type Faction, type PlayerMat } from '@scythe/engine';
 import type { Catalog, MapOption } from '../menu/setup';
 
 const FORMAT = 'scythe-content';
@@ -12,11 +14,12 @@ export interface Library {
   maps: MapOption[];
   factions: Faction[];
   mats: PlayerMat[];
+  encounters: EncounterCard[];
 }
 
 export type LibraryKind = keyof Library;
 
-export const EMPTY_LIBRARY: Library = { maps: [], factions: [], mats: [] };
+export const EMPTY_LIBRARY: Library = { maps: [], factions: [], mats: [], encounters: [] };
 
 /** JSON with object keys sorted, so equal data compares equal whatever order its keys were written in. */
 const canonical = (value: unknown): string =>
@@ -33,12 +36,12 @@ const body = (item: { id: string; name: string }) => canonical({ ...item, id: ''
  * changed built-in one is kept as "<name> (custom)". Returns the names added.
  */
 export function addToLibrary(library: Library, builtIn: Catalog, incoming: Library): { library: Library; added: string[] } {
-  const next: Library = { maps: [...library.maps], factions: [...library.factions], mats: [...library.mats] };
+  const next: Library = { maps: [...library.maps], factions: [...library.factions], mats: [...library.mats], encounters: [...library.encounters] };
   const added: string[] = [];
-  const kinds: LibraryKind[] = ['maps', 'factions', 'mats'];
+  const kinds: LibraryKind[] = ['maps', 'factions', 'mats', 'encounters'];
   for (const kind of kinds) {
-    const builtIns = builtIn[kind] as { id: string; name: string }[];
-    for (const original of incoming[kind] as { id: string; name: string }[]) {
+    const builtIns = (builtIn[kind] ?? []) as { id: string; name: string }[];
+    for (const original of (incoming[kind] ?? []) as { id: string; name: string }[]) {
       const mine = next[kind] as { id: string; name: string }[];
       if ([...builtIns, ...mine].some((x) => body(x) === body(original))) continue;
       let item = original;
@@ -55,17 +58,20 @@ export function addToLibrary(library: Library, builtIn: Catalog, incoming: Libra
   return { library: next, added };
 }
 
-export function removeFromLibrary(library: Library, kind: LibraryKind, id: string): Library {
-  return { ...library, [kind]: (library[kind] as { id: string }[]).filter((x) => x.id !== id) };
+/** Removes one item, or several at once (a whole encounter deck). */
+export function removeFromLibrary(library: Library, kind: LibraryKind, id: string | string[]): Library {
+  const ids = typeof id === 'string' ? [id] : id;
+  return { ...library, [kind]: (library[kind] as { id: string }[]).filter((x) => !ids.includes(x.id)) };
 }
 
-/** Built-in maps, factions and mats first, then the player's own (and the built-in encounter deck). */
+/** Built-in maps, factions and mats first, then the player's own; the player's encounter cards, if any, else the built-in deck. */
 export function catalogWith(builtIn: Catalog, library: Library): Catalog {
+  const encounters = library.encounters.length ? library.encounters : builtIn.encounters;
   return {
     maps: [...builtIn.maps, ...library.maps],
     factions: [...builtIn.factions, ...library.factions],
     mats: [...builtIn.mats, ...library.mats],
-    ...(builtIn.encounters && { encounters: builtIn.encounters }),
+    ...(encounters && { encounters }),
   };
 }
 
@@ -73,10 +79,11 @@ export function contentFileText(content: Library): string {
   return JSON.stringify({ format: FORMAT, formatVersion: FORMAT_VERSION, ...content });
 }
 
-/** Named after the one thing in it, or "scythe-content" when there are several. */
+/** Named after the one thing in it, "scythe-encounters" for encounter cards alone, or "scythe-content" when there are several. */
 export function contentFileName(content: Library): string {
-  const all = [...content.maps, ...content.factions, ...content.mats];
-  const name = all.length === 1 ? all[0]!.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'content' : 'content';
+  const all = [...content.maps, ...content.factions, ...content.mats, ...content.encounters];
+  const onlyCards = content.encounters.length > 1 && all.length === content.encounters.length;
+  const name = onlyCards ? 'encounters' : all.length === 1 ? all[0]!.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'content' : 'content';
   return `scythe-${name}.scythe-content.json`;
 }
 
@@ -117,16 +124,26 @@ export function parseContentFile(text: string): Library {
   let content: Library;
   if (data.format === FORMAT) {
     if ((data.formatVersion as number) > FORMAT_VERSION) throw new Error('This file was made by a newer version of the app. Update the app to open it.');
-    content = { maps: (data.maps as MapOption[]) ?? [], factions: (data.factions as Faction[]) ?? [], mats: (data.mats as PlayerMat[]) ?? [] };
+    content = {
+      maps: (data.maps as MapOption[]) ?? [],
+      factions: (data.factions as Faction[]) ?? [],
+      mats: (data.mats as PlayerMat[]) ?? [],
+      encounters: (data.encounters as EncounterCard[]) ?? [],
+    };
   } else if (data.format === 'scythe-save') {
-    const setup = data.setup as { board: Board; players: { faction: Faction; mat: PlayerMat }[] } | undefined;
+    const setup = data.setup as { board: Board; players: { faction: Faction; mat: PlayerMat }[]; encounters?: EncounterCard[] } | undefined;
     if (!setup?.board || !Array.isArray(setup.players)) throw neither;
     const name = (data.mapName as string | undefined) ?? `Map from ${setup.players.map((p) => p.faction?.name).join(', ')} game`;
-    content = { maps: [{ id: mapId(setup.board), name, board: setup.board }], factions: setup.players.map((p) => p.faction), mats: setup.players.map((p) => p.mat) };
+    content = {
+      maps: [{ id: mapId(setup.board), name, board: setup.board }],
+      factions: setup.players.map((p) => p.faction),
+      mats: setup.players.map((p) => p.mat),
+      encounters: setup.encounters ?? [],
+    };
   } else {
     throw neither;
   }
-  if (![content.maps, content.factions, content.mats].every(Array.isArray)) throw neither;
+  if (![content.maps, content.factions, content.mats, content.encounters].every(Array.isArray)) throw neither;
   const check = (item: { id?: unknown; name?: unknown } | undefined, what: string, problems: () => string[]) => {
     const name = typeof item?.name === 'string' && item.name ? item.name : `a ${what}`;
     let found: string[];
@@ -140,5 +157,6 @@ export function parseContentFile(text: string): Library {
   for (const m of content.maps) check(m, 'map', () => boardProblems(m.board));
   for (const f of content.factions) check(f, 'faction', () => validateFaction(f));
   for (const m of content.mats) check(m, 'mat', () => validateMat(m));
+  for (const c of content.encounters) check(c, 'encounter card', () => validateEncounterCard(c));
   return content;
 }

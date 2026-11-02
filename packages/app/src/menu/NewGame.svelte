@@ -27,7 +27,7 @@
     message: string;
     onStart: (setup: GameSetup, mapName: string) => void;
     onImport: (file: File) => void;
-    onRemove: (kind: LibraryKind, id: string) => void;
+    onRemove: (kind: LibraryKind, id: string | string[]) => void;
     onBack: () => void;
     backLabel: string;
   } = $props();
@@ -44,6 +44,10 @@
     ...library.maps.map((x) => ({ kind: 'maps' as const, id: x.id, name: x.name, what: 'Map' })),
     ...library.factions.map((x) => ({ kind: 'factions' as const, id: x.id, name: x.name, what: 'Faction' })),
     ...library.mats.map((x) => ({ kind: 'mats' as const, id: x.id, name: x.name, what: 'Mat' })),
+    // Encounter cards are one deck: one row, removed all together.
+    ...(library.encounters.length
+      ? [{ kind: 'encounters' as const, id: library.encounters.map((c) => c.id), name: `Your ${library.encounters.length} card${library.encounters.length === 1 ? '' : 's'}`, what: 'Encounter deck' }]
+      : []),
   ]);
 
   function chosenFile() {
@@ -111,17 +115,20 @@
               <li>
                 <small>{item.what}</small>
                 <span>{item.name}</span>
-                {#if removing === item.kind + item.id}
+                {#if removing === item.kind + String(item.id)}
                   <button class="small" onclick={() => ((removing = null), onRemove(item.kind, item.id))}>Remove</button>
                   <button class="quiet small" onclick={() => (removing = null)}>Keep</button>
                 {:else}
-                  <button class="quiet small" aria-label="Remove {item.name}" onclick={() => (removing = item.kind + item.id)}>✕</button>
+                  <button class="quiet small" aria-label="Remove {item.name}" onclick={() => (removing = item.kind + String(item.id))}>✕</button>
                 {/if}
               </li>
             {/each}
           </ul>
         {:else}
           <p class="hint">Import a content file or any saved game's file to play with its map, factions and mats; or add them from the editors. They stay on this device.</p>
+        {/if}
+        {#if !library.encounters.length}
+          <p class="hint">Encounters use a made-up sample deck until you add your cards from the encounter card editor.</p>
         {/if}
       </section>
     </div>
