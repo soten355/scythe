@@ -164,6 +164,19 @@ should check it against the rulebook; tick it once confirmed.
       the turn).
 - [ ] Verify: Dominate (Saxony) lets it complete both of its objectives.
 
+## Structure bonus tiles
+
+- [ ] Verify: one tile is drawn at random at setup, face up for everyone,
+      and scored only at the end, paying coins whatever the popularity.
+- [ ] Verify: every structure a player has built counts, even on a hex
+      they no longer control.
+- [ ] Verify: "next to your structures" counts each matching hex once,
+      however many of your structures touch it; and a structure's own hex
+      doesn't count as next to itself.
+- [ ] Verify: an encounter spot still counts after its token is taken.
+- [ ] Verify: "in a row" means side by side in one straight line (a river
+      between them doesn't break it).
+
 ## Game end and scoring
 
 - [ ] Verify: the game ends the moment a player places their sixth star,
