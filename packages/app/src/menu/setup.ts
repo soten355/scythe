@@ -30,7 +30,7 @@ export interface SetupChoice {
   players: { faction: string; mat: string }[];
 }
 
-/** Solo games need the Automa, which comes later. */
+/** Solo games need the bots, which come later. */
 export const MIN_PLAYERS = 2;
 export const MAX_PLAYERS = 7;
 

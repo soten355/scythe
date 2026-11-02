@@ -14,7 +14,7 @@ We are building a personal, offline-first digital version of Scythe that plays o
 | Campaign mode later | Engine supports persistent state across games as an add-on module |
 | Base game plus Invaders from Afar, open to more | Content lives in modules; expansions register on top of the core |
 | Clean first, polish later (animation, sound, 3D) | Graphics are a separate layer that can be swapped without touching rules |
-| Automa first, strategic AI later | Bots share one interface; a smarter AI drops into the same slot |
+| Bots that play the real game, each with its faction's personality (no Automa; decided Nov 2, 2026) | Bots share one interface; a smarter AI drops into the same slot |
 
 **Scope at launch:** base game (5 factions, 5 player mats), up to 5 players in any mix of humans and bots. Invaders from Afar (2 factions, 2 player mats, up to 7 players) comes later, in Phase 5 (moved Nov 2, 2026: the owner has no physical copy to enter it from).
 
@@ -51,7 +51,7 @@ The rules engine is the center of the project; the app, the players and the save
         ▼                                    │
 ┌──────────────────────────────────────┐     │
 │ Seats                                │     │
-│ Human · Pass-and-play · Automa · AI  │     │
+│ Human · Pass-and-play · Bots         │     │
 └──────────────────────────────────────┘     │
         │ chosen action                      │
         ▼                                    │
@@ -91,7 +91,7 @@ score(state) -> FinalScores
 
 **The action log is the source of truth.** A game is its setup plus an ordered list of actions. Replaying the log rebuilds any state, which gives us saves, undo, replays and bug reports for free.
 
-**Determinism.** All randomness (shuffles, Automa draws) comes from a seeded random number generator stored in state, never from the system clock or `Math.random()`. Same seed plus same actions always produces the same game.
+**Determinism.** All randomness (shuffles, card draws) comes from a seeded random number generator stored in state, never from the system clock or `Math.random()`. Same seed plus same actions always produces the same game.
 
 **Testing.** Rules are verified with automated tests: scripted scenarios ("a mech with Riverwalk can cross onto a farm") and fuzz tests where bots play thousands of random legal games and the engine checks invariants (no negative resources, unit counts match, the game always ends).
 
@@ -106,13 +106,13 @@ The core engine knows the turn structure; everything else is content that a modu
 - Cards: encounter, factory, objective, combat
 - Board changes and structure bonus tiles
 - Rule hooks: points where a module can add or change behavior ("before combat," "on game end," "when a star is placed")
-- Automa decks for its factions
+- A bot personality for each of its factions
 
 | Module | Contents | When |
 | --- | --- | --- |
 | Core | Board, turn structure, actions, combat, scoring | Phase 1 |
 | Base game | 5 factions, 5 player mats, all base cards | Phases 1–2 |
-| Invaders from Afar | 2 factions, 2 player mats, their Automa cards | Phase 5 |
+| Invaders from Afar | 2 factions, 2 player mats, their bot personalities | Phase 5 |
 | Campaign | Persistent progress across games, unlocks, modules turned on over time | Phase 5 |
 | Later expansions | The Wind Gambit, other maps, modular board | Optional |
 
@@ -132,10 +132,29 @@ interface Seat {
 | --- | --- | --- |
 | Human | Waits for taps in the UI | Gets a "view" that hides other players' hidden cards |
 | Pass-and-play human | Same as human, with a handoff screen between turns | Hides your combat cards and objectives until the next player taps in |
-| Automa | Draws from its card deck and follows the card | Uses the official solo rules' simplified bot economy; difficulty levels follow those rules |
-| Strategic AI | Searches ahead with the engine (Monte Carlo tree search), later possibly a trained model | Runs in a background thread (Web Worker) so the UI never freezes |
+| Bot | Tries out whole turns in the engine and picks the best by a position score, tilted by its faction's personality | Runs in a background thread (Web Worker) so the UI never freezes; thinks for at most 2–3 seconds a turn on the iPhone |
 
-**Two kinds of bots.** The Automa doesn't play the full game; it follows its own simplified rules. The strategic AI plays the real game with the same rules as you. The engine supports both: Automa rules are a module, while the strategic AI simply uses `legalActions` like a human.
+**Bots play the real game.** No Automa (dropped Nov 2, 2026: on a screen it's just a very simple computer). Bots use `legalActions` and the same rules as you, and see only what a player at the table could see (no peeking at your combat cards, objectives or the decks).
+
+**How a bot thinks.** Built in layers, each reusing the one before:
+
+1. **Turn planner:** the engine's small steps are grouped into whole turns (section, top row, bottom row, every choice in between), so a bot compares complete turns.
+2. **Position score:** a formula for "how well am I doing": coins, stars, territories and resources at my popularity tier, plus progress (upgrades, mechs, structures, recruits, workers out, power, combat cards, closeness to the Factory and to stars). Its weights can be adjusted.
+3. **Personality:** each faction's bot tilts the weights and adds a few priorities, so it plays like that faction would. It still plays to win; the personality is a bias, not a script.
+4. **Difficulty = smarter, not a different personality:** Easy picks good-but-not-best turns more often and thinks one turn ahead; harder levels make fewer slips, look further ahead and judge fights better. Every level keeps its faction's personality.
+5. **Later (Phase 5):** tree search on top of the same score for the strongest level, and self-play on the Linux machine to tune the weights.
+
+**Faction personalities** (first sketch, to be tuned in play-testing):
+
+| Faction | Leans toward |
+| --- | --- |
+| Nordic | Spreading out: workers across rivers early, lots of territory, fights only when it's clearly ahead |
+| Rusviet | Tempo: repeating its strongest section, a fast economy, an early push to the Factory |
+| Polonia | Encounters and popularity: hunting encounter tokens, avoiding fights, high popularity for a big payout |
+| Crimea | Pressure: building up combat cards, using Coercion, picking fights and taking territory |
+| Saxony | Stars by any route: objectives and combat stars, fights when a win is likely |
+
+**Fights and bluffing.** A bot doesn't always dial its maximum power; it mixes its choices so you can't read it, and it weighs what you might have in hand from what it has seen.
 
 **Bot pacing.** Bot turns are shown step by step with a short delay, plus a "skip to my turn" button, so you can follow what they did.
 
@@ -213,7 +232,7 @@ scythe/
   packages/
     engine/      rules, state, actions, RNG (no UI imports)
     content/     modules: base, invaders-from-afar, campaign
-    bots/        automa, strategic AI
+    bots/        turn planner, position score, faction personalities
     app/         PWA: board, mats, menus, saves
   tools/         simulation runner, balance checks (runs on the Linux machine)
 ```
@@ -276,12 +295,18 @@ Each phase ends in something playable on the phone. A phase is done when its che
 - [x] Done when: a complete 5-faction game can be played to final scoring and reloaded from a file
   - Checked (Nov 2, 2026): a test plays three complete 5-faction games (every deck in: encounters, a Factory card, objectives, a structure bonus tile; about 1,000-1,400 moves each) to final scoring, saves each to a file and reads it back to the same game and scores (`packages/app/src/saves/full-game.test.ts`). In the app, such a file opens straight on its final scores (fixed: it used to ask to pass to the next player first). Random play favours Crimea (19 of 40 games): one free resource a turn from Coercion matters a lot to players who rarely have resources; with Coercion off the wins even out, so it's not a rules bug.
 
-**Phase 3: Automa bots**
+**Phase 3: Bots with faction personalities** (replaces the Automa plan, Nov 2, 2026)
 
-- [ ] Automa card deck and its simplified rules
-- [ ] Difficulty levels
+- [ ] Turn planner: list a bot's complete turns from the engine's small steps
+- [ ] Position score with adjustable weights
+- [ ] A bot that plays whole games by trying each turn and keeping the best (no personality yet), beating random play in simulations
+- [ ] Faction personalities for all 5 base factions
+- [ ] Fights: choosing power and combat cards, with some bluffing, from only what the bot can see
+- [ ] Difficulty levels (Easy, Medium, Hard): smarter at each level, same personality
+- [ ] Bots think in a Web Worker, at most 2–3 seconds a turn on the iPhone
+- [ ] Solo and mixed games on the new game screen (any seat can be a bot, with its level)
 - [ ] Bot turn playback with skip
-- [ ] Done when: a full solo game against 1–4 Automa opponents plays without errors (1–6 once Invaders from Afar is in)
+- [ ] Done when: a full solo game against 1–4 bots plays without errors on the phone, and in simulations Hard beats Medium and Medium beats Easy most of the time
 
 **Phase 4: Polish**
 
@@ -291,19 +316,19 @@ Each phase ends in something playable on the phone. A phase is done when its che
 - [ ] Optional 3D board
 - [ ] Done when: it feels like a game, not a prototype
 
-**Phase 5: Strategic AI and campaign**
+**Phase 5: Stronger AI and campaign**
 
-- [ ] Monte Carlo tree search bot in a Web Worker
-- [ ] Self-play simulations on the Linux machine to tune or train it
+- [ ] Strongest bot level: tree search on top of the Phase 3 position score, within the 2–3 second turn limit
+- [ ] Self-play simulations on the Linux machine to tune the position score and personality weights
 - [ ] Campaign module with persistent progress
-- [ ] Invaders from Afar: its 2 factions (with their faction and mech abilities) and 2 player mats, up to 7 players, and their Automa cards (moved from Phase 2 on Nov 2, 2026: no physical copy; the owner knows it from the digital edition)
-- [ ] Done when: the AI beats the Automa consistently, and a campaign can be played start to finish
+- [ ] Invaders from Afar: its 2 factions (with their faction and mech abilities) and 2 player mats, up to 7 players, and their bot personalities (moved from Phase 2 on Nov 2, 2026: no physical copy; the owner knows it from the digital edition)
+- [ ] Done when: the tree-search level beats Hard bots consistently in simulations, and a campaign can be played start to finish
 
 ## Open questions and risks
 
 **Open questions**
 
-- [ ] Do we have the physical game or PDF rulebooks (base, Automa rules; Invaders from Afar: no physical copy, Nov 2, 2026)? Card-by-card data entry depends on having them on hand.
+- [ ] Do we have the physical game or PDF rulebooks (base; Invaders from Afar: no physical copy, Nov 2, 2026)? Card-by-card data entry depends on having them on hand.
 - [x] Svelte or React for the UI? Svelte (5), chosen Oct 29, 2026 for its small size on the phone, built-in animation and readable code. Switching to React later would only touch the app, never the engine.
 - [x] Which two factions and mats for Phase 1? Nordic + Rusviet; Industrial + Engineering.
 - [ ] Original faction names and theme, or neutral placeholders until the art pass?
@@ -314,6 +339,6 @@ Each phase ends in something playable on the phone. A phase is done when its che
 | --- | --- | --- |
 | Rules accuracy: Scythe has many edge cases and FAQ rulings | Bugs that feel unfair or wrong | Scenario tests per rule; a rules-check log of sources; fuzz testing |
 | Data entry: hundreds of cards and abilities | Slow, error-prone | Content as structured data files; validation scripts |
-| Strategic AI difficulty: hidden information and a huge branching factor | Weak or slow AI | Start with Automa; limit search depth; train offline on the Linux GPU |
+| Strategic AI difficulty: hidden information and a huge branching factor | Weak or slow AI | Build in layers (turn planner, position score, personalities) before search; time-boxed thinking; tune offline on the Linux machine |
 | Phone performance during AI search | Hot phone, slow turns | Web Worker, time-boxed thinking, difficulty settings |
 | Scope creep from polish and expansions | Never finishing | Phase gates: each phase must be playable before the next starts |

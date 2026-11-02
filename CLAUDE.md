@@ -11,7 +11,7 @@ sound and 3D later.
 ## Repo layout
 - `packages/engine` — rules, state, actions, seeded RNG. Pure TypeScript, no DOM, no imports from app.
 - `packages/content` — content modules (base, invaders-from-afar, later campaign). Data-first.
-- `packages/bots` — Automa now, strategic AI later.
+- `packages/bots` — bots that play the real game, each with its faction's personality (no Automa).
 - `packages/app` — the PWA (UI, board, menus, saves). Vite + vite-plugin-pwa.
 - `tools/` — simulation and balance scripts (run in Node via `tsx`).
 
@@ -33,7 +33,7 @@ Vite `base` is `/scythe/`.
   each cost).
 - `packages/engine` imports nothing from `packages/app`.
 - Every player is a "seat": `chooseAction(view, legalActions) -> Promise<Action>`.
-  Human, pass-and-play, Automa and strategic AI all use this interface. Bots
+  Human, pass-and-play and bots all use this interface. Bots
   run in Web Workers.
 - Content (factions, player mats, cards, mech abilities) is registered by
   modules, described as data where possible, with rule hooks for unique
@@ -64,4 +64,4 @@ invariants. Write tests before rule code.
 Phases 0 (setup), 1 (engine core, hot-seat 2D board) and 2 (full rules and
 all base-game content) — done; the board keeps evolving with play-testing,
 and the real encounter, Factory and objective cards and structure bonus
-tiles are still to be entered with the editors. Next: Phase 3, Automa bots.
+tiles are still to be entered with the editors. Next: Phase 3, bots with faction personalities (Automa dropped).

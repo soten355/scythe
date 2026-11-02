@@ -106,7 +106,7 @@
         </div>
         {#if most < MAX_PLAYERS}
           <p class="hint">
-            {catalog.factions.length} factions and {catalog.mats.length} player mats so far: one of each per player. Solo play arrives with the Automa.
+            {catalog.factions.length} factions and {catalog.mats.length} player mats so far: one of each per player. Solo play arrives with the bots.
           </p>
         {/if}
       </section>
