@@ -61,6 +61,7 @@ invariants. Write tests before rule code.
   but doesn't write code.
 
 ## Current phase
-Phases 0 (setup) and 1 (engine core, hot-seat 2D board with 2 factions) —
-done; the board keeps evolving with play-testing. Next: Phase 2, full rules
-and all content.
+Phases 0 (setup), 1 (engine core, hot-seat 2D board) and 2 (full rules and
+all base-game content) — done; the board keeps evolving with play-testing,
+and the real encounter, Factory and objective cards and structure bonus
+tiles are still to be entered with the editors. Next: Phase 3, Automa bots.
