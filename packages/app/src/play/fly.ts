@@ -1,6 +1,7 @@
 // Big moments over the map: a large icon pinned in the middle, then flown to
 // where it belongs.
 import type { Icon } from './icons';
+import { inkOn } from './ink';
 import { MECH_PARTS } from './shapes';
 
 /** An icon (see icons.ts) as a standalone element. */
@@ -18,10 +19,10 @@ function iconElement(icon: Icon): HTMLElement {
 
 /** A big moment: an icon (with a smaller one under it, say a recruit's bonus), or a mech being put together. */
 export type Moment =
-  | { icon: Icon; below?: Icon; target: string; side?: Side }
+  | { icon: Icon; below?: Icon; target: string; sides?: Side[] }
   | { mech: { color: string; initial: string }; target: string };
 
-/** A smaller gain beside the icon (a recruit's one-time bonus: "+2 ⚡"), flown to the first of `targets` on screen. */
+/** A smaller gain beside the icon (a recruit's one-time bonus: "+2 ⚡"; an encounter's rewards), flown to the first of `targets` on screen. */
 type Side = { text: string; icon: Icon; targets: string[] };
 
 const SVG = 'http://www.w3.org/2000/svg';
@@ -47,7 +48,7 @@ function mechElement(color: string, initial: string): { el: SVGSVGElement; parts
     return path;
   });
   const label = document.createElementNS(SVG, 'text');
-  Object.entries({ y: '0.6', 'font-size': '6', 'font-weight': '700', 'text-anchor': 'middle', fill: '#fff' }).forEach(([k, v]) => label.setAttribute(k, v));
+  Object.entries({ y: '0.6', 'font-size': '6', 'font-weight': '700', 'text-anchor': 'middle', fill: inkOn(color) }).forEach(([k, v]) => label.setAttribute(k, v));
   label.textContent = initial;
   el.append(...parts, label);
   // The label goes on last.
@@ -68,8 +69,9 @@ export async function showMoment(moment: Moment, over: Element): Promise<void> {
     return pin(el, over, target, parts);
   }
   const main = pin(moment.below ? stacked(moment.icon, moment.below) : iconElement(moment.icon), over, target);
-  if (!moment.side) return main;
-  await Promise.all([main, pin(sideElement(moment.side), over, onScreen(moment.side.targets), undefined, 1.1)]);
+  if (!moment.sides?.length) return main;
+  // Side by side to the right of the main icon.
+  await Promise.all([main, ...moment.sides.map((side, i) => pin(sideElement(side), over, onScreen(side.targets), undefined, 1.1 + i * 0.95))]);
 }
 
 /** The side gain: its amount and icon, about half the main icon's size. */

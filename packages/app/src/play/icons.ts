@@ -52,6 +52,9 @@ export const STRUCTURE_ICONS: Record<Structure, Icon> = {
 /** A recruit (placed by Enlist), flown onto the mat when it's placed. */
 export const RECRUIT_ICON: Icon = { text: '🎖️' };
 
+/** An encounter card, flown to the top bar with what it gave. */
+export const ENCOUNTER_CARD_ICON: Icon = { text: '📜' };
+
 /** A star, flown to the top bar when one is earned. */
 export const STAR_ICON: Icon = { text: '⭐' };
 

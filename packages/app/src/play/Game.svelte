@@ -14,7 +14,9 @@
   import { fade } from 'svelte/transition';
   import { guide } from './camera';
   import { showMoment, type Moment } from './fly';
-  import { BONUS_ICONS, RECRUIT_ICON, STAR_ICON, STAR_KIND_ICONS } from './icons';
+  import { inkOn } from './ink';
+  import { BONUS_ICONS, ENCOUNTER_CARD_ICON, RECRUIT_ICON, RESOURCE_ICONS, STAR_ICON, STAR_KIND_ICONS, type Icon } from './icons';
+  import { gainsBetween, type GainKind } from './gains';
   import { buildPrompt, combatSummary, sectionHeadings, type Button, type Prompt, type RowStatus, type Selection } from './prompt';
   import { canSwitchSection, phase, previousSection, sectionChoices } from './turn';
   import { loadSettings } from './settings';
@@ -76,6 +78,12 @@
     onSave(record);
   });
   const settings = loadSettings();
+  const GAIN_ICONS: Record<GainKind, Icon> = { ...BONUS_ICONS, ...RESOURCE_ICONS };
+  /** Which top bar number each gain flies to. */
+  const GAIN_STAT: Record<GainKind, string> = {
+    coins: 'coins', power: 'power', popularity: 'popularity', combatCard: 'combatCard',
+    worker: 'workers', oil: 'resources', metal: 'resources', wood: 'resources', food: 'resources',
+  };
   /**
    * Big moments to show (a recruit placed, a star earned, a mech deployed),
    * in order: each is pinned over the map, then flies to where it belongs.
@@ -154,10 +162,22 @@
           icon: RECRUIT_ICON,
           below: BONUS_ICONS[mat.sections[a.section]!.bottom.recruitBonus],
           target: `[data-recruit="${a.section}"]`,
-          side: { text: `+${amount}`, icon: BONUS_ICONS[a.bonus], targets: [`[data-stat="${seat}|${a.bonus}"]`, `[data-player="${seat}"]`] },
+          sides: [{ text: `+${amount}`, icon: BONUS_ICONS[a.bonus], targets: [`[data-stat="${seat}|${a.bonus}"]`, `[data-player="${seat}"]`] }],
         });
       }
       if (a.type === 'deploy') added.push({ mech: { color: faction.color, initial: faction.name[0]! }, target: `[data-mech="${before.currentPlayer}|${a.hex}"]` });
+    }
+    // An encounter option (or a resource of your choice): what it gave flies to the top bar.
+    if (actions.some((a) => a.type === 'encounterOption' || a.type === 'encounterResource')) {
+      const seat = before.currentPlayer;
+      const gains = gainsBetween(before, next, seat);
+      if (gains.length) {
+        added.push({
+          icon: ENCOUNTER_CARD_ICON,
+          target: `[data-player="${seat}"]`,
+          sides: gains.map((g) => ({ text: `+${g.amount}`, icon: GAIN_ICONS[g.kind], targets: [`[data-stat="${seat}|${GAIN_STAT[g.kind]}"]`, `[data-player="${seat}"]`] })),
+        });
+      }
     }
     next.players.forEach((p, seat) => {
       for (const kind of p.stars.slice(before.players[seat]!.stars.length)) added.push({ icon: STAR_ICON, below: STAR_KIND_ICONS[kind], target: `[data-stars="${seat}"]` });
@@ -434,8 +454,8 @@
       <!-- The last player's badge slides off to the left as the next one slides in from the right. -->
       <span class="badges">
         {#key handoff}
-          {#if from !== undefined}<span class="badge leaving" style:--f={color(from)}>{name(from)[0]}</span>{/if}
-          <span class="badge arriving" style:--f={color(to)}>{name(to)[0]}</span>
+          {#if from !== undefined}<span class="badge leaving" style:--f={color(from)} style:color={inkOn(color(from))}>{name(from)[0]}</span>{/if}
+          <span class="badge arriving" style:--f={color(to)} style:color={inkOn(color(to))}>{name(to)[0]}</span>
         {/key}
       </span>
       <span>Pass to <b>{name(to)}</b>{handoff.note ? ` ${handoff.note}` : ''}</span>
@@ -453,7 +473,7 @@
             <button onclick={() => (selection = o.select)}><span class="big"><InlineIcon icon={o.icon} /></span> {o.label}</button>
           {/each}
         </div>
-        <button class="quiet back" onclick={() => (selection = c.cancel)}>Back</button>
+        {#if c.cancel}{@const cancel = c.cancel}<button class="quiet back" onclick={() => (selection = cancel)}>Back</button>{/if}
       </div>
     </div>
   {/if}
