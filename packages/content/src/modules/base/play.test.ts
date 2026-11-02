@@ -1,10 +1,11 @@
-import { activeSeat, applyAction, isGameOver, legalActions, newGame, nextInt, seedRng } from '@scythe/engine';
+import { activeSeat, applyAction, isGameOver, legalActions, newGame, nextInt, seedRng, validateObjectiveCard } from '@scythe/engine';
 import { describe, expect, it } from 'vitest';
 import { baseBoard } from './board';
 import { baseFactions } from './factions';
 import { baseMats } from './mats';
 import { sampleEncounters } from './encounters';
 import { sampleFactoryCards } from './factory';
+import { sampleObjectives } from './objectives';
 
 describe('a game with the base content', () => {
   const setup = (seed: number) => ({
@@ -36,15 +37,17 @@ describe('a game with the base content', () => {
     }
   });
 
-  it('plays random legal games with encounters, the Factory and all five factions, keeping every count in bounds', () => {
+  it('plays random legal games with encounters, the Factory, objectives and all five factions, keeping every count in bounds', () => {
     let encounters = 0;
-    let factoryUsed = 0;
-    for (let seed = 0; seed < 10; seed++) {
+    let factoryUsed = 0; // Factory cards taken or used
+    let objectives = 0;
+    for (let seed = 0; seed < 20; seed++) {
       let state = newGame({
         seed,
         board: baseBoard,
         encounters: sampleEncounters,
         factory: sampleFactoryCards,
+        objectives: sampleObjectives,
         players: baseFactions.map((faction, i) => ({ faction, mat: baseMats[i]! })),
       });
       expect(state.encounterTokens).toHaveLength(11);
@@ -57,7 +60,8 @@ describe('a game with the base content', () => {
         const tokens = state.encounterTokens.length;
         state = applyAction(state, options[pick]!);
         if (state.encounterTokens.length < tokens) encounters++;
-        if (options[pick]!.type === 'factoryUse') factoryUsed++;
+        if (options[pick]!.type === 'takeFactoryCard' || options[pick]!.type === 'factoryUse') factoryUsed++;
+        if (options[pick]!.type === 'completeObjective') objectives++;
         for (const p of state.players) {
           expect(Math.min(p.coins, p.power, p.popularity)).toBeGreaterThanOrEqual(0);
           expect(p.workers.length).toBeLessThanOrEqual(8);
@@ -66,16 +70,31 @@ describe('a game with the base content', () => {
         // Every Factory card is in the deck or with one player.
         const held = state.players.flatMap((p) => (p.factoryCard ? [p.factoryCard] : []));
         expect([...state.factoryDeck, ...held].sort()).toEqual(sampleFactoryCards.map((c) => c.id).sort());
+        // Objective cards are all dealt or in the deck; one objective star each, except with Dominate.
+        expect([...state.objectiveDeck, ...state.players.flatMap((p) => p.objectives)].sort()).toEqual(sampleObjectives.map((c) => c.id).sort());
+        state.players.forEach((p, seat) => {
+          const limit = baseFactions[seat]!.ability.rule?.kind === 'unlimitedCombatStars' ? 2 : 1;
+          expect(p.stars.filter((s) => s === 'objective').length).toBeLessThanOrEqual(limit);
+          for (const id of p.objectivesDone ?? []) expect(p.objectives).toContain(id);
+        });
       }
     }
     expect(encounters).toBeGreaterThan(0);
     expect(factoryUsed).toBeGreaterThan(0);
-  });
+    expect(objectives).toBeGreaterThan(0);
+  }, 30_000);
 });
 
 describe('the sample encounter deck', () => {
   it('has a unique ID and three options for every card', () => {
     expect(new Set(sampleEncounters.map((c) => c.id)).size).toBe(sampleEncounters.length);
     for (const c of sampleEncounters) expect(c.options, c.id).toHaveLength(3);
+  });
+});
+
+describe('the sample objective deck', () => {
+  it('has a unique ID for every card, and every card is complete', () => {
+    expect(new Set(sampleObjectives.map((c) => c.id)).size).toBe(sampleObjectives.length);
+    for (const c of sampleObjectives) expect(validateObjectiveCard(c), c.id).toEqual([]);
   });
 });
