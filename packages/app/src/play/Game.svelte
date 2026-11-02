@@ -30,7 +30,8 @@
   import { exportSave } from '../saves/files';
   import { startBots } from '../bots/client';
   import type { RemoteSeat } from '@scythe/bots';
-  import { botName, isBot, needsPass } from './seats';
+  import { botName, isBot, needsPass, people } from './seats';
+  import { botTurnsSince, paceOf } from './narrate';
 
   let {
     save,
@@ -92,9 +93,12 @@
     level && botThread ? botThread.client.seat(`${record.id}:${seat}`, { level, seed: record.setup.seed + seat + 1 }) : null,
   );
   onDestroy(() => botThread?.stop());
-  /** A bot's move shows for at least this long before the next (item 9 brings proper playback). */
-  const BOT_PACE = 550;
+  /** How long a bot's move stays on screen before the next: the ones worth watching, and the small steps between. */
+  const BOT_PACE = { watch: 900, quick: 200 };
   let botBusy = $state(false);
+  /** Skip was tapped: bots play on at once, without showing their moves, until it's a person's turn (or, with no people, the next turn). */
+  let skipping = $state(false);
+  let storiesOpen = $state(false);
   let botTrouble: string | null = $state(null);
 
   // Autosave: every move, undo and new turn.
@@ -180,7 +184,9 @@
     const next = states[states.length - 1]!;
     history = [...history, next];
     steps = [...steps, actions];
-    travel = travelOf(before, next, actions, ++travels) ?? travel;
+    /** A bot's move played while skipping: nothing to show for it. */
+    const unseen = byBot && skipping;
+    travel = unseen ? null : (travelOf(before, next, actions, ++travels) ?? travel);
     const added: Moment[] = [];
     const { faction, mat } = before.setup.players[before.currentPlayer]!;
     for (const a of actions) {
@@ -212,12 +218,13 @@
     next.players.forEach((p, seat) => {
       for (const kind of p.stars.slice(before.players[seat]!.stars.length)) added.push({ icon: STAR_ICON, below: STAR_KIND_ICONS[kind], target: `[data-stars="${seat}"]` });
     });
-    if (added.length) moments = [...moments, ...added];
+    if (added.length && !unseen) moments = [...moments, ...added];
     selection = {};
     const nextSeat = activeSeat(next);
     // A bot's moves can't be undone.
     if (byBot) turnStart = history.length - 1;
     const pass = needsPass(bots, seats, viewer, nextSeat);
+    if (!isBot(bots, nextSeat) || (next.currentPlayer !== before.currentPlayer && people(bots, seats).length === 0)) skipping = false;
     if (next.currentPlayer !== before.currentPlayer) {
       turnStart = history.length - 1;
       if (pass) handoff = { from: seat, to: nextSeat };
@@ -227,7 +234,7 @@
       turnStart = history.length - 1;
       if (pass) handoff = { from: seat, to: nextSeat, note: handoffNote(next, nextSeat) };
     }
-    if (next.lastCombat !== before.lastCombat) {
+    if (next.lastCombat !== before.lastCombat && !unseen) {
       // A fight was revealed: it can't be taken back.
       turnStart = history.length - 1;
       revealed = next.lastCombat ?? null;
@@ -334,7 +341,7 @@
     botBusy = true;
     botSeats[seat]!.chooseAction(playerView(state, seat), legalActions(state, seat)).then(
       async (action) => {
-        const wait = BOT_PACE - (performance.now() - started);
+        const wait = skipping ? 0 : BOT_PACE[paceOf(action)] - (performance.now() - started);
         if (wait > 0) await new Promise((done) => setTimeout(done, wait));
         botBusy = false;
         if (history.length === at) act(action);
@@ -346,6 +353,9 @@
     );
   });
   const botLabel = (seat: number) => `${name(seat)} (${botName(bots![seat]!)})`;
+  /** What the bots have done since a person last finished a turn, told in plain lines; the last may be under way. */
+  const stories = $derived(bots ? botTurnsSince(history, steps, bots) : []);
+  const playing = $derived(botNow ? stories.findLast((t) => t.seat === game.currentPlayer) : undefined);
 
   let menuOpen = $state(false);
 
@@ -467,6 +477,12 @@
         {#key intro}<div class="intro">
         {#if botNow}
           <p class="title">{botLabel(seatNow)} is playing…</p>
+          {#if playing && playing.seat === seatNow}
+            <ul class="story">{#each playing.lines as line, i (i)}<li>{line}</li>{/each}</ul>
+          {/if}
+          {#if !skipping}
+            <button class="skip" onclick={() => (skipping = true)}>⏭ {people(bots, seats).length ? 'Skip to your turn' : 'Skip this turn'}</button>
+          {/if}
           {#if botTrouble}
             <p class="hint">Something went wrong while it was thinking: {botTrouble}</p>
             <button class="primary" onclick={() => (botTrouble = null)}>Try again</button>
@@ -503,6 +519,7 @@
       {/if}
       <div class="footer">
         <button class="quiet" onclick={undo} disabled={!canUndo}>↶ Undo</button>
+        {#if stories.length && !botNow}<button class="quiet" onclick={() => (storiesOpen = true)}>📜 Bots' turns</button>{/if}
       </div>
     </aside>
   </main>
@@ -612,6 +629,24 @@
         <p><b>⚔ {r.title}</b></p>
         {#each r.lines as line, i (i)}<p class="line">{line}</p>{/each}
         <button class="primary ok" onclick={() => (revealed = null)}>OK</button>
+      </div>
+    </div>
+  {/if}
+
+  {#if storiesOpen && !botNow}
+    <!-- What each bot did since your last turn, oldest first. -->
+    <div class="ask" role="dialog" aria-modal="true" style:--c={color(game.currentPlayer)}>
+      <div class="box stories">
+        <p><b>📜 Since your last turn</b></p>
+        <div class="list">
+          {#each stories as t, i (i)}
+            <section style:--f={color(t.seat)}>
+              <h4>{botLabel(t.seat)}</h4>
+              <ul class="story">{#each t.lines as line, j (j)}<li>{line}</li>{/each}</ul>
+            </section>
+          {/each}
+        </div>
+        <button class="primary ok" onclick={() => (storiesOpen = false)}>OK</button>
       </div>
     </div>
   {/if}
@@ -835,6 +870,29 @@
     display: flex;
     flex-direction: column;
     gap: 5px;
+  }
+  .story {
+    margin: 6px 0;
+    padding-left: 16px;
+    font-size: 12px;
+    line-height: 1.45;
+  }
+  .skip {
+    margin-top: 4px;
+  }
+  .stories .list {
+    max-height: 60vh;
+    overflow-y: auto;
+    text-align: left;
+  }
+  .stories section {
+    border-left: 4px solid var(--f);
+    padding-left: 8px;
+    margin-bottom: 8px;
+  }
+  .stories h4 {
+    margin: 0;
+    font-size: 13px;
   }
   .footer {
     display: flex;
