@@ -258,7 +258,8 @@ Each phase ends in something playable on the phone. A phase is done when its che
     - Done (Nov 2, 2026): encounters.html, linked from the main menu. Once your cards are added, new games draw from them in place of the sample deck; the new game screen shows your deck as one line (✕ goes back to the sample). Still to do: enter the real deck.
   - [x] The Factory
     - Done (Nov 2, 2026): ending the character's move on the Factory (after winning any fight) offers players + 1 cards; keep one (one a game, the rest go under the deck). It becomes a fifth section after the mat: its top part (pay → gain, resources paid from hexes you control, Coercion allowed, free bottom-row actions) then its move (so many units, so many hexes), and no bottom row. New games use a made-up sample deck of 8 cards for now.
-  - [ ] Factory card editor, to enter the real deck (like the encounter card editor)
+  - [x] Factory card editor, to enter the real deck (like the encounter card editor)
+    - Done (Nov 2, 2026): `factory.html`, linked from the home screen. Each card's top part (cost, resources, rewards, free actions) and move; "Add deck to game" makes new games use it in place of the sample deck (shown as "Factory deck" on the new game screen, removable there); save to a file or Export to paste into chat.
   - [ ] Objectives
   - [ ] Structure bonus tiles
 - [ ] All 5 base factions and 5 mats; Invaders from Afar factions and mats
