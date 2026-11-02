@@ -1,7 +1,7 @@
 import type { ObjectiveCard } from '@scythe/engine';
 
 // A SAMPLE objective deck, made up for play-testing until the real cards are
-// entered from the physical game. The conditions and names here are
+// entered from the physical game (with the objective card editor). The conditions and names here are
 // invented, not the published cards'. Each card is a list of conditions that
 // must all hold at once.
 
