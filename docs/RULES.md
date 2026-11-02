@@ -130,6 +130,24 @@ should check it against the rulebook; tick it once confirmed.
 - [ ] Verify: used cards are set aside; the engine shuffles them back into
       a new deck if the deck runs out (it never should with the full deck).
 
+## The Factory
+
+- [x] When the character ends its move on the Factory (and wins any fight
+      there), the player looks at one card more than there are players and
+      keeps one; one Factory card a game. (Owner, Nov 2, 2026.)
+- [x] Reaching the Factory doesn't end the character's move (unlike an
+      encounter): it only has to end the move there. (Owner.)
+- [x] The card is a fifth section: top part "pay → gain", bottom part a
+      Move; it can't be picked twice in a row. (Owner.)
+- [ ] Verify: the cards not kept go back under the deck.
+- [ ] Verify: the Factory card's Move gives no coins instead (unlike the
+      mat's Move), and there's no bottom-row action after it.
+- [ ] Verify: Speed adds to the Factory card's move for the character and
+      mechs; the card's distance applies to workers too.
+- [ ] Verify: Coercion can pay one resource of a Factory card's cost.
+- [ ] Verify: free bottom-row actions from a Factory card give no coins and
+      no recruit bonuses (as with encounters).
+
 ## Game end and scoring
 
 - [ ] Verify: the game ends the moment a player places their sixth star,

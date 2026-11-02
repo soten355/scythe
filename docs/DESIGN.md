@@ -256,7 +256,9 @@ Each phase ends in something playable on the phone. A phase is done when its che
   - Encounters (Nov 1, 2026): tokens on the map, a shuffled deck, the card in a pop-up with its three options (greyed out when you can't pay), rewards of every kind (coins, power, popularity, combat cards, workers and resources on the hex, resources of your choice, free Upgrade/Deploy/Build/Enlist), and Meander. New games use a made-up sample deck of 6 cards for now.
   - [x] Encounter card editor, to enter the real deck from the physical cards (with "Add to game" / "Save to a file")
     - Done (Nov 2, 2026): encounters.html, linked from the main menu. Once your cards are added, new games draw from them in place of the sample deck; the new game screen shows your deck as one line (✕ goes back to the sample). Still to do: enter the real deck.
-  - [ ] The Factory
+  - [x] The Factory
+    - Done (Nov 2, 2026): ending the character's move on the Factory (after winning any fight) offers players + 1 cards; keep one (one a game, the rest go under the deck). It becomes a fifth section after the mat: its top part (pay → gain, resources paid from hexes you control, Coercion allowed, free bottom-row actions) then its move (so many units, so many hexes), and no bottom row. New games use a made-up sample deck of 8 cards for now.
+  - [ ] Factory card editor, to enter the real deck (like the encounter card editor)
   - [ ] Objectives
   - [ ] Structure bonus tiles
 - [ ] All 5 base factions and 5 mats; Invaders from Afar factions and mats
