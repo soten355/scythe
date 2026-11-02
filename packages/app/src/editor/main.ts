@@ -412,7 +412,7 @@ async function asContent() {
   if (!name) return null;
   localStorage.setItem(NAME_KEY, name);
   const id = `map-${name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'mine'}`;
-  return { maps: [{ id, name, board }], factions: [], mats: [], encounters: [], factory: [], objectives: [] };
+  return { maps: [{ id, name, board }], factions: [], mats: [], encounters: [], factory: [], objectives: [], structureBonuses: [] };
 }
 
 function openExport() {

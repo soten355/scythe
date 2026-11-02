@@ -13,6 +13,6 @@ export const BUILT_IN: Catalog = {
   factory: sampleFactoryCards,
   // Until the real deck is entered with the objective card editor.
   objectives: sampleObjectives,
-  // Until the real tiles are entered.
+  // Until the real tiles are entered with the structure bonus tile editor.
   structureBonuses: sampleStructureBonuses,
 };

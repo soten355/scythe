@@ -1,10 +1,11 @@
-// The player's own maps, factions, mats, encounter, Factory and objective cards: made in the
+// The player's own maps, factions, mats, cards and structure bonus tiles: made in the
 // editors or brought in from files (content files, or what's inside any
 // save). Kept on the device and offered on the new game screen next to the
 // built-in ones. Games don't depend on the library: each save carries its own
-// copies. Encounter, Factory and objective cards each make one deck: once
-// there are any, new games use them in place of the built-in deck.
-import { validateEncounterCard, validateFaction, validateFactoryCard, validateMat, validateObjectiveCard, type Board, type EncounterCard, type Faction, type FactoryCard, type ObjectiveCard, type PlayerMat } from '@scythe/engine';
+// copies. Encounter, Factory and objective cards each make one deck, and the
+// tiles one set: once there are any, new games use them in place of the
+// built-in ones.
+import { validateEncounterCard, validateFaction, validateFactoryCard, validateMat, validateObjectiveCard, validateStructureBonus, type Board, type EncounterCard, type Faction, type FactoryCard, type ObjectiveCard, type PlayerMat, type StructureBonusTile } from '@scythe/engine';
 import type { Catalog, MapOption } from '../menu/setup';
 
 const FORMAT = 'scythe-content';
@@ -17,11 +18,12 @@ export interface Library {
   encounters: EncounterCard[];
   factory: FactoryCard[];
   objectives: ObjectiveCard[];
+  structureBonuses: StructureBonusTile[];
 }
 
 export type LibraryKind = keyof Library;
 
-export const EMPTY_LIBRARY: Library = { maps: [], factions: [], mats: [], encounters: [], factory: [], objectives: [] };
+export const EMPTY_LIBRARY: Library = { maps: [], factions: [], mats: [], encounters: [], factory: [], objectives: [], structureBonuses: [] };
 
 /** JSON with object keys sorted, so equal data compares equal whatever order its keys were written in. */
 const canonical = (value: unknown): string =>
@@ -38,9 +40,9 @@ const body = (item: { id: string; name: string }) => canonical({ ...item, id: ''
  * changed built-in one is kept as "<name> (custom)". Returns the names added.
  */
 export function addToLibrary(library: Library, builtIn: Catalog, incoming: Library): { library: Library; added: string[] } {
-  const next: Library = { maps: [...library.maps], factions: [...library.factions], mats: [...library.mats], encounters: [...library.encounters], factory: [...library.factory], objectives: [...library.objectives] };
+  const next: Library = { maps: [...library.maps], factions: [...library.factions], mats: [...library.mats], encounters: [...library.encounters], factory: [...library.factory], objectives: [...library.objectives], structureBonuses: [...library.structureBonuses] };
   const added: string[] = [];
-  const kinds: LibraryKind[] = ['maps', 'factions', 'mats', 'encounters', 'factory', 'objectives'];
+  const kinds: LibraryKind[] = ['maps', 'factions', 'mats', 'encounters', 'factory', 'objectives', 'structureBonuses'];
   for (const kind of kinds) {
     const builtIns = (builtIn[kind] ?? []) as { id: string; name: string }[];
     for (const original of (incoming[kind] ?? []) as { id: string; name: string }[]) {
@@ -66,11 +68,12 @@ export function removeFromLibrary(library: Library, kind: LibraryKind, id: strin
   return { ...library, [kind]: (library[kind] as { id: string }[]).filter((x) => !ids.includes(x.id)) };
 }
 
-/** Built-in maps, factions and mats first, then the player's own; the player's encounter, Factory and objective cards, if any, else the built-in decks. */
+/** Built-in maps, factions and mats first, then the player's own; the player's encounter, Factory and objective cards and structure bonus tiles, if any, else the built-in ones. */
 export function catalogWith(builtIn: Catalog, library: Library): Catalog {
   const encounters = library.encounters.length ? library.encounters : builtIn.encounters;
   const factory = library.factory.length ? library.factory : builtIn.factory;
   const objectives = library.objectives.length ? library.objectives : builtIn.objectives;
+  const structureBonuses = library.structureBonuses.length ? library.structureBonuses : builtIn.structureBonuses;
   return {
     maps: [...builtIn.maps, ...library.maps],
     factions: [...builtIn.factions, ...library.factions],
@@ -78,7 +81,7 @@ export function catalogWith(builtIn: Catalog, library: Library): Catalog {
     ...(encounters && { encounters }),
     ...(factory && { factory }),
     ...(objectives && { objectives }),
-    ...(builtIn.structureBonuses && { structureBonuses: builtIn.structureBonuses }),
+    ...(structureBonuses && { structureBonuses }),
   };
 }
 
@@ -86,11 +89,11 @@ export function contentFileText(content: Library): string {
   return JSON.stringify({ format: FORMAT, formatVersion: FORMAT_VERSION, ...content });
 }
 
-/** Named after the one thing in it, "scythe-encounters", "scythe-factory" or "scythe-objectives" for a deck of cards alone, or "scythe-content" when there are several. */
+/** Named after the one thing in it, "scythe-encounters", "scythe-factory", "scythe-objectives" or "scythe-structure-bonuses" for a deck of cards (or the tiles) alone, or "scythe-content" when there are several. */
 export function contentFileName(content: Library): string {
-  const all = [...content.maps, ...content.factions, ...content.mats, ...content.encounters, ...content.factory, ...content.objectives];
-  const deck = (['encounters', 'factory', 'objectives'] as const).find((kind) => content[kind].length > 1 && all.length === content[kind].length);
-  const name = deck ?? (all.length === 1 ? all[0]!.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'content' : 'content');
+  const all = [...content.maps, ...content.factions, ...content.mats, ...content.encounters, ...content.factory, ...content.objectives, ...content.structureBonuses];
+  const deck = (['encounters', 'factory', 'objectives', 'structureBonuses'] as const).find((kind) => content[kind].length > 1 && all.length === content[kind].length);
+  const name = (deck === 'structureBonuses' ? 'structure-bonuses' : deck) ?? (all.length === 1 ? all[0]!.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'content' : 'content');
   return `scythe-${name}.scythe-content.json`;
 }
 
@@ -138,9 +141,10 @@ export function parseContentFile(text: string): Library {
       encounters: (data.encounters as EncounterCard[]) ?? [],
       factory: (data.factory as FactoryCard[]) ?? [],
       objectives: (data.objectives as ObjectiveCard[]) ?? [],
+      structureBonuses: (data.structureBonuses as StructureBonusTile[]) ?? [],
     };
   } else if (data.format === 'scythe-save') {
-    const setup = data.setup as { board: Board; players: { faction: Faction; mat: PlayerMat }[]; encounters?: EncounterCard[]; factory?: FactoryCard[]; objectives?: ObjectiveCard[] } | undefined;
+    const setup = data.setup as { board: Board; players: { faction: Faction; mat: PlayerMat }[]; encounters?: EncounterCard[]; factory?: FactoryCard[]; objectives?: ObjectiveCard[]; structureBonuses?: StructureBonusTile[] } | undefined;
     if (!setup?.board || !Array.isArray(setup.players)) throw neither;
     const name = (data.mapName as string | undefined) ?? `Map from ${setup.players.map((p) => p.faction?.name).join(', ')} game`;
     content = {
@@ -150,11 +154,12 @@ export function parseContentFile(text: string): Library {
       encounters: setup.encounters ?? [],
       factory: setup.factory ?? [],
       objectives: setup.objectives ?? [],
+      structureBonuses: setup.structureBonuses ?? [],
     };
   } else {
     throw neither;
   }
-  if (![content.maps, content.factions, content.mats, content.encounters, content.factory, content.objectives].every(Array.isArray)) throw neither;
+  if (![content.maps, content.factions, content.mats, content.encounters, content.factory, content.objectives, content.structureBonuses].every(Array.isArray)) throw neither;
   const check = (item: { id?: unknown; name?: unknown } | undefined, what: string, problems: () => string[]) => {
     const name = typeof item?.name === 'string' && item.name ? item.name : `a ${what}`;
     let found: string[];
@@ -171,5 +176,6 @@ export function parseContentFile(text: string): Library {
   for (const c of content.encounters) check(c, 'encounter card', () => validateEncounterCard(c));
   for (const c of content.factory) check(c, 'Factory card', () => validateFactoryCard(c));
   for (const c of content.objectives) check(c, 'objective card', () => validateObjectiveCard(c));
+  for (const t of content.structureBonuses) check(t, 'structure bonus tile', () => validateStructureBonus(t));
   return content;
 }

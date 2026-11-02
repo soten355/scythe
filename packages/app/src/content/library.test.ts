@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { baseBoard, baseFactions, baseMats, sampleEncounters, sampleFactoryCards, sampleObjectives } from '@scythe/content';
-import type { EncounterCard, FactoryCard, GameSetup, ObjectiveCard } from '@scythe/engine';
+import { baseBoard, baseFactions, baseMats, sampleEncounters, sampleFactoryCards, sampleObjectives, sampleStructureBonuses } from '@scythe/content';
+import type { EncounterCard, FactoryCard, GameSetup, ObjectiveCard, StructureBonusTile } from '@scythe/engine';
 import type { Catalog } from '../menu/setup';
 import { createSave, saveFileText } from '../saves/save';
 import { addToLibrary, catalogWith, contentFileName, contentFileText, EMPTY_LIBRARY, parseContentFile, removeFromLibrary, type Library } from './library';
@@ -17,63 +17,63 @@ const myMat = { ...firstMat, id: 'odd', name: 'Odd', coins: 8 };
 const myMap = { id: 'island', name: 'Island', board: { ...baseBoard, rivers: [] } };
 const myCard: EncounterCard = { ...sampleEncounters[0]!, id: 'card-1', name: 'The bridge' };
 const myOtherCard: EncounterCard = { ...sampleEncounters[1]!, id: 'card-2', name: 'The well' };
-const cards = { maps: [], factions: [], mats: [], encounters: [myCard, myOtherCard], factory: [], objectives: [] };
+const cards = { maps: [], factions: [], mats: [], encounters: [myCard, myOtherCard], factory: [], objectives: [], structureBonuses: [] };
 
 describe('adding to the library', () => {
   it('adds new maps, factions and mats, and says what was added', () => {
-    const { library, added } = addToLibrary(EMPTY_LIBRARY, builtIn, { maps: [myMap], factions: [myFaction], mats: [myMat], encounters: [], factory: [], objectives: [] });
-    expect(library).toEqual({ maps: [myMap], factions: [myFaction], mats: [myMat], encounters: [], factory: [], objectives: [] });
+    const { library, added } = addToLibrary(EMPTY_LIBRARY, builtIn, { maps: [myMap], factions: [myFaction], mats: [myMat], encounters: [], factory: [], objectives: [], structureBonuses: [] });
+    expect(library).toEqual({ maps: [myMap], factions: [myFaction], mats: [myMat], encounters: [], factory: [], objectives: [], structureBonuses: [] });
     expect(added).toEqual(['Island', 'Wolves', 'Odd']);
   });
 
   it('skips anything exactly like a built-in one or one already added', () => {
-    const once = addToLibrary(EMPTY_LIBRARY, builtIn, { maps: [], factions: [myFaction], mats: [], encounters: [], factory: [], objectives: [] }).library;
-    const { library, added } = addToLibrary(once, builtIn, { maps: [builtIn.maps[0]!], factions: [nordic, myFaction], mats: [firstMat], encounters: [], factory: [], objectives: [] });
+    const once = addToLibrary(EMPTY_LIBRARY, builtIn, { maps: [], factions: [myFaction], mats: [], encounters: [], factory: [], objectives: [], structureBonuses: [] }).library;
+    const { library, added } = addToLibrary(once, builtIn, { maps: [builtIn.maps[0]!], factions: [nordic, myFaction], mats: [firstMat], encounters: [], factory: [], objectives: [], structureBonuses: [] });
     expect(library).toEqual(once);
     expect(added).toEqual([]);
   });
 
   it('a renamed copy of a built-in one is added', () => {
-    const { library, added } = addToLibrary(EMPTY_LIBRARY, builtIn, { maps: [{ ...builtIn.maps[0]!, id: 'copy', name: 'Copy' }], factions: [], mats: [], encounters: [], factory: [], objectives: [] });
+    const { library, added } = addToLibrary(EMPTY_LIBRARY, builtIn, { maps: [{ ...builtIn.maps[0]!, id: 'copy', name: 'Copy' }], factions: [], mats: [], encounters: [], factory: [], objectives: [], structureBonuses: [] });
     expect(library.maps.map((m) => m.name)).toEqual(['Copy']);
     expect(added).toEqual(['Copy']);
   });
 
   it('a changed built-in one is added alongside it, marked custom', () => {
     const changed = { ...nordic, power: 6 };
-    const { library } = addToLibrary(EMPTY_LIBRARY, builtIn, { maps: [], factions: [changed], mats: [], encounters: [], factory: [], objectives: [] });
+    const { library } = addToLibrary(EMPTY_LIBRARY, builtIn, { maps: [], factions: [changed], mats: [], encounters: [], factory: [], objectives: [], structureBonuses: [] });
     expect(library.factions).toEqual([{ ...changed, id: `${nordic.id}-custom`, name: `${nordic.name} (custom)` }]);
   });
 
   it('a newer version of one already added replaces it', () => {
-    const once = addToLibrary(EMPTY_LIBRARY, builtIn, { maps: [], factions: [myFaction], mats: [], encounters: [], factory: [], objectives: [] }).library;
+    const once = addToLibrary(EMPTY_LIBRARY, builtIn, { maps: [], factions: [myFaction], mats: [], encounters: [], factory: [], objectives: [], structureBonuses: [] }).library;
     const newer = { ...myFaction, power: 2 };
-    const { library, added } = addToLibrary(once, builtIn, { maps: [], factions: [newer], mats: [], encounters: [], factory: [], objectives: [] });
+    const { library, added } = addToLibrary(once, builtIn, { maps: [], factions: [newer], mats: [], encounters: [], factory: [], objectives: [], structureBonuses: [] });
     expect(library.factions).toEqual([newer]);
     expect(added).toEqual(['Wolves']);
   });
 
   it('changing a built-in one twice keeps one custom version', () => {
     let lib: Library = EMPTY_LIBRARY;
-    lib = addToLibrary(lib, builtIn, { maps: [], factions: [{ ...nordic, power: 6 }], mats: [], encounters: [], factory: [], objectives: [] }).library;
-    lib = addToLibrary(lib, builtIn, { maps: [], factions: [{ ...nordic, power: 1 }], mats: [], encounters: [], factory: [], objectives: [] }).library;
+    lib = addToLibrary(lib, builtIn, { maps: [], factions: [{ ...nordic, power: 6 }], mats: [], encounters: [], factory: [], objectives: [], structureBonuses: [] }).library;
+    lib = addToLibrary(lib, builtIn, { maps: [], factions: [{ ...nordic, power: 1 }], mats: [], encounters: [], factory: [], objectives: [], structureBonuses: [] }).library;
     expect(lib.factions.map((f) => [f.id, f.power])).toEqual([[`${nordic.id}-custom`, 1]]);
   });
 
   it('a different one with a name already used gets a number', () => {
-    const { library } = addToLibrary(EMPTY_LIBRARY, builtIn, { maps: [], factions: [{ ...myFaction, id: 'other', name: nordic.name }], mats: [], encounters: [], factory: [], objectives: [] });
+    const { library } = addToLibrary(EMPTY_LIBRARY, builtIn, { maps: [], factions: [{ ...myFaction, id: 'other', name: nordic.name }], mats: [], encounters: [], factory: [], objectives: [], structureBonuses: [] });
     expect(library.factions[0]!.name).toBe(`${nordic.name} (2)`);
   });
 
   it('removes', () => {
-    const lib = addToLibrary(EMPTY_LIBRARY, builtIn, { maps: [myMap], factions: [myFaction], mats: [myMat], encounters: [], factory: [], objectives: [] }).library;
+    const lib = addToLibrary(EMPTY_LIBRARY, builtIn, { maps: [myMap], factions: [myFaction], mats: [myMat], encounters: [], factory: [], objectives: [], structureBonuses: [] }).library;
     expect(removeFromLibrary(lib, 'factions', 'wolves').factions).toEqual([]);
     expect(removeFromLibrary(lib, 'maps', 'island').maps).toEqual([]);
     expect(removeFromLibrary(lib, 'mats', 'odd').mats).toEqual([]);
   });
 
   it('the new game screen offers built-in ones first, then the library', () => {
-    const lib = addToLibrary(EMPTY_LIBRARY, builtIn, { maps: [myMap], factions: [myFaction], mats: [myMat], encounters: [], factory: [], objectives: [] }).library;
+    const lib = addToLibrary(EMPTY_LIBRARY, builtIn, { maps: [myMap], factions: [myFaction], mats: [myMat], encounters: [], factory: [], objectives: [], structureBonuses: [] }).library;
     const all = catalogWith(builtIn, lib);
     expect(all.maps.map((m) => m.id)).toEqual(['standard', 'island']);
     expect(all.factions.at(-1)).toEqual(myFaction);
@@ -83,13 +83,13 @@ describe('adding to the library', () => {
 
 describe('content files', () => {
   it('round-trips maps, factions and mats', () => {
-    const content = { maps: [myMap], factions: [myFaction], mats: [myMat], encounters: [], factory: [], objectives: [] };
+    const content = { maps: [myMap], factions: [myFaction], mats: [myMat], encounters: [], factory: [], objectives: [], structureBonuses: [] };
     expect(parseContentFile(contentFileText(content))).toEqual(content);
   });
 
   it('names the file after what is in it', () => {
-    expect(contentFileName({ maps: [], factions: [myFaction], mats: [], encounters: [], factory: [], objectives: [] })).toBe('scythe-wolves.scythe-content.json');
-    expect(contentFileName({ maps: [myMap], factions: [myFaction], mats: [myMat], encounters: [], factory: [], objectives: [] })).toBe('scythe-content.scythe-content.json');
+    expect(contentFileName({ maps: [], factions: [myFaction], mats: [], encounters: [], factory: [], objectives: [], structureBonuses: [] })).toBe('scythe-wolves.scythe-content.json');
+    expect(contentFileName({ maps: [myMap], factions: [myFaction], mats: [myMat], encounters: [], factory: [], objectives: [], structureBonuses: [] })).toBe('scythe-content.scythe-content.json');
   });
 
   it("takes a save file's map, factions and mats", () => {
@@ -215,5 +215,33 @@ describe('objective cards', () => {
   it('rejects a broken card, naming it', () => {
     const broken = { ...deck, objectives: [{ ...mine, checks: [] }] };
     expect(() => parseContentFile(contentFileText(broken))).toThrow(/Hoard can't be used: it needs at least one condition/);
+  });
+});
+
+describe('structure bonus tiles', () => {
+  const withTiles: Catalog = { ...builtIn, structureBonuses: sampleStructureBonuses };
+  const mine: StructureBonusTile = { ...sampleStructureBonuses[0]!, id: 'tile-1', name: 'Deep roots' };
+  const set = { ...EMPTY_LIBRARY, structureBonuses: [mine] };
+
+  it('new games draw from the built-in tiles until you add yours, then only yours', () => {
+    expect(catalogWith(withTiles, EMPTY_LIBRARY).structureBonuses).toBe(sampleStructureBonuses);
+    expect(catalogWith(withTiles, addToLibrary(EMPTY_LIBRARY, withTiles, set).library).structureBonuses).toEqual([mine]);
+  });
+
+  it('round-trips through a content file named for them', () => {
+    const two = { ...set, structureBonuses: [mine, { ...mine, id: 'tile-2', name: 'Shallow roots' }] };
+    expect(parseContentFile(contentFileText(two))).toEqual(two);
+    expect(contentFileName(two)).toBe('scythe-structure-bonuses.scythe-content.json');
+  });
+
+  it("takes a save's tiles, and reads older files without any", () => {
+    const setup: GameSetup = { seed: 1, board: myMap.board, structureBonuses: [mine], players: [{ faction: myFaction, mat: myMat }, { faction: baseFactions[1]!, mat: baseMats[1]! }] };
+    expect(parseContentFile(saveFileText(createSave(setup, 'g', new Date('2026-11-01T00:00:00Z')))).structureBonuses).toEqual([mine]);
+    expect(parseContentFile(JSON.stringify({ format: 'scythe-content', formatVersion: 1, maps: [], factions: [myFaction], mats: [] })).structureBonuses).toEqual([]);
+  });
+
+  it('rejects a broken tile, naming it', () => {
+    const broken = { ...set, structureBonuses: [{ ...mine, pays: [] }] };
+    expect(() => parseContentFile(contentFileText(broken))).toThrow(/Deep roots can't be used: it needs at least one payout/);
   });
 });

@@ -44,7 +44,7 @@
     ...library.maps.map((x) => ({ kind: 'maps' as const, id: x.id, name: x.name, what: 'Map' })),
     ...library.factions.map((x) => ({ kind: 'factions' as const, id: x.id, name: x.name, what: 'Faction' })),
     ...library.mats.map((x) => ({ kind: 'mats' as const, id: x.id, name: x.name, what: 'Mat' })),
-    // Encounter, Factory and objective cards are a deck each: one row each, removed all together.
+    // Each deck of cards, and the tiles, show as one row each, removed all together.
     ...(library.encounters.length
       ? [{ kind: 'encounters' as const, id: library.encounters.map((c) => c.id), name: `Your ${library.encounters.length} card${library.encounters.length === 1 ? '' : 's'}`, what: 'Encounter deck' }]
       : []),
@@ -53,6 +53,9 @@
       : []),
     ...(library.objectives.length
       ? [{ kind: 'objectives' as const, id: library.objectives.map((c) => c.id), name: `Your ${library.objectives.length} card${library.objectives.length === 1 ? '' : 's'}`, what: 'Objective deck' }]
+      : []),
+    ...(library.structureBonuses.length
+      ? [{ kind: 'structureBonuses' as const, id: library.structureBonuses.map((t) => t.id), name: `Your ${library.structureBonuses.length} tile${library.structureBonuses.length === 1 ? '' : 's'}`, what: 'Structure bonus tiles' }]
       : []),
   ]);
 
@@ -141,6 +144,9 @@
         {/if}
         {#if !library.objectives.length}
           <p class="hint">Objectives use a made-up sample deck until you add your cards from the objective card editor.</p>
+        {/if}
+        {#if !library.structureBonuses.length}
+          <p class="hint">Structure bonus tiles are made-up samples until you add yours from the structure bonus tile editor.</p>
         {/if}
       </section>
     </div>

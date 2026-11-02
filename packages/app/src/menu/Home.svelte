@@ -32,6 +32,7 @@
     <a href="{base}encounters.html">Encounter card editor</a>
     <a href="{base}factory.html">Factory card editor</a>
     <a href="{base}objectives.html">Objective card editor</a>
+    <a href="{base}structure-bonuses.html">Structure bonus tile editor</a>
   </nav>
   <p class="meta">engine v{ENGINE_VERSION}</p>
 </div>
