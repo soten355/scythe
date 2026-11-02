@@ -179,7 +179,7 @@ root.addEventListener('click', async (e) => {
       // This faction only: it can be played (or shared) as it is now.
       const problems = validateFaction(faction());
       if (problems.length) return tell(`Fix this first: ${problems.join('; ')}.`);
-      const content = { maps: [], factions: [faction()], mats: [], encounters: [], factory: [] };
+      const content = { maps: [], factions: [faction()], mats: [], encounters: [], factory: [], objectives: [] };
       return btn!.dataset.act === 'add' ? addToGame(content) : exportContent(content);
     }
     case 'export':

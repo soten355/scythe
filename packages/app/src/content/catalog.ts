@@ -11,6 +11,6 @@ export const BUILT_IN: Catalog = {
   encounters: sampleEncounters,
   // Until the real deck is entered with the Factory card editor.
   factory: sampleFactoryCards,
-  // Until the real deck is entered (an objective card editor is still to come).
+  // Until the real deck is entered with the objective card editor.
   objectives: sampleObjectives,
 };
