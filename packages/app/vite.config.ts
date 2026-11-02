@@ -9,8 +9,8 @@ export default defineConfig({
   base,
   build: {
     rollupOptions: {
-      // play.html is the game; editor.html, mats.html, factions.html, encounters.html, factory.html and objectives.html are the map, player mat, faction, encounter, Factory and objective card editors.
-      input: { main: 'index.html', play: 'play.html', editor: 'editor.html', mats: 'mats.html', factions: 'factions.html', encounters: 'encounters.html', factory: 'factory.html', objectives: 'objectives.html' },
+      // play.html is the game; editor.html, mats.html, factions.html, encounters.html, factory.html, objectives.html and structure-bonuses.html are the map, player mat, faction, encounter, Factory and objective card, and structure bonus tile editors.
+      input: { main: 'index.html', play: 'play.html', editor: 'editor.html', mats: 'mats.html', factions: 'factions.html', encounters: 'encounters.html', factory: 'factory.html', objectives: 'objectives.html', structureBonuses: 'structure-bonuses.html' },
     },
   },
   plugins: [

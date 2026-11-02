@@ -1,7 +1,7 @@
 import type { StructureBonusTile } from '@scythe/engine';
 
 // SAMPLE structure bonus tiles, made up for play-testing until the real ones
-// are entered from the physical game. The names and payouts here are
+// are entered from the physical game (with the structure bonus tile editor). The names and payouts here are
 // invented, not the published tiles'. One is drawn for each game.
 
 const steps = (...pays: [number, number][]) => pays.map(([atLeast, coins]) => ({ atLeast, coins }));
