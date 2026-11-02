@@ -188,3 +188,26 @@ function proceed(state: GameState, turn: EncounterStep): GameState {
 function finish(state: GameState, turn: EncounterStep): GameState {
   return { ...state, encounterDiscard: [...state.encounterDiscard, turn.card], turn: { step: 'bottom', section: turn.section, paid: 0 } };
 }
+
+const BOTTOM_ACTIONS: BottomActionType[] = ['upgrade', 'deploy', 'build', 'enlist'];
+
+/** Returns a list of problems in plain language; empty means the card is usable. */
+export function validateEncounterCard(card: EncounterCard): string[] {
+  const problems: string[] = [];
+  const amount = (n: unknown) => n === undefined || (typeof n === 'number' && Number.isInteger(n) && n >= 0);
+  if (!card.name?.trim()) problems.push('name is missing');
+  if (!card.id?.trim()) problems.push('ID is missing');
+  if (!Array.isArray(card.options) || card.options.length !== 3) return [...problems, 'it needs three options'];
+  card.options.forEach((o, i) => {
+    const which = `option ${i + 1}`;
+    if (!o?.text?.trim()) problems.push(`${which} has no text`);
+    const cost = o?.cost ?? {};
+    const gain = o?.gain ?? {};
+    if (![cost.coins, cost.popularity, cost.power].every(amount)) problems.push(`${which}'s cost must be whole numbers of 0 or more`);
+    const counts = [gain.coins, gain.power, gain.popularity, gain.combatCards, gain.workers, gain.anyResources, ...Object.values(gain.resources ?? {})];
+    if (!counts.every(amount)) problems.push(`${which}'s rewards must be whole numbers of 0 or more`);
+    if (Object.keys(gain.resources ?? {}).some((r) => !RESOURCES.includes(r as Resource))) problems.push(`${which} gives an unknown resource`);
+    if ((gain.actions ?? []).some((a) => !BOTTOM_ACTIONS.includes(a))) problems.push(`${which} gives an unknown action`);
+  });
+  return problems;
+}

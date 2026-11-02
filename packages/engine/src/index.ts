@@ -13,4 +13,4 @@ export * from './faction';
 export * from './afford';
 export { COMBAT_DECK, MAX_DIAL, MAX_COMBAT_STARS, combatUnitsOn, maxCombatCards, type CombatResult } from './combat';
 export { rulesOf, rulesOfKind, hasRule } from './abilities';
-export { canPay as canPayEncounter, encounterCard, optionLimit as encounterOptionLimit, type EncounterCard, type EncounterCost, type EncounterGain, type EncounterOption, type EncounterTask } from './encounters';
+export { canPay as canPayEncounter, encounterCard, validateEncounterCard, optionLimit as encounterOptionLimit, type EncounterCard, type EncounterCost, type EncounterGain, type EncounterOption, type EncounterTask } from './encounters';

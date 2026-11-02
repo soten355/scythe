@@ -4,7 +4,7 @@
 // is Produce/Deploy); player 1 uses mat B.
 import { describe, expect, it } from 'vitest';
 import { activeSeat, applyAction, legalActions, newGame, type Action, type GameState, type PlayerState } from './game';
-import type { EncounterCard } from './encounters';
+import { validateEncounterCard, type EncounterCard } from './encounters';
 import type { AbilityRule } from './faction';
 import { factionA, testSetup } from './test-fixtures';
 
@@ -245,5 +245,36 @@ describe('Meander', () => {
 
   it('without Meander, one option ends the encounter', () => {
     expect(legalActions(encounter(), 0)).not.toContainEqual({ type: 'endEncounter' });
+  });
+});
+
+describe('checking an encounter card', () => {
+  it('accepts a complete card', () => {
+    expect(validateEncounterCard(cards[0]!)).toEqual([]);
+  });
+
+  it('names what is missing or wrong', () => {
+    const card = cards[0]!;
+    const broken: EncounterCard = {
+      ...card,
+      name: ' ',
+      options: [
+        { ...card.options[0], text: '' },
+        { ...card.options[1], cost: { coins: -1 } },
+        { ...card.options[2], gain: { resources: { gold: 1 } as never, actions: ['fly' as never], workers: 1.5 } },
+      ],
+    };
+    expect(validateEncounterCard(broken)).toEqual([
+      'name is missing',
+      'option 1 has no text',
+      "option 2's cost must be whole numbers of 0 or more",
+      "option 3's rewards must be whole numbers of 0 or more",
+      'option 3 gives an unknown resource',
+      'option 3 gives an unknown action',
+    ]);
+  });
+
+  it('needs exactly three options', () => {
+    expect(validateEncounterCard({ ...cards[0]!, options: [cards[0]!.options[0]] as never })).toEqual(['it needs three options']);
   });
 });
