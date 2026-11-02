@@ -4,6 +4,7 @@ import { baseBoard } from './board';
 import { baseFactions } from './factions';
 import { baseMats } from './mats';
 import { sampleEncounters } from './encounters';
+import { sampleFactoryCards } from './factory';
 
 describe('a game with the base content', () => {
   const setup = (seed: number) => ({
@@ -35,13 +36,15 @@ describe('a game with the base content', () => {
     }
   });
 
-  it('plays random legal games with encounters and all five factions, keeping every count in bounds', () => {
+  it('plays random legal games with encounters, the Factory and all five factions, keeping every count in bounds', () => {
     let encounters = 0;
+    let factoryUsed = 0;
     for (let seed = 0; seed < 10; seed++) {
       let state = newGame({
         seed,
         board: baseBoard,
         encounters: sampleEncounters,
+        factory: sampleFactoryCards,
         players: baseFactions.map((faction, i) => ({ faction, mat: baseMats[i]! })),
       });
       expect(state.encounterTokens).toHaveLength(11);
@@ -54,14 +57,19 @@ describe('a game with the base content', () => {
         const tokens = state.encounterTokens.length;
         state = applyAction(state, options[pick]!);
         if (state.encounterTokens.length < tokens) encounters++;
+        if (options[pick]!.type === 'factoryUse') factoryUsed++;
         for (const p of state.players) {
           expect(Math.min(p.coins, p.power, p.popularity)).toBeGreaterThanOrEqual(0);
           expect(p.workers.length).toBeLessThanOrEqual(8);
         }
         expect(state.encounterDeck.length + state.encounterDiscard.length).toBeLessThanOrEqual(sampleEncounters.length);
+        // Every Factory card is in the deck or with one player.
+        const held = state.players.flatMap((p) => (p.factoryCard ? [p.factoryCard] : []));
+        expect([...state.factoryDeck, ...held].sort()).toEqual(sampleFactoryCards.map((c) => c.id).sort());
       }
     }
     expect(encounters).toBeGreaterThan(0);
+    expect(factoryUsed).toBeGreaterThan(0);
   });
 });
 
