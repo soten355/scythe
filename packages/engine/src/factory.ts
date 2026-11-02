@@ -197,3 +197,22 @@ function rewards(state: GameState, todo: BottomActionType[]): GameState {
 }
 
 const toMove = (state: GameState): GameState => ({ ...state, turn: { step: 'top', section: FACTORY } });
+
+const ACTIONS: BottomActionType[] = ['upgrade', 'deploy', 'build', 'enlist'];
+
+/** What's wrong with a Factory card, in plain words; empty when it's fine. */
+export function validateFactoryCard(card: FactoryCard): string[] {
+  const problems: string[] = [];
+  const amount = (n: unknown) => n === undefined || (typeof n === 'number' && Number.isInteger(n) && n >= 0);
+  const atLeastOne = (n: unknown) => typeof n === 'number' && Number.isInteger(n) && n >= 1;
+  if (!card.name?.trim()) problems.push('name is missing');
+  if (!card.id?.trim()) problems.push('ID is missing');
+  const cost = card.cost ?? {};
+  const gain = card.gain ?? {};
+  if (![cost.coins, cost.popularity, cost.power, ...Object.values(cost.resources ?? {})].every(amount)) problems.push('its cost must be whole numbers of 0 or more');
+  if (Object.keys(cost.resources ?? {}).some((r) => !RESOURCES.includes(r as Resource))) problems.push('its cost has an unknown resource');
+  if (![gain.coins, gain.power, gain.popularity, gain.combatCards].every(amount)) problems.push('its rewards must be whole numbers of 0 or more');
+  if ((gain.actions ?? []).some((a) => !ACTIONS.includes(a))) problems.push('it gives an unknown action');
+  if (!atLeastOne(card.move?.units) || !atLeastOne(card.move?.hexes)) problems.push('its move must be at least 1 unit, at least 1 hex');
+  return problems;
+}

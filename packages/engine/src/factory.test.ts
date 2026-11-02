@@ -3,7 +3,7 @@
 // (section 2 is Move, 2 units; section 0's bottom row is Upgrade); player 1 mat B.
 import { describe, expect, it } from 'vitest';
 import { activeSeat, applyAction, legalActions, newGame, type Action, type GameState, type PlayerState } from './game';
-import { FACTORY, type FactoryCard } from './factory';
+import { FACTORY, validateFactoryCard, type FactoryCard } from './factory';
 import type { AbilityRule } from './faction';
 import { factionA, testSetup } from './test-fixtures';
 
@@ -170,5 +170,18 @@ describe('the Factory card as a fifth section', () => {
   it('skipping the move ends the turn', () => {
     const state = play(holding('f1', { power: 0 }), choose(FACTORY), skip, skip);
     expect(state.turn).toMatchObject({ step: 'end', section: FACTORY });
+  });
+});
+
+describe('checking a Factory card', () => {
+  it('is fine when complete', () => {
+    for (const c of cards) expect(validateFactoryCard(c)).toEqual([]);
+  });
+
+  it('names what is missing or wrong', () => {
+    const blank: FactoryCard = { id: '', name: ' ', cost: {}, gain: {}, move: { units: 0, hexes: 1.5 } };
+    expect(validateFactoryCard(blank)).toEqual(['name is missing', 'ID is missing', 'its move must be at least 1 unit, at least 1 hex']);
+    const odd = { ...cards[1]!, cost: { coins: -1, resources: { gold: 1 } }, gain: { actions: ['fly'] } } as unknown as FactoryCard;
+    expect(validateFactoryCard(odd)).toEqual(['its cost must be whole numbers of 0 or more', 'its cost has an unknown resource', 'it gives an unknown action']);
   });
 });
