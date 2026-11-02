@@ -1,9 +1,10 @@
 <script lang="ts">
   // Top bar: the current player's coins, power, popularity, combat cards,
-  // mechs, workers and the resources on hexes they control. Everyone else shrinks to
+  // mechs, workers, territories controlled (the Factory counts three) and the
+  // resources on hexes they control. Everyone else shrinks to
   // their name (just its first letter with four or more players, so all fit on
   // a phone); everyone's stars always show.
-  import { controlledHexes, RESOURCES, type GameState } from '@scythe/engine';
+  import { controlledHexes, RESOURCES, territories, type GameState } from '@scythe/engine';
   import { cubicInOut } from 'svelte/easing';
   import { slide } from 'svelte/transition';
 
@@ -39,8 +40,9 @@
           <span title="popularity" data-stat="{seat}|popularity">♥ {p.popularity}</span>
           <span title="combat cards" data-stat="{seat}|combatCard">▭ {p.combatCards.length}</span>
           <span title="mechs deployed (of 4)">🤖 {p.mechs.length}</span>
-          <span title="workers">👷 {p.workers.length}</span>
-          <span class="res" title="oil, metal, wood, food on hexes you control">
+          <span title="workers" data-stat="{seat}|workers">👷 {p.workers.length}</span>
+          <span title="territories you control (the Factory counts as 3)">⬢ {territories(game, seat)}</span>
+          <span class="res" title="oil, metal, wood, food on hexes you control" data-stat="{seat}|resources">
             oil {totals.oil} · metal {totals.metal} · wood {totals.wood} · food {totals.food}
           </span>
         </span>

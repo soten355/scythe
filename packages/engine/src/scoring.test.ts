@@ -2,7 +2,7 @@
 // (see test-fixtures.ts): B2 is a lake, B3 the Factory.
 import { describe, expect, it } from 'vitest';
 import { applyAction, isGameOver, legalActions, newGame, type Action, type GameState, type PlayerState } from './game';
-import { POPULARITY_TIERS, score, standings, tierOf } from './scoring';
+import { POPULARITY_TIERS, score, standings, territories, tierOf } from './scoring';
 import type { StarKind } from './state';
 import { testSetup } from './test-fixtures';
 
@@ -67,6 +67,11 @@ describe('final scoring', () => {
   it('counts the Factory as three territories, and a lake as one', () => {
     const state = game({ coins: 0, popularity: 0, character: 'B3', mechs: ['B2'], workers: [] });
     expect(score(state)[0]!.territories).toEqual({ count: 4, rate: 2, coins: 8 });
+  });
+
+  it('counts territories during the game the same way (for the top bar)', () => {
+    const state = game({ coins: 0, popularity: 0, character: 'B3', mechs: ['B2'], workers: [] });
+    expect(territories(state, 0)).toBe(4);
   });
 
   it('counts a structure as a territory when no enemy unit stands on it', () => {

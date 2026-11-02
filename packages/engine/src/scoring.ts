@@ -47,6 +47,9 @@ export interface PlayerScore {
 /** Territories a player controls: the Factory counts three, every other hex (lakes too) one. */
 const territoryCount = (state: GameState, hexes: HexId[]) => hexes.reduce((n, h) => n + (state.setup.board.hexes[h]?.terrain === 'factory' ? 3 : 1), 0);
 
+/** How many territories a player controls now, as final scoring counts them (the Factory as three). */
+export const territories = (state: GameState, seat: number): number => territoryCount(state, [...controlledHexes(state, seat)]);
+
 /** Resources lying on hexes the player controls. */
 const resourceCount = (state: GameState, hexes: HexId[]) =>
   hexes.reduce((n, h) => n + Object.values(state.resources[h] ?? {}).reduce((a, b) => a + (b ?? 0), 0), 0);
