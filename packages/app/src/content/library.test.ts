@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { baseBoard, baseFactions, baseMats, sampleEncounters } from '@scythe/content';
-import type { EncounterCard, GameSetup } from '@scythe/engine';
+import { baseBoard, baseFactions, baseMats, sampleEncounters, sampleFactoryCards } from '@scythe/content';
+import type { EncounterCard, FactoryCard, GameSetup } from '@scythe/engine';
 import type { Catalog } from '../menu/setup';
 import { createSave, saveFileText } from '../saves/save';
 import { addToLibrary, catalogWith, contentFileName, contentFileText, EMPTY_LIBRARY, parseContentFile, removeFromLibrary, type Library } from './library';
@@ -17,63 +17,63 @@ const myMat = { ...firstMat, id: 'odd', name: 'Odd', coins: 8 };
 const myMap = { id: 'island', name: 'Island', board: { ...baseBoard, rivers: [] } };
 const myCard: EncounterCard = { ...sampleEncounters[0]!, id: 'card-1', name: 'The bridge' };
 const myOtherCard: EncounterCard = { ...sampleEncounters[1]!, id: 'card-2', name: 'The well' };
-const cards = { maps: [], factions: [], mats: [], encounters: [myCard, myOtherCard] };
+const cards = { maps: [], factions: [], mats: [], encounters: [myCard, myOtherCard], factory: [] };
 
 describe('adding to the library', () => {
   it('adds new maps, factions and mats, and says what was added', () => {
-    const { library, added } = addToLibrary(EMPTY_LIBRARY, builtIn, { maps: [myMap], factions: [myFaction], mats: [myMat], encounters: [] });
-    expect(library).toEqual({ maps: [myMap], factions: [myFaction], mats: [myMat], encounters: [] });
+    const { library, added } = addToLibrary(EMPTY_LIBRARY, builtIn, { maps: [myMap], factions: [myFaction], mats: [myMat], encounters: [], factory: [] });
+    expect(library).toEqual({ maps: [myMap], factions: [myFaction], mats: [myMat], encounters: [], factory: [] });
     expect(added).toEqual(['Island', 'Wolves', 'Odd']);
   });
 
   it('skips anything exactly like a built-in one or one already added', () => {
-    const once = addToLibrary(EMPTY_LIBRARY, builtIn, { maps: [], factions: [myFaction], mats: [], encounters: [] }).library;
-    const { library, added } = addToLibrary(once, builtIn, { maps: [builtIn.maps[0]!], factions: [nordic, myFaction], mats: [firstMat], encounters: [] });
+    const once = addToLibrary(EMPTY_LIBRARY, builtIn, { maps: [], factions: [myFaction], mats: [], encounters: [], factory: [] }).library;
+    const { library, added } = addToLibrary(once, builtIn, { maps: [builtIn.maps[0]!], factions: [nordic, myFaction], mats: [firstMat], encounters: [], factory: [] });
     expect(library).toEqual(once);
     expect(added).toEqual([]);
   });
 
   it('a renamed copy of a built-in one is added', () => {
-    const { library, added } = addToLibrary(EMPTY_LIBRARY, builtIn, { maps: [{ ...builtIn.maps[0]!, id: 'copy', name: 'Copy' }], factions: [], mats: [], encounters: [] });
+    const { library, added } = addToLibrary(EMPTY_LIBRARY, builtIn, { maps: [{ ...builtIn.maps[0]!, id: 'copy', name: 'Copy' }], factions: [], mats: [], encounters: [], factory: [] });
     expect(library.maps.map((m) => m.name)).toEqual(['Copy']);
     expect(added).toEqual(['Copy']);
   });
 
   it('a changed built-in one is added alongside it, marked custom', () => {
     const changed = { ...nordic, power: 6 };
-    const { library } = addToLibrary(EMPTY_LIBRARY, builtIn, { maps: [], factions: [changed], mats: [], encounters: [] });
+    const { library } = addToLibrary(EMPTY_LIBRARY, builtIn, { maps: [], factions: [changed], mats: [], encounters: [], factory: [] });
     expect(library.factions).toEqual([{ ...changed, id: `${nordic.id}-custom`, name: `${nordic.name} (custom)` }]);
   });
 
   it('a newer version of one already added replaces it', () => {
-    const once = addToLibrary(EMPTY_LIBRARY, builtIn, { maps: [], factions: [myFaction], mats: [], encounters: [] }).library;
+    const once = addToLibrary(EMPTY_LIBRARY, builtIn, { maps: [], factions: [myFaction], mats: [], encounters: [], factory: [] }).library;
     const newer = { ...myFaction, power: 2 };
-    const { library, added } = addToLibrary(once, builtIn, { maps: [], factions: [newer], mats: [], encounters: [] });
+    const { library, added } = addToLibrary(once, builtIn, { maps: [], factions: [newer], mats: [], encounters: [], factory: [] });
     expect(library.factions).toEqual([newer]);
     expect(added).toEqual(['Wolves']);
   });
 
   it('changing a built-in one twice keeps one custom version', () => {
     let lib: Library = EMPTY_LIBRARY;
-    lib = addToLibrary(lib, builtIn, { maps: [], factions: [{ ...nordic, power: 6 }], mats: [], encounters: [] }).library;
-    lib = addToLibrary(lib, builtIn, { maps: [], factions: [{ ...nordic, power: 1 }], mats: [], encounters: [] }).library;
+    lib = addToLibrary(lib, builtIn, { maps: [], factions: [{ ...nordic, power: 6 }], mats: [], encounters: [], factory: [] }).library;
+    lib = addToLibrary(lib, builtIn, { maps: [], factions: [{ ...nordic, power: 1 }], mats: [], encounters: [], factory: [] }).library;
     expect(lib.factions.map((f) => [f.id, f.power])).toEqual([[`${nordic.id}-custom`, 1]]);
   });
 
   it('a different one with a name already used gets a number', () => {
-    const { library } = addToLibrary(EMPTY_LIBRARY, builtIn, { maps: [], factions: [{ ...myFaction, id: 'other', name: nordic.name }], mats: [], encounters: [] });
+    const { library } = addToLibrary(EMPTY_LIBRARY, builtIn, { maps: [], factions: [{ ...myFaction, id: 'other', name: nordic.name }], mats: [], encounters: [], factory: [] });
     expect(library.factions[0]!.name).toBe(`${nordic.name} (2)`);
   });
 
   it('removes', () => {
-    const lib = addToLibrary(EMPTY_LIBRARY, builtIn, { maps: [myMap], factions: [myFaction], mats: [myMat], encounters: [] }).library;
+    const lib = addToLibrary(EMPTY_LIBRARY, builtIn, { maps: [myMap], factions: [myFaction], mats: [myMat], encounters: [], factory: [] }).library;
     expect(removeFromLibrary(lib, 'factions', 'wolves').factions).toEqual([]);
     expect(removeFromLibrary(lib, 'maps', 'island').maps).toEqual([]);
     expect(removeFromLibrary(lib, 'mats', 'odd').mats).toEqual([]);
   });
 
   it('the new game screen offers built-in ones first, then the library', () => {
-    const lib = addToLibrary(EMPTY_LIBRARY, builtIn, { maps: [myMap], factions: [myFaction], mats: [myMat], encounters: [] }).library;
+    const lib = addToLibrary(EMPTY_LIBRARY, builtIn, { maps: [myMap], factions: [myFaction], mats: [myMat], encounters: [], factory: [] }).library;
     const all = catalogWith(builtIn, lib);
     expect(all.maps.map((m) => m.id)).toEqual(['standard', 'island']);
     expect(all.factions.at(-1)).toEqual(myFaction);
@@ -83,13 +83,13 @@ describe('adding to the library', () => {
 
 describe('content files', () => {
   it('round-trips maps, factions and mats', () => {
-    const content = { maps: [myMap], factions: [myFaction], mats: [myMat], encounters: [] };
+    const content = { maps: [myMap], factions: [myFaction], mats: [myMat], encounters: [], factory: [] };
     expect(parseContentFile(contentFileText(content))).toEqual(content);
   });
 
   it('names the file after what is in it', () => {
-    expect(contentFileName({ maps: [], factions: [myFaction], mats: [], encounters: [] })).toBe('scythe-wolves.scythe-content.json');
-    expect(contentFileName({ maps: [myMap], factions: [myFaction], mats: [myMat], encounters: [] })).toBe('scythe-content.scythe-content.json');
+    expect(contentFileName({ maps: [], factions: [myFaction], mats: [], encounters: [], factory: [] })).toBe('scythe-wolves.scythe-content.json');
+    expect(contentFileName({ maps: [myMap], factions: [myFaction], mats: [myMat], encounters: [], factory: [] })).toBe('scythe-content.scythe-content.json');
   });
 
   it("takes a save file's map, factions and mats", () => {
@@ -159,5 +159,33 @@ describe('encounter cards', () => {
   it('rejects a broken card, naming it', () => {
     const broken = { ...cards, encounters: [{ ...myCard, options: [myCard.options[0]] }] };
     expect(() => parseContentFile(contentFileText(broken as never))).toThrow(/The bridge can't be used: it needs three options/);
+  });
+});
+
+describe('Factory cards', () => {
+  const withDeck: Catalog = { ...builtIn, factory: sampleFactoryCards };
+  const mine: FactoryCard = { ...sampleFactoryCards[0]!, id: 'factory-1', name: 'Gears' };
+  const deck = { ...EMPTY_LIBRARY, factory: [mine] };
+
+  it('new games use the built-in deck until you add cards, then only yours', () => {
+    expect(catalogWith(withDeck, EMPTY_LIBRARY).factory).toBe(sampleFactoryCards);
+    expect(catalogWith(withDeck, addToLibrary(EMPTY_LIBRARY, withDeck, deck).library).factory).toEqual([mine]);
+  });
+
+  it('round-trips through a content file named for them', () => {
+    const two = { ...deck, factory: [mine, { ...mine, id: 'factory-2', name: 'Rivets' }] };
+    expect(parseContentFile(contentFileText(two))).toEqual(two);
+    expect(contentFileName(two)).toBe('scythe-factory.scythe-content.json');
+  });
+
+  it("takes a save's Factory deck, and reads older files and libraries without any", () => {
+    const setup: GameSetup = { seed: 1, board: myMap.board, factory: [mine], players: [{ faction: myFaction, mat: myMat }, { faction: baseFactions[1]!, mat: baseMats[1]! }] };
+    expect(parseContentFile(saveFileText(createSave(setup, 'g', new Date('2026-11-01T00:00:00Z')))).factory).toEqual([mine]);
+    expect(parseContentFile(JSON.stringify({ format: 'scythe-content', formatVersion: 1, maps: [], factions: [myFaction], mats: [] })).factory).toEqual([]);
+  });
+
+  it('rejects a broken card, naming it', () => {
+    const broken = { ...deck, factory: [{ ...mine, move: { units: 0, hexes: 1 } }] };
+    expect(() => parseContentFile(contentFileText(broken))).toThrow(/Gears can't be used: its move must be at least 1 unit/);
   });
 });

@@ -44,9 +44,12 @@
     ...library.maps.map((x) => ({ kind: 'maps' as const, id: x.id, name: x.name, what: 'Map' })),
     ...library.factions.map((x) => ({ kind: 'factions' as const, id: x.id, name: x.name, what: 'Faction' })),
     ...library.mats.map((x) => ({ kind: 'mats' as const, id: x.id, name: x.name, what: 'Mat' })),
-    // Encounter cards are one deck: one row, removed all together.
+    // Encounter cards are one deck, Factory cards another: one row each, removed all together.
     ...(library.encounters.length
       ? [{ kind: 'encounters' as const, id: library.encounters.map((c) => c.id), name: `Your ${library.encounters.length} card${library.encounters.length === 1 ? '' : 's'}`, what: 'Encounter deck' }]
+      : []),
+    ...(library.factory.length
+      ? [{ kind: 'factory' as const, id: library.factory.map((c) => c.id), name: `Your ${library.factory.length} card${library.factory.length === 1 ? '' : 's'}`, what: 'Factory deck' }]
       : []),
   ]);
 
@@ -129,6 +132,9 @@
         {/if}
         {#if !library.encounters.length}
           <p class="hint">Encounters use a made-up sample deck until you add your cards from the encounter card editor.</p>
+        {/if}
+        {#if !library.factory.length}
+          <p class="hint">The Factory uses a made-up sample deck until you add your cards from the Factory card editor.</p>
         {/if}
       </section>
     </div>

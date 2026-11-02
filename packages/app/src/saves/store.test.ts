@@ -51,7 +51,7 @@ describe('save store', () => {
 
   it('keeps the library of maps, factions and mats', async () => {
     expect(await store.library()).toEqual(EMPTY_LIBRARY);
-    const lib = { maps: [], factions: [{ ...baseFactions[0]!, id: 'x', name: 'X' }], mats: [], encounters: [] };
+    const lib = { maps: [], factions: [{ ...baseFactions[0]!, id: 'x', name: 'X' }], mats: [], encounters: [], factory: [] };
     await store.putLibrary(lib);
     expect(await store.library()).toEqual(lib);
     expect(await store.list()).toEqual([]);

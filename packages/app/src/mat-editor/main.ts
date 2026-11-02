@@ -218,7 +218,7 @@ root.addEventListener('click', async (e) => {
       // This mat only: it can be played (or shared) as it is now.
       const problems = validateMat(mat());
       if (problems.length) return tell(`Fix this first: ${problems.join('; ')}.`);
-      const content = { maps: [], factions: [], mats: [mat()], encounters: [] };
+      const content = { maps: [], factions: [], mats: [mat()], encounters: [], factory: [] };
       return btn!.dataset.act === 'add' ? addToGame(content) : exportContent(content);
     }
     case 'export':

@@ -119,10 +119,10 @@ export function askText(message: string, value: string): Promise<string | null> 
 }
 
 /**
- * Adds maps, factions, mats or encounter cards to the player's library, for
+ * Adds maps, factions, mats, encounter or Factory cards to the player's library, for
  * the new game screen, and says what happened (`said` words it, given the
  * names added, when there's at least one). `replace`: that kind is replaced
- * as a whole rather than added to (the encounter deck).
+ * as a whole rather than added to (the encounter or Factory deck).
  */
 export async function addToGame(content: Library, said?: (added: string[]) => string, replace?: LibraryKind): Promise<void> {
   const store = new SaveStore();
