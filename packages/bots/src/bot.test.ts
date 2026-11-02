@@ -30,6 +30,14 @@ describe('planning bot', () => {
     expect(state.turnsTaken / 3).toBeLessThan(80);
   }, 120_000);
 
+  it("doesn't stall: a setup whose games once ran 750 turns now ends", async () => {
+    // Saxony against Nordic (seed 704): Saxony sat still to keep the power to produce, and Nordic stopped one star short.
+    const s: GameSetup = { ...setup(704, 2), players: [4, 0].map((f, i) => ({ faction: baseFactions[f]!, mat: baseMats[(i + 8) % 5]! })) };
+    const { state, finished } = await playMatch(s, [planningBot({ personality: 'balanced', seed: 40 }), planningBot({ personality: 'balanced', seed: 41 })], { maxActions: 20_000 });
+    expect(finished).toBe(true);
+    expect(state.turnsTaken / 2).toBeLessThan(100);
+  }, 120_000);
+
   it("decides the same whatever the other players' hidden cards are", async () => {
     const start = newGame(setup(1, 2));
     const seat = start.currentPlayer;

@@ -36,6 +36,7 @@ import {
   objectiveMet,
   structureBonusCoins,
   structureBonusCount,
+  score,
   standings,
   structureBonusTile,
   territories,
@@ -78,6 +79,8 @@ export interface Weights {
   nearStar: number;
   /** For the closest star still to place: this times how close (0-1) times the share of stars already placed. */
   closestStar: number;
+  /** One star from the end and ahead on coins: the closest star counts this many times over (it wins the game). */
+  finishing: number;
   /** One of your own objectives whose conditions hold now. */
   objectiveReady: number;
   /** Pull toward the nearest encounter: this times how many hexes closer than 10 the character is. */
@@ -99,7 +102,7 @@ export const DEFAULT_WEIGHTS: Weights = {
   combatCard: 0.6,
   resource: 0.5,
   produces: 2,
-  canProduce: 6,
+  canProduce: 2,
   upgrade: 2.5,
   mech: 3,
   structure: 2,
@@ -108,6 +111,7 @@ export const DEFAULT_WEIGHTS: Weights = {
   factoryCard: 3,
   nearStar: 3,
   closestStar: 8,
+  finishing: 4,
   objectiveReady: 3,
   encounterPull: 0.4,
   factoryPull: 0.4,
@@ -178,6 +182,8 @@ export function playerValue(state: GameState, seat: number, viewer: number, weig
     // What leads to stars: worth as much at the end, when the next star may win the game.
     const near = nearStars(player, structures, faction.stars);
     const placed = player.stars.length / faction.stars;
+    // The last star wins the game for a player in the lead: worth pressing for.
+    const finishing = player.stars.length === faction.stars - 1 && leadingNow(state, seat) ? weights.finishing : 1;
     Object.assign(parts, {
       // Resources as fuel: only as many as the bottom-row actions still to take can use.
       fuel: RESOURCES.reduce((n, r) => n + Math.min(stock[r], need[r]), 0) * weights.resource,
@@ -186,7 +192,7 @@ export function playerValue(state: GameState, seat: number, viewer: number, weig
       canProduce: canPayToProduce(player) ? weights.canProduce : 0,
       nearStars: near.sum * weights.nearStar,
       // The closest star still to place, more so the more stars are already down.
-      closestStar: near.best * placed * weights.closestStar,
+      closestStar: near.best * placed * weights.closestStar * finishing,
       objectives: seat === viewer ? readyObjectives(state, seat) * weights.objectiveReady : 0,
     });
   }
@@ -301,6 +307,12 @@ function nearStars(player: PlayerState, structures: number, starsAllowed: number
   ];
   const open = goals.filter(([kind]) => !player.stars.includes(kind as PlayerState['stars'][number])).map(([, f]) => Math.min(1, f));
   return { sum: open.reduce((n, f) => n + f ** 2, 0), best: Math.max(0, ...open) };
+}
+
+/** Whether this player would win (on coins, tie-breakers aside) if the game ended now. */
+function leadingNow(state: GameState, seat: number): boolean {
+  const totals = score(state).map((s) => s.total);
+  return totals[seat]! >= Math.max(...totals.filter((_t, i) => i !== seat));
 }
 
 function canPayToProduce(player: PlayerState): boolean {

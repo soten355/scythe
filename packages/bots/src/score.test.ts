@@ -102,6 +102,24 @@ describe('position score', () => {
     expect(gameLeft(randomGame(1))).toBe(0);
   });
 
+  it('presses for the last star when ahead: progress toward it counts several times over', () => {
+    const five: PlayerState['stars'] = ['power', 'mechs', 'workers', 'upgrades', 'recruits'];
+    const ahead = withPlayer(withPlayer(start, me, { stars: five, coins: 40, popularity: 13 }), them, { coins: 0 });
+    const behind = withPlayer(withPlayer(start, me, { stars: five, coins: 0, popularity: 13 }), them, { coins: 200 });
+    const push = (s: GameState) => playerValue(withPlayer(s, me, { popularity: 14 }), me, me).parts.closestStar! - playerValue(s, me, me).parts.closestStar!;
+    expect(push(ahead)).toBeCloseTo(push(behind) * DEFAULT_WEIGHTS.finishing);
+  });
+
+  it('prefers producing to sitting still, even when it uses the last of its power', () => {
+    // 4 workers: producing costs 1 power, and there's only 1.
+    const board = start.setup.board;
+    const mountain = Object.values(board.hexes).find((h) => h.terrain === 'mountain')!.id;
+    const forest = Object.values(board.hexes).find((h) => h.terrain === 'forest')!.id;
+    const before = withPlayer(start, me, { power: 1, workers: [mountain, mountain, forest, forest] });
+    const after: GameState = { ...withPlayer(before, me, { power: 0 }), resources: { [mountain]: { metal: 2 }, [forest]: { wood: 2 } } };
+    expect(value(after, me)).toBeGreaterThan(value(before, me));
+  });
+
   it('scores a finished game by the result: winning beats anything, losing is worse than anything', () => {
     for (const seed of [1, 2, 3]) {
       const end = randomGame(seed);
