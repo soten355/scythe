@@ -550,13 +550,17 @@ describe('Build', () => {
     return p;
   };
 
-  it('asks which structure first, then where', () => {
+  it('asks which structure first, in a pop-up, then where', () => {
     const state = building();
     let p = paid(state);
     expect(p.highlights.size).toBe(0);
-    const mill = p.buttons.find((b) => b.label.startsWith('Mill'))!;
-    expect(mill).toBeDefined();
+    expect(p.choice?.message).toBe('Choose a structure to build:');
+    expect(p.choice?.options.map((o) => o.label.split(':')[0])).toEqual(['Mine', 'Mill', 'Armory', 'Monument']);
+    // Back un-picks the last payment.
+    expect(p.choice?.cancel).toEqual({ pay: ['A4', 'A4'] });
+    const mill = p.choice!.options.find((o) => o.label.startsWith('Mill'))!;
     p = prompt(state, mill.select);
+    expect(p.choice).toBeUndefined();
     expect([...p.highlights].sort()).toEqual(['A4', 'A5']);
     p = prompt(state, p.tapSelects.get('A5'));
     const go = p.buttons.find((b) => b.primary)!;

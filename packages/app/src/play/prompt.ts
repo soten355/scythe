@@ -53,7 +53,7 @@ export function placeName(at: Location): string {
   if (at.startsWith('base:')) return `the ${at.slice('base:'.length).toUpperCase()} home base`;
   return at;
 }
-import { BONUS_ICONS, RESOURCE_ICONS, type Icon } from './icons';
+import { BONUS_ICONS, RESOURCE_ICONS, STRUCTURE_ICONS, type Icon } from './icons';
 
 export interface Selection {
   hex?: Location;
@@ -144,8 +144,8 @@ export interface Prompt {
     /** Take nothing (more): after a first option with Meander, or when none can be paid for. */
     stop?: Button;
   };
-  /** A choice to make in a pop-up (a recruit's spot, then its one-time bonus); cancel goes back. */
-  choice?: { message: string; options: { label: string; icon: Icon; select: Selection }[]; cancel: Selection };
+  /** A choice to make in a pop-up (a structure to build; a recruit's spot, then its one-time bonus); cancel goes back, when there's somewhere to go back to. */
+  choice?: { message: string; options: { label: string; icon: Icon; select: Selection }[]; cancel?: Selection };
   /**
    * The current player's pieces that can be tapped to pick that unit, keyed
    * "hex|kind" (workers on one hex are one piece), and the one picked.
@@ -907,7 +907,7 @@ function bottomPrompt(state: GameState, actions: Action[], selection: Selection,
           select: keep({ recruit: section }),
         })),
         // Back un-picks the last payment.
-        cancel: { pay: paid.slice(0, -1) },
+        ...(!free && { cancel: { pay: paid.slice(0, -1) } }),
       };
     } else if (!chosen) {
       choice = {
@@ -930,9 +930,16 @@ function bottomPrompt(state: GameState, actions: Action[], selection: Selection,
     const structure = selection.structure;
     chosen = builds.find((a) => sameAction(a, selection.effect));
     if (!structure) {
-      for (const s of [...new Set(builds.map((a) => a.structure))]) {
-        choices.push({ label: `${STRUCTURE_NAMES[s]}: ${STRUCTURE_BONUS[s]}`, select: keep({ structure: s }) });
-      }
+      // A pop-up asks which structure; Back un-picks the last payment (a free Build from an encounter has nothing to go back to).
+      choice = {
+        message: 'Choose a structure to build:',
+        options: [...new Set(builds.map((a) => a.structure))].map((s) => ({
+          label: `${STRUCTURE_NAMES[s]}: ${STRUCTURE_BONUS[s]}`,
+          icon: STRUCTURE_ICONS[s],
+          select: keep({ structure: s }),
+        })),
+        ...(!free && { cancel: { pay: paid.slice(0, -1) } }),
+      };
     } else {
       for (const a of builds) {
         if (a.structure !== structure) continue;
