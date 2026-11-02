@@ -4,7 +4,7 @@
 items (`- [ ]` → `- [x]`) as they're completed.**
 
 ## Goal
-Personal offline PWA of Scythe (base game + Invaders from Afar) for iPhone
+Personal offline PWA of Scythe (base game; Invaders from Afar later, in Phase 5) for iPhone
 (landscape only) and Mac browser. Clean and functional first; animation,
 sound and 3D later.
 

@@ -16,7 +16,7 @@ We are building a personal, offline-first digital version of Scythe that plays o
 | Clean first, polish later (animation, sound, 3D) | Graphics are a separate layer that can be swapped without touching rules |
 | Automa first, strategic AI later | Bots share one interface; a smarter AI drops into the same slot |
 
-**Scope at launch:** base game (5 factions, 5 player mats) plus Invaders from Afar (2 factions, 2 player mats), up to 7 players in any mix of humans and bots.
+**Scope at launch:** base game (5 factions, 5 player mats), up to 5 players in any mix of humans and bots. Invaders from Afar (2 factions, 2 player mats, up to 7 players) comes later, in Phase 5 (moved Nov 2, 2026: the owner has no physical copy to enter it from).
 
 **IP approach:** we rebuild the rules, which aren't copyrightable, and use original visuals and wording. The engine refers to content by neutral IDs; display names, art and flavor text live in a swappable content pack. Encounter and objective cards keep their mechanical effects, with original text.
 
@@ -112,7 +112,7 @@ The core engine knows the turn structure; everything else is content that a modu
 | --- | --- | --- |
 | Core | Board, turn structure, actions, combat, scoring | Phase 1 |
 | Base game | 5 factions, 5 player mats, all base cards | Phases 1–2 |
-| Invaders from Afar | 2 factions, 2 player mats, their Automa cards | Phase 2 |
+| Invaders from Afar | 2 factions, 2 player mats, their Automa cards | Phase 5 |
 | Campaign | Persistent progress across games, unlocks, modules turned on over time | Phase 5 |
 | Later expansions | The Wind Gambit, other maps, modular board | Optional |
 
@@ -247,8 +247,8 @@ Each phase ends in something playable on the phone. A phase is done when its che
 **Phase 2: Full rules and all content**
 
 - [x] Combat (power dial, combat cards), retreats, popularity loss
-- [ ] Mechs and all mech abilities; faction abilities
-  - Base game done (Nov 1, 2026): every faction and mech ability of the five base factions works, including Polonia's Meander (since encounters). Abilities are rules on the faction data; Invaders from Afar's factions get theirs as they're entered, adding new rule kinds only where needed.
+- [x] Mechs and all mech abilities; faction abilities
+  - Base game done (Nov 1, 2026): every faction and mech ability of the five base factions works, including Polonia's Meander (since encounters). Abilities are rules on the faction data; Invaders from Afar's factions get theirs with that expansion, in Phase 5.
   - Done from play-testing: a Speed unit can drop off and pick up workers and resources at each hex along the way, using the side panel's pick-up slots, with the map updating live.
 - [x] Stars, triumph track, game end and final scoring
   - Stars are placed on the triumph track as they're earned (shown in the top bar). The sixth ends the game at once; a final scores screen shows each player's coins, stars, territories and resources at their popularity tier, and the winner (with tie-breakers). Objective stars and structure bonus tiles join when those are entered.
@@ -268,19 +268,19 @@ Each phase ends in something playable on the phone. A phase is done when its che
     - Done (Nov 2, 2026): one tile drawn at random for each game, shown under the round card (tap it for its payouts). At the end, each player's structures are counted as the tile says (tunnels, lakes or encounter spots next to them; on tunnels or certain terrains; the longest straight row) and pay coins by step, whatever their popularity; a Structures column on the final scores. New games use 6 made-up sample tiles for now.
   - [x] Structure bonus tile editor, to enter the real tiles (like the card editors)
     - Done (Nov 2, 2026): `structure-bonuses.html`, linked from the home screen. Each tile's name, what it counts (spots next to your structures; your structures on tunnels or terrains; your longest straight row) and its payout steps, with the game's wording shown below. "Add tiles to game" makes new games draw from them (shown as "Structure bonus tiles" on the new game screen, removable there); save to a file or Export to paste into chat. Still to do across this item: enter the real encounter, Factory and objective cards and the real tiles.
-- [ ] All 5 base factions and 5 mats; Invaders from Afar factions and mats
-  - Base game done (Nov 1, 2026): Nordic, Rusviet, Polonia, Crimea, Saxony; Industrial, Engineering, Patriotic, Mechanical, Agricultural. Up to 5 players. Still to come: Invaders from Afar's two factions and two mats.
+- [x] All 5 base factions and 5 mats
+  - Done (Nov 1, 2026): Nordic, Rusviet, Polonia, Crimea, Saxony; Industrial, Engineering, Patriotic, Mechanical, Agricultural. Up to 5 players. Invaders from Afar's factions and mats moved to Phase 5 (Nov 2, 2026).
 - [x] Autosave, save slots, export and import
   - Done (Nov 1, 2026): every game is saved on the device after each move and undo; Saved games lists them (play, save to a file, delete) and opens `.scythe.json` files, checking each by replaying its moves. A file of a game already on the device opens as a copy, never overwriting. On iPhone, saving to a file uses the share sheet (Save to Files, AirDrop). Undo picks up where it was after reopening a game.
 - [x] Your own maps, factions and mats: a library on the device, imported from content or save files, or added from the editors (not in the original plan; added Nov 1, 2026)
-- [ ] Done when: a complete 7-faction game can be played to final scoring and reloaded from a file
+- [ ] Done when: a complete 5-faction game can be played to final scoring and reloaded from a file
 
 **Phase 3: Automa bots**
 
 - [ ] Automa card deck and its simplified rules
 - [ ] Difficulty levels
 - [ ] Bot turn playback with skip
-- [ ] Done when: a full solo game against 1–6 Automa opponents plays without errors
+- [ ] Done when: a full solo game against 1–4 Automa opponents plays without errors (1–6 once Invaders from Afar is in)
 
 **Phase 4: Polish**
 
@@ -295,13 +295,14 @@ Each phase ends in something playable on the phone. A phase is done when its che
 - [ ] Monte Carlo tree search bot in a Web Worker
 - [ ] Self-play simulations on the Linux machine to tune or train it
 - [ ] Campaign module with persistent progress
+- [ ] Invaders from Afar: its 2 factions (with their faction and mech abilities) and 2 player mats, up to 7 players, and their Automa cards (moved from Phase 2 on Nov 2, 2026: no physical copy; the owner knows it from the digital edition)
 - [ ] Done when: the AI beats the Automa consistently, and a campaign can be played start to finish
 
 ## Open questions and risks
 
 **Open questions**
 
-- [ ] Do we have the physical game or PDF rulebooks (base, Invaders from Afar, Automa rules)? Card-by-card data entry depends on having them on hand.
+- [ ] Do we have the physical game or PDF rulebooks (base, Automa rules; Invaders from Afar: no physical copy, Nov 2, 2026)? Card-by-card data entry depends on having them on hand.
 - [x] Svelte or React for the UI? Svelte (5), chosen Oct 29, 2026 for its small size on the phone, built-in animation and readable code. Switching to React later would only touch the app, never the engine.
 - [x] Which two factions and mats for Phase 1? Nordic + Rusviet; Industrial + Engineering.
 - [ ] Original faction names and theme, or neutral placeholders until the art pass?
