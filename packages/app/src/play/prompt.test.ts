@@ -183,11 +183,11 @@ const button = (p: ReturnType<typeof prompt>, label: string) => p.buttons.find((
 const pays = (hexes: string[]): Action[] => hexes.map((hex) => ({ type: 'pay', hex }));
 
 describe('paying with a combat card (Crimea: Coercion)', () => {
-  // Crimea (home "nw": workers on A1, A2) on Industrial: Deploy (section 1) costs 3 metal.
+  // Crimea (home "s": workers on G3, H1) on Industrial: Deploy (section 1) costs 3 metal.
   const coercing = () => {
     const crimea = baseFactions.find((f) => f.id === 'crimea')!;
     const state = newGame({ seed: 1, board: baseBoard, players: [{ faction: crimea, mat: baseMats[0]! }, { faction: baseFactions[1]!, mat: baseMats[1]! }] });
-    const ready = { ...state, players: [{ ...state.players[0]!, combatCards: [3, 5, 3] }, state.players[1]!], resources: { A1: { metal: 2 } } };
+    const ready = { ...state, players: [{ ...state.players[0]!, combatCards: [3, 5, 3] }, state.players[1]!], resources: { G3: { metal: 2 } } };
     return play(ready, { type: 'chooseSection', section: 1 }, { type: 'skipTop' });
   };
 
@@ -205,10 +205,10 @@ describe('paying with a combat card (Crimea: Coercion)', () => {
   });
 
   it('pays with the card first, then the hexes', () => {
-    const onA1 = prompt(coercing(), { card: 3, pay: ['A1', 'A1'], hex: 'A1' });
-    const p = prompt(coercing(), onA1.buttons[0]!.select);
+    const onG3 = prompt(coercing(), { card: 3, pay: ['G3', 'G3'], hex: 'G3' });
+    const p = prompt(coercing(), onG3.buttons[0]!.select);
     const deploy = p.buttons.find((b) => b.primary);
-    expect(deploy?.actions?.slice(0, 3)).toEqual([{ type: 'payWithCard', value: 3 }, ...pays(['A1', 'A1'])]);
+    expect(deploy?.actions?.slice(0, 3)).toEqual([{ type: 'payWithCard', value: 3 }, ...pays(['G3', 'G3'])]);
   });
 });
 

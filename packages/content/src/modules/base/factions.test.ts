@@ -20,7 +20,7 @@ describe('base factions', () => {
     expect(byId.nordic).toMatchObject({ homeBase: 'ne', power: 4, combatCards: 1 });
     expect(byId.rusviet).toMatchObject({ homeBase: 'e', power: 3, combatCards: 2 });
     expect(byId.polonia).toMatchObject({ homeBase: 'w', power: 2, combatCards: 3 });
-    expect(byId.crimea).toMatchObject({ homeBase: 'nw', power: 5, combatCards: 0 });
+    expect(byId.crimea).toMatchObject({ homeBase: 's', power: 5, combatCards: 0 });
     expect(byId.saxony).toMatchObject({ homeBase: 'sw', power: 1, combatCards: 4 });
   });
 

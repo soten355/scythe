@@ -99,7 +99,7 @@ export const baseFactions: Faction[] = [
     id: 'crimea',
     name: 'Crimea',
     color: '#fefb00',
-    homeBase: 'nw',
+    homeBase: 's',
     power: 5,
     combatCards: 0,
     stars: 6,
