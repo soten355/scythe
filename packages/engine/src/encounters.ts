@@ -12,13 +12,14 @@
 // A game whose setup has no encounter cards (one saved before encounters
 // existed) has no tokens either, so nothing happens.
 import type { HexId } from './board';
-import type { Action, GameState, ResourcePile, SectionIndex, TurnStep } from './game';
+import type { Action, GameState, ResourcePile, Section, TurnStep } from './game';
 import { rulesOfKind } from './abilities';
 import { applyEffect, effectOptions } from './bottom-actions';
 import { drawCombatCards } from './combat';
 import type { BottomActionType, Resource } from './mat';
 import { shuffle } from './rng';
-import { addResources, gain, MAX_WORKERS, updatePlayer } from './state';
+import { addResources, gain, MAX_WORKERS, toBottomRow, updatePlayer } from './state';
+import { arriveAtFactory } from './factory';
 
 export interface EncounterCost {
   coins?: number;
@@ -88,17 +89,17 @@ export const canPay = (state: GameState, seat: number, cost: EncounterCost): boo
   return p.coins >= (cost.coins ?? 0) && p.popularity >= (cost.popularity ?? 0) && p.power >= (cost.power ?? 0);
 };
 
-/** Called once the move and its fights are over: an encounter if the character stands on a token, else on to the bottom row. */
-export function afterFights(state: GameState, section: SectionIndex): GameState {
+/** Called once the move and its fights are over: an encounter if the character stands on a token, else the Factory (see factory.ts), else on to the bottom row. */
+export function afterFights(state: GameState, section: Section): GameState {
   const hex = state.players[state.currentPlayer]!.character;
-  if (!state.encounterTokens.includes(hex)) return { ...state, turn: { step: 'bottom', section, paid: 0 } };
+  if (!state.encounterTokens.includes(hex)) return arriveAtFactory(state, section);
   let { encounterDeck: deck, encounterDiscard: discard, rng } = state;
   if (deck.length === 0) {
     [deck, rng] = shuffle(rng, discard);
     discard = [];
   }
   const [card, ...rest] = deck;
-  if (!card) return { ...state, turn: { step: 'bottom', section, paid: 0 } };
+  if (!card) return { ...state, turn: toBottomRow(section) };
   return {
     ...state,
     rng,
@@ -186,7 +187,7 @@ function proceed(state: GameState, turn: EncounterStep): GameState {
 }
 
 function finish(state: GameState, turn: EncounterStep): GameState {
-  return { ...state, encounterDiscard: [...state.encounterDiscard, turn.card], turn: { step: 'bottom', section: turn.section, paid: 0 } };
+  return { ...state, encounterDiscard: [...state.encounterDiscard, turn.card], turn: toBottomRow(turn.section) };
 }
 
 const BOTTOM_ACTIONS: BottomActionType[] = ['upgrade', 'deploy', 'build', 'enlist'];

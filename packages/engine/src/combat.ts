@@ -19,7 +19,7 @@ import type { HexId } from './board';
 import { neighbors } from './board';
 import { hasRule, rulesOfKind } from './abilities';
 import { afterFights } from './encounters';
-import type { Action, CombatSide, Fight, GameState, Location, PlayerState, Retreat, SectionIndex, TurnStep } from './game';
+import type { Action, CombatSide, Fight, GameState, Location, PlayerState, Retreat, Section, TurnStep } from './game';
 import { nextInt, shuffle } from './rng';
 import { MAX_POPULARITY, onBoard, placeStar, updatePlayer } from './state';
 
@@ -96,7 +96,7 @@ const losePopularity = (state: GameState, seat: number, n: number): GameState =>
  * Called when the current player's move is over: sends home enemy workers
  * the mover's characters and mechs landed on, then starts the fights, if any.
  */
-export function afterMove(state: GameState, section: SectionIndex): GameState {
+export function afterMove(state: GameState, section: Section): GameState {
   const seat = state.currentPlayer;
   const me = state.players[seat]!;
   const fights: HexId[] = [];
@@ -117,13 +117,13 @@ export function afterMove(state: GameState, section: SectionIndex): GameState {
 }
 
 /** Starts the only fight left on its own; with several, the attacker picks; with none, on to any encounter, then the bottom row. */
-function nextFight(state: GameState, section: SectionIndex, left: HexId[]): GameState {
+function nextFight(state: GameState, section: Section, left: HexId[]): GameState {
   if (left.length === 0) return afterFights(state, section);
   if (left.length > 1) return { ...state, turn: { step: 'combat', section, left, fight: null } };
   return startFight(state, section, left, left[0]!);
 }
 
-function startFight(start: GameState, section: SectionIndex, left: HexId[], hex: HexId): GameState {
+function startFight(start: GameState, section: Section, left: HexId[], hex: HexId): GameState {
   const attacker = start.currentPlayer;
   const defender = start.players.findIndex((p, i) => i !== attacker && combatUnitsOn(p, hex) > 0);
   const state = asFightStarts(start, hex, attacker, defender);

@@ -14,13 +14,18 @@ import { bottomActions, applyBottom } from './bottom-actions';
 import { hasRule } from './abilities';
 import { applyCombat, combatActions, combatSeat, COMBAT_DECK, drawCombatCards, type CombatResult } from './combat';
 import { applyEncounter, encounterActions, setupEncounters, type EncounterCard, type EncounterTask } from './encounters';
-import { awardStars, endTurn, SECTIONS, type StarKind } from './state';
+import { applyFactory, factoryActions, setupFactory, type FactoryCard } from './factory';
+import { awardStars, endTurn, SECTIONS, toBottomRow, type StarKind } from './state';
 import type { Faction } from './faction';
-import type { PlayerMat, RecruitBonus, Resource, Structure } from './mat';
+import type { BottomActionType, PlayerMat, RecruitBonus, Resource, Structure } from './mat';
 import { seedRng, shuffle, type RngState } from './rng';
 import { topActions, applyTop } from './top-actions';
 
 export type SectionIndex = 0 | 1 | 2 | 3;
+/** The Factory card, picked like a fifth section of the mat once a player has one. */
+export const FACTORY = 4;
+/** A mat section, or the Factory card. */
+export type Section = SectionIndex | typeof FACTORY;
 
 export interface GameSetup {
   seed: number;
@@ -29,6 +34,8 @@ export interface GameSetup {
   players: { faction: Faction; mat: PlayerMat }[];
   /** The encounter deck. None (as in games saved before encounters): no encounters, and no tokens on the map. */
   encounters?: EncounterCard[];
+  /** The Factory deck. None (as in games saved before the Factory): no Factory cards. */
+  factory?: FactoryCard[];
 }
 
 /**
@@ -54,8 +61,8 @@ export interface TopUpgrade {
 }
 
 export interface PlayerState {
-  /** Section used on this player's previous turn; null before their first. */
-  lastSection: SectionIndex | null;
+  /** Section used on this player's previous turn (the Factory card counts as one); null before their first. */
+  lastSection: Section | null;
   coins: number;
   power: number;
   popularity: number;
@@ -74,6 +81,8 @@ export interface PlayerState {
   recruits: SectionIndex[];
   /** One-time recruit bonuses already used. */
   recruitBonusesTaken: RecruitBonus[];
+  /** The Factory card this player took, if any (one a game). */
+  factoryCard?: string;
   /** Stars placed so far, in the order earned (one of each kind but two for combat, and the faction's star count in all). */
   stars: StarKind[];
 }
@@ -81,13 +90,13 @@ export interface PlayerState {
 /** Where the current player is within their turn. */
 export type TurnStep =
   | { step: 'chooseSection' }
-  | { step: 'top'; section: SectionIndex }
+  | { step: 'top'; section: Section }
   /**
    * Moving units. `load` is what a unit has picked up to take along. A unit
    * with hexes left to go (Speed) is `walking`: it may move again, and drop
    * off or pick up things on the way, until another unit moves or the move ends.
    */
-  | { step: 'moving'; section: SectionIndex; moved: UnitRef[]; load?: Load; walking?: { unit: UnitRef; left: number } }
+  | { step: 'moving'; section: Section; moved: UnitRef[]; load?: Load; walking?: { unit: UnitRef; left: number } }
   | { step: 'trading'; section: SectionIndex; left: number; hex: HexId }
   | { step: 'producing'; section: SectionIndex; produced: HexId[] }
   /**
@@ -95,7 +104,7 @@ export type TurnStep =
    * picked. After a lost fight, `retreat` waits for the loser to choose
    * where their character and mechs go (when they have a choice).
    */
-  | { step: 'combat'; section: SectionIndex; left: HexId[]; fight: Fight | null; retreat?: Retreat }
+  | { step: 'combat'; section: Section; left: HexId[]; fight: Fight | null; retreat?: Retreat }
   /**
    * `skippedTop`: the top-row action was skipped this turn (so the side panel doesn't tick it).
    * `coerced`: a combat card was paid in place of a resource (once a turn).
@@ -106,9 +115,15 @@ export type TurnStep =
    * the options taken so far (Meander: up to two), `todo` what's still to
    * choose for them (resources, free bottom-row actions).
    */
-  | { step: 'encounter'; section: SectionIndex; hex: HexId; card: string; picked: number[]; todo: EncounterTask[] }
-  /** The bottom-row action is done; only End turn is left. */
-  | { step: 'end'; section: SectionIndex; skippedTop?: true };
+  | { step: 'encounter'; section: Section; hex: HexId; card: string; picked: number[]; todo: EncounterTask[] }
+  /** Factory cards to choose one from, after the character ends its move on the Factory. */
+  | { step: 'factoryCard'; section: Section; offered: string[] }
+  /** Using the Factory card's top part: resources paid so far (and whether a combat card stood in for one). */
+  | { step: 'factoryTop'; section: typeof FACTORY; paid: ResourcePile; coerced?: true }
+  /** Free bottom-row actions the Factory card's top part gave, still to take. */
+  | { step: 'factoryRewards'; section: typeof FACTORY; todo: BottomActionType[] }
+  /** The bottom-row action (or the Factory card's move) is done; only End turn is left. */
+  | { step: 'end'; section: Section; skippedTop?: true };
 
 /** One side of a fight: the cards added so far, and the power dialed once they've chosen (null until then). */
 export interface CombatSide {
@@ -149,6 +164,8 @@ export interface GameState {
   combatDiscard: number[];
   /** Hexes whose encounter token is still there. */
   encounterTokens: HexId[];
+  /** Factory card IDs still to draw, from the front. */
+  factoryDeck: string[];
   /** Encounter card IDs still to draw (from the front), and the ones used. */
   encounterDeck: string[];
   encounterDiscard: string[];
@@ -193,6 +210,11 @@ export type Action =
   | { type: 'encounterResource'; resource: Resource }
   /** Take no (more) options: with Meander after the first, or when none can be paid for. */
   | { type: 'endEncounter' }
+  // Factory: keep one of the cards offered; then, using it, pay its resources
+  // one at a time and take its reward (its move is then a normal move).
+  | { type: 'takeFactoryCard'; card: string }
+  | { type: 'factoryPay'; hex: HexId; resource: Resource }
+  | { type: 'factoryUse' }
   // Bottom row: pay the cost one resource at a time, then the action itself.
   | { type: 'pay'; hex: HexId }
   /** Coercion: a combat card of this value paid in place of one resource. */
@@ -247,9 +269,10 @@ export function newGame(setup: GameSetup): GameState {
     encounterTokens: [],
     encounterDeck: [],
     encounterDiscard: [],
+    factoryDeck: [],
   };
   // The encounter deck is shuffled after the combat deck, so games without encounters deal the same as before.
-  return setup.players.reduce((s, p, seat) => drawCombatCards(s, seat, p.faction.combatCards), setupEncounters(state));
+  return setup.players.reduce((s, p, seat) => drawCombatCards(s, seat, p.faction.combatCards), setupFactory(setupEncounters(state)));
 }
 
 /** Who must act now: the current player, except while the defender in a fight is choosing. */
@@ -263,7 +286,8 @@ export function legalActions(state: GameState, seat: number): Action[] {
   switch (turn.step) {
     case 'chooseSection': {
       const last = hasRule(state, seat, 'repeatSection') ? null : state.players[seat]?.lastSection;
-      return SECTIONS.filter((s) => s !== last).map((section) => ({ type: 'chooseSection', section }));
+      const sections: Section[] = [...SECTIONS, ...(state.players[seat]?.factoryCard ? [FACTORY as Section] : [])];
+      return sections.filter((s) => s !== last).map((section) => ({ type: 'chooseSection', section }));
     }
     case 'top':
       return [...topActions(state, turn), { type: 'skipTop' }];
@@ -275,6 +299,10 @@ export function legalActions(state: GameState, seat: number): Action[] {
       return combatActions(state, turn);
     case 'encounter':
       return encounterActions(state, turn);
+    case 'factoryCard':
+    case 'factoryTop':
+    case 'factoryRewards':
+      return factoryActions(state, turn);
     case 'bottom':
       return [...bottomActions(state, turn), ...(turn.paid === 0 ? [{ type: 'skipBottom' } as const] : [])];
     case 'end':
@@ -304,10 +332,16 @@ export function applyAction(state: GameState, action: Action): GameState {
 function step(state: GameState, action: Action): GameState {
   const turn = state.turn;
   switch (turn.step) {
-    case 'chooseSection':
-      return { ...state, turn: { step: 'top', section: (action as { section: SectionIndex }).section } };
+    case 'chooseSection': {
+      const section = (action as { section: Section }).section;
+      if (section === FACTORY) return { ...state, turn: { step: 'factoryTop', section, paid: {} } };
+      return { ...state, turn: { step: 'top', section } };
+    }
     case 'top':
-      if (action.type === 'skipTop') return { ...state, turn: { step: 'bottom', section: turn.section, paid: 0, skippedTop: true } };
+      if (action.type === 'skipTop') {
+        const next = toBottomRow(turn.section);
+        return { ...state, turn: next.step === 'bottom' || next.step === 'end' ? { ...next, skippedTop: true } : next };
+      }
       return applyTop(state, turn, action);
     case 'moving':
     case 'trading':
@@ -317,6 +351,10 @@ function step(state: GameState, action: Action): GameState {
       return applyCombat(state, turn, action);
     case 'encounter':
       return applyEncounter(state, turn, action);
+    case 'factoryCard':
+    case 'factoryTop':
+    case 'factoryRewards':
+      return applyFactory(state, turn, action);
     case 'bottom':
       if (action.type === 'skipBottom') return endTurn(state);
       return applyBottom(state, turn, action);

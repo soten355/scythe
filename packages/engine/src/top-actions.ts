@@ -6,11 +6,12 @@
 // Factory (for workers) and move extra hexes. A unit with extra hexes moves one hex per
 // action and may drop off and pick up workers and resources on the way.
 import { hasRiver, neighbors, type HexId } from './board';
-import type { Action, GameState, Load, Location, PlayerState, SectionIndex, TurnStep, UnitRef } from './game';
+import { FACTORY, type Action, type GameState, type Load, type Location, type PlayerState, type Section, type SectionIndex, type TurnStep, type UnitRef } from './game';
+import { heldFactoryCard } from './factory';
 import type { Resource, TopAction } from './mat';
 import { rulesOf, rulesOfKind } from './abilities';
 import { afterMove, drawCombatCards } from './combat';
-import { addResources, controlledHexes, current, enemyUnitHexes, gain, isHomeBase, MAX_WORKERS, onBoard, topValue, unusedHomeBases, updatePlayer } from './state';
+import { addResources, controlledHexes, current, enemyUnitHexes, gain, isHomeBase, MAX_WORKERS, onBoard, toBottomRow, topValue, unusedHomeBases, updatePlayer } from './state';
 
 type TopStep = Extract<TurnStep, { step: 'top' | 'moving' | 'trading' | 'producing' }>;
 
@@ -27,7 +28,10 @@ export const TERRAIN_PRODUCES: Partial<Record<string, Resource | 'worker'>> = {
 
 export function topActions(state: GameState, turn: TopStep): Action[] {
   const { player, mat } = current(state);
-  const top = mat.sections[turn.section].top;
+  // The Factory card's move: no coins instead.
+  if (turn.step === 'top' && turn.section === FACTORY) return moveOptions(state, FACTORY, []);
+  // Undefined only for the Factory card, which never gets past the move.
+  const top = mat.sections[turn.section as SectionIndex]?.top;
   switch (turn.step) {
     case 'moving':
       // Picking things up before a unit's first hex: only that unit can load more or move.
@@ -41,14 +45,14 @@ export function topActions(state: GameState, turn: TopStep): Action[] {
     case 'producing':
       return [...produceOptions(state, turn.section, turn.produced), { type: 'endProduce' }];
     case 'top':
-      switch (top.action) {
+      switch (top!.action) {
         case 'move':
           return [{ type: 'gainCoins' }, ...moveOptions(state, turn.section, [])];
         case 'trade':
-          if (player.coins < top.cost) return [];
+          if (player.coins < top!.cost) return [];
           return [...tradeResourceOptions(state, player), { type: 'tradePopularity' }];
         case 'produce':
-          return canPayProduceCost(player) ? produceOptions(state, turn.section, []) : [];
+          return canPayProduceCost(player) ? produceOptions(state, turn.section as SectionIndex, []) : [];
         case 'bolster':
           if (player.coins < top.cost) return [];
           return [
@@ -62,9 +66,11 @@ export function topActions(state: GameState, turn: TopStep): Action[] {
 export function applyTop(state: GameState, turn: TopStep, action: Action): GameState {
   const { seat, player, mat } = current(state);
   const section = turn.section;
-  const top = mat.sections[section].top;
-  const value = (field: string) => topValue(player, mat, section, field);
-  const toBottom = (s: GameState): GameState => ({ ...s, turn: { step: 'bottom', section, paid: 0 } });
+  // Only a move can come from the Factory card; everything else is a mat section's top row.
+  const matSection = section as SectionIndex;
+  const top = mat.sections[matSection]?.top;
+  const value = (field: string) => topValue(player, mat, matSection, field);
+  const toBottom = (s: GameState): GameState => ({ ...s, turn: toBottomRow(section) });
   const endOfMove = (s: GameState): GameState => afterMove(s, section);
 
   switch (action.type) {
@@ -98,11 +104,11 @@ export function applyTop(state: GameState, turn: TopStep, action: Action): GameS
       const from = unitsOf(player).find((u) => sameUnit(u.unit, action.unit))!.at;
       const load = withLakeCargo(state, seat, action.unit, from, loadOf(turn, action.unit));
       const next = moveUnit(state, seat, action.unit, action.to, load);
-      const left = walking ? walking.left - 1 : extraHexes(state, seat, action.unit);
+      const left = walking ? walking.left - 1 : extraHexes(state, seat, action.unit, section);
       // Moving onto other players' units ends that unit's move, and so does the character reaching an encounter.
       const encounter = action.unit.kind === 'character' && state.encounterTokens.includes(action.to);
       const keepGoing = left > 0 && !encounter && !enemyUnitHexes(state, seat).has(action.to);
-      if (!keepGoing && moved.length >= value('units')) return endOfMove(next);
+      if (!keepGoing && moved.length >= unitsToMove(state, section)) return endOfMove(next);
       const walk = keepGoing ? { walking: { unit: action.unit, left }, ...(load && { load }) } : {};
       return { ...next, turn: { step: 'moving', section, moved, ...walk } };
     }
@@ -110,7 +116,7 @@ export function applyTop(state: GameState, turn: TopStep, action: Action): GameS
       return endOfMove(state);
 
     case 'tradePopularity':
-      return toBottom(updatePlayer(state, seat, gain(payTopCost(player, top), { popularity: value('popularity'), ...armory(player, top) })));
+      return toBottom(updatePlayer(state, seat, gain(payTopCost(player, top!), { popularity: value('popularity'), ...armory(player, top!) })));
 
     case 'tradeResource': {
       let next = state;
@@ -119,20 +125,20 @@ export function applyTop(state: GameState, turn: TopStep, action: Action): GameS
         left = turn.left - 1;
       } else {
         // First resource: pay the cost and take the building bonus once.
-        next = updatePlayer(next, seat, gain(payTopCost(player, top), armory(player, top)));
-        left = (top.action === 'trade' ? top.resources : 0) - 1;
+        next = updatePlayer(next, seat, gain(payTopCost(player, top!), armory(player, top!)));
+        left = (top!.action === 'trade' ? top!.resources : 0) - 1;
       }
       next = addResources(next, action.hex, action.resource, 1);
       if (left <= 0) return toBottom(next);
-      return { ...next, turn: { step: 'trading', section, left, hex: action.hex } };
+      return { ...next, turn: { step: 'trading', section: matSection, left, hex: action.hex } };
     }
 
     case 'produce': {
       const produced = [...(turn.step === 'producing' ? turn.produced : []), action.hex];
       const paid = turn.step === 'producing' ? state : payProduceCost(state, seat);
       const next = produce(paid, seat, action.hex);
-      if (produceOptions(next, section, produced).length === 0) return toBottom(next);
-      return { ...next, turn: { step: 'producing', section, produced } };
+      if (produceOptions(next, matSection, produced).length === 0) return toBottom(next);
+      return { ...next, turn: { step: 'producing', section: matSection, produced } };
     }
     case 'endProduce':
       return toBottom(state);
@@ -216,9 +222,19 @@ export function moveTargets(state: GameState, seat: number, at: Location, kind: 
   return [...new Set(targets)].filter((to) => to !== at && (terrain(to) !== 'lake' || lakes) && (fighter || !enemies.has(to)));
 }
 
-/** Extra hexes a unit may move after its first (Speed), for the character and mechs. */
-const extraHexes = (state: GameState, seat: number, unit: UnitRef) =>
-  unit.kind === 'worker' ? 0 : rulesOfKind(state, seat, 'speed').reduce((n, r) => n + r.extra, 0);
+/** Extra hexes a unit may move after its first: Speed (for the character and mechs), and the Factory card's move (for any unit). */
+function extraHexes(state: GameState, seat: number, unit: UnitRef, section: Section): number {
+  const speed = unit.kind === 'worker' ? 0 : rulesOfKind(state, seat, 'speed').reduce((n, r) => n + r.extra, 0);
+  const card = section === FACTORY ? heldFactoryCard(state, seat) : undefined;
+  return speed + (card ? Math.max(0, card.move.hexes - 1) : 0);
+}
+
+/** How many units a move may move: the section's top-row value, or the Factory card's. */
+export function unitsToMove(state: GameState, section: Section): number {
+  const { seat, player, mat } = current(state);
+  if (section === FACTORY) return heldFactoryCard(state, seat)?.move.units ?? 0;
+  return topValue(player, mat, section, 'units');
+}
 
 /** What this unit is carrying, if the current load is its. */
 const loadOf = (turn: TopStep, unit: UnitRef): Load | undefined =>
@@ -249,9 +265,9 @@ const landable = (targets: Location[], load: Load | undefined) =>
   load && Object.keys(load.resources).length ? targets.filter((to) => !isHomeBase(to)) : targets;
 
 /** Units that haven't moved yet, while the section allows more: their moves and pick-ups. `load`: only that unit, with it. */
-function moveOptions(state: GameState, section: SectionIndex, moved: UnitRef[], load?: Load): Action[] {
-  const { player, mat } = current(state);
-  if (moved.length >= topValue(player, mat, section, 'units')) return [];
+function moveOptions(state: GameState, section: Section, moved: UnitRef[], load?: Load): Action[] {
+  const { player } = current(state);
+  if (moved.length >= unitsToMove(state, section)) return [];
   const actions: Action[] = [];
   for (const { unit, at } of unitsOf(player)) {
     if (load ? !sameUnit(load.unit, unit) : moved.some((m) => sameUnit(m, unit))) continue;

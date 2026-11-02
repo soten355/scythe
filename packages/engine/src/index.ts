@@ -14,3 +14,5 @@ export * from './afford';
 export { COMBAT_DECK, MAX_DIAL, MAX_COMBAT_STARS, combatUnitsOn, maxCombatCards, type CombatResult } from './combat';
 export { rulesOf, rulesOfKind, hasRule } from './abilities';
 export { canPay as canPayEncounter, encounterCard, validateEncounterCard, optionLimit as encounterOptionLimit, type EncounterCard, type EncounterCost, type EncounterGain, type EncounterOption, type EncounterTask } from './encounters';
+export { factoryCard, heldFactoryCard, type FactoryCard, type FactoryCost, type FactoryGain } from './factory';
+export { unitsToMove } from './top-actions';

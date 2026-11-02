@@ -2,7 +2,7 @@
 // control of hexes, resources on hexes and ending the turn.
 import type { HexId } from './board';
 import { MAX_POWER, type Faction } from './faction';
-import type { GameState, Location, PlayerState, ResourcePile, SectionIndex } from './game';
+import { FACTORY, type GameState, type Location, type PlayerState, type ResourcePile, type Section, type SectionIndex, type TurnStep } from './game';
 import { BOTTOM_COST_RESOURCE, upgradeables, type PlayerMat, type Resource } from './mat';
 
 export const SECTIONS: SectionIndex[] = [0, 1, 2, 3];
@@ -39,6 +39,10 @@ export function placeStar(state: GameState, seat: number, kind: StarKind): GameS
   if (player.stars.length >= state.setup.players[seat]!.faction.stars) return state;
   return updatePlayer(state, seat, { stars: [...player.stars, kind] });
 }
+
+/** After the top row (its move, fights, encounter and Factory card): the bottom row, or for the Factory card, which has none, End turn. */
+export const toBottomRow = (section: Section): TurnStep =>
+  section === FACTORY ? { step: 'end', section } : { step: 'bottom', section, paid: 0 };
 
 /** Records the section used and passes play to the next seat clockwise. */
 export function endTurn(state: GameState): GameState {
