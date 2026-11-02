@@ -29,6 +29,7 @@ import {
   MAX_DIAL,
   RESOURCES,
   legalActions,
+  objectiveCard,
   produceCost,
   produceYield,
   shortfall,
@@ -254,6 +255,8 @@ export function label(state: GameState, action: Action): string {
       return onFactory ? 'Skip the move' : 'Skip the top action';
     case 'takeFactoryCard':
       return `Keep ${factoryCard(state, action.card).name}`;
+    case 'completeObjective':
+      return `★ Complete objective: ${objectiveCard(state, action.card).name}`;
     case 'factoryPay':
       return `Pay 1 ${action.resource} from ${action.hex}`;
     case 'factoryUse':
@@ -386,7 +389,7 @@ export function title(state: GameState): string {
     const card = heldFactoryCard(state, state.currentPlayer)!;
     switch (turn.step) {
       case 'factoryTop': {
-        const pays = legalActions(state, state.currentPlayer);
+        const pays = turnActions(state);
         if (pays.every((a) => a.type === 'skipTop')) return `${who} · Factory card: can't pay ${costText(card.cost).toLowerCase()}; skip to the move`;
         if (pays.some((a) => a.type === 'factoryUse')) return `${who} · Factory card: paid; use it for ${gainText(card.gain, '')}`;
         return `${who} · Factory card: tap glowing hexes you control to pay ${costText(card.cost).replace(/^Pay /, '')}`;
@@ -460,7 +463,19 @@ export function title(state: GameState): string {
   return who;
 }
 
+/** What the current player can do on their turn, leaving out completing objectives (those get their own buttons, see buildPrompt). */
+const turnActions = (state: GameState) => legalActions(state, state.currentPlayer).filter((a) => a.type !== 'completeObjective');
+
+/** What to show for the legal actions: the step's own prompt, plus a button for each objective that can be completed now. */
 export function buildPrompt(state: GameState, actions: Action[], selection: Selection): Prompt {
+  const prompt = stepPrompt(state, actions.filter((a) => a.type !== 'completeObjective'), selection);
+  const objectives = actions.flatMap((a): Button[] =>
+    a.type === 'completeObjective' ? [{ label: label(state, a), action: a, primary: true }] : [],
+  );
+  return objectives.length ? { ...prompt, buttons: [...objectives, ...prompt.buttons] } : prompt;
+}
+
+function stepPrompt(state: GameState, actions: Action[], selection: Selection): Prompt {
   const turn = state.turn;
   // Picking things up before a unit's first hex: that unit only. A unit partway through its move (Speed) stays selected unless you pick another.
   const forced = turn.step === 'moving' && !turn.walking ? turn.load?.unit : undefined;
@@ -571,7 +586,7 @@ function routes(state: GameState, unit: UnitRef, first: Action[], near: Map<Loca
     for (const { state: s, path } of frontier) {
       // Past the first hex, only while this unit is still on its way.
       if (path.length && !(s.turn.step === 'moving' && s.turn.walking && sameUnit(s.turn.walking.unit, unit))) continue;
-      for (const a of legalActions(s, s.currentPlayer)) {
+      for (const a of turnActions(s)) {
         if (a.type !== 'moveUnit' || !sameUnit(a.unit, unit)) continue;
         const to = [...path, a];
         if (path.length && !seen.has(a.to)) {
@@ -795,7 +810,7 @@ function producePrompt(state: GameState, actions: Action[], picked: HexId[]): Pr
   let s = state;
   for (const hex of picked) {
     const a: Action = { type: 'produce', hex };
-    if (!legalActions(s, s.currentPlayer).some((l) => l.type === 'produce' && l.hex === hex)) continue;
+    if (!turnActions(s).some((l) => l.type === 'produce' && l.hex === hex)) continue;
     run.push(a);
     s = applyAction(s, a);
   }
@@ -865,7 +880,7 @@ function bottomPrompt(state: GameState, actions: Action[], selection: Selection,
   const coerced = selection.card !== undefined && actions.some((a) => a.type === 'payWithCard' && a.value === selection.card);
   if (coerced) (pays.push(card), (after = applyAction(after, card)));
   for (const hex of selection.pay ?? []) {
-    if (pays.length >= owed || !legalActions(after, after.currentPlayer).some((a) => a.type === 'pay' && a.hex === hex)) continue;
+    if (pays.length >= owed || !turnActions(after).some((a) => a.type === 'pay' && a.hex === hex)) continue;
     pays.push({ type: 'pay', hex });
     after = applyAction(after, { type: 'pay', hex });
   }
@@ -889,13 +904,13 @@ function bottomPrompt(state: GameState, actions: Action[], selection: Selection,
   if (pays.length < owed) {
     const highlights = new Set<Location>();
     const tapSelects = new Map<Location, Selection>();
-    for (const a of legalActions(after, after.currentPlayer)) {
+    for (const a of turnActions(after)) {
       if (a.type !== 'pay') continue;
       highlights.add(a.hex);
       tapSelects.set(a.hex, keepCard({ pay: [...paid, a.hex] }));
     }
     // Coercion: a combat card can stand in for one of the resources.
-    const buttons: Button[] = legalActions(after, after.currentPlayer).flatMap((a) =>
+    const buttons: Button[] = turnActions(after).flatMap((a) =>
       a.type === 'payWithCard' ? [{ label: `Pay a ${a.value} combat card instead of 1 ${cost.resource}`, select: { pay: paid, card: a.value } }] : [],
     );
     return { ...none, title: title(state), buttons, highlights, tapSelects, marked, slots, preview, paying: true };
@@ -906,7 +921,7 @@ function bottomPrompt(state: GameState, actions: Action[], selection: Selection,
     const button = { label: bottom.coins ? `Pay and take ${plural(bottom.coins, 'coin')}` : 'Pay', actions: pays, primary: true };
     return { ...none, title: title(state), buttons: [button], marked, slots, preview };
   }
-  const now = legalActions(after, after.currentPlayer);
+  const now = turnActions(after);
   const options = now.filter(isEffect);
   if (!options.length) {
     const buttons = now.filter((a) => a.type !== 'skipBottom').map((a) => ({ label: label(after, a), actions: [...pays, a], primary: true }));

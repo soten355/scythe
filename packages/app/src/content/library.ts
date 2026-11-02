@@ -75,6 +75,7 @@ export function catalogWith(builtIn: Catalog, library: Library): Catalog {
     mats: [...builtIn.mats, ...library.mats],
     ...(encounters && { encounters }),
     ...(factory && { factory }),
+    ...(builtIn.objectives && { objectives: builtIn.objectives }),
   };
 }
 

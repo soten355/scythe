@@ -15,6 +15,7 @@
   import { BONUS_ICONS, STRUCTURE_ICONS } from './icons';
   import InlineIcon from './InlineIcon.svelte';
   import { costText, gainText, moveText, needText, type Prompt, type Selection } from './prompt';
+  import { objectiveStatus } from './objective-text';
 
   let {
     game,
@@ -62,6 +63,9 @@
   const player = $derived(game.players[seat]!);
   const active = $derived(game.turn.step === 'chooseSection' ? null : game.turn.section);
   const factory = $derived(heldFactoryCard(game, seat));
+  /** Your objective cards (the drawer only ever shows the current player's). */
+  const objectives = $derived(objectiveStatus(game, seat));
+  const OBJECTIVE_MARK = { done: '★', ready: '✓', notYet: '', closed: '' } as const;
   const chooseFactory = $derived(choices.find((a) => a.type === 'chooseSection' && a.section === FACTORY));
 
   const sections = $derived(
@@ -179,6 +183,18 @@
         <div class="section factory" class:active={active === FACTORY} class:last={!picking && previous === FACTORY}>{@render factoryContent()}</div>
       {/if}
     {/if}
+    {#if objectives.length}
+      <!-- Your objectives: hidden from the others, so only on your own mat. -->
+      <div class="section objectives">
+        <div class="head"><b>🎯 Objectives</b></div>
+        {#each objectives as o (o.name)}
+          <div class="objective {o.status}" title={o.story ?? ''}>
+            <b>{OBJECTIVE_MARK[o.status]} {o.name}</b>
+            {#if shown}<span in:slide={opening} out:slide={closing}>{o.text}{o.status === 'closed' ? ' (one objective a game)' : ''}</span>{/if}
+          </div>
+        {/each}
+      </div>
+    {/if}
   </div>
 </div>
 
@@ -234,6 +250,25 @@
   }
   .section.factory {
     background: #241e28;
+  }
+  .section.objectives {
+    background: #1e2622;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .objective {
+    display: flex;
+    flex-direction: column;
+  }
+  .objective.ready b {
+    color: #9be08a;
+  }
+  .objective.done b {
+    color: #ffd23f;
+  }
+  .objective.closed {
+    opacity: 0.45;
   }
   .section.choosable {
     border-color: #fff6c8;

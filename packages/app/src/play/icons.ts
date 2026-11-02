@@ -68,4 +68,5 @@ export const STAR_KIND_ICONS: Record<StarKind, Icon> = {
   popularity: BONUS_ICONS.popularity, // top popularity
   power: BONUS_ICONS.power, // top power
   combat: { text: '⚔️' }, // a fight won
+  objective: { text: '🎯' }, // an objective completed
 };
