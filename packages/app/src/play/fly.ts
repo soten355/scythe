@@ -22,8 +22,12 @@ export type Moment =
   | { icon: Icon; below?: Icon; target: string; sides?: Side[] }
   | { mech: { color: string; initial: string }; target: string };
 
-/** A smaller gain beside the icon (a recruit's one-time bonus: "+2 ⚡"; an encounter's rewards), flown to the first of `targets` on screen. */
-type Side = { text: string; icon: Icon; targets: string[] };
+/**
+ * A smaller gain beside the icon (a recruit's one-time bonus: "+2 ⚡"; an
+ * encounter's rewards), flown to the first of `targets` on screen; on a chip
+ * of `color` when it says whose it is (recruit bonuses paid to neighbours).
+ */
+type Side = { text: string; icon: Icon; targets: string[]; color?: string };
 
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -70,8 +74,10 @@ export async function showMoment(moment: Moment, over: Element): Promise<void> {
   }
   const main = pin(moment.below ? stacked(moment.icon, moment.below) : iconElement(moment.icon), over, target);
   if (!moment.sides?.length) return main;
-  // Side by side to the right of the main icon.
-  await Promise.all([main, ...moment.sides.map((side, i) => pin(sideElement(side), over, onScreen(side.targets), undefined, 1.1 + i * 0.95))]);
+  // Chips (one per player) in a column to the right of the main icon; other gains side by side.
+  const chips = moment.sides.every((side) => side.color);
+  const place = (i: number): [number, number] => (chips ? [1.05, (i - (moment.sides!.length - 1) / 2) * 0.62] : [1.1 + i * 0.95, 0]);
+  await Promise.all([main, ...moment.sides.map((side, i) => pin(sideElement(side), over, onScreen(side.targets), undefined, ...place(i)))]);
 }
 
 /** The side gain: its amount and icon, about half the main icon's size. */
@@ -79,6 +85,7 @@ function sideElement(side: Side): HTMLElement {
   const el = document.createElement('span');
   const inner = document.createElement('span');
   Object.assign(inner.style, { fontSize: '0.5em', fontWeight: '700', color: '#fff', display: 'inline-flex', alignItems: 'center', gap: '0.1em' });
+  if (side.color) Object.assign(inner.style, { fontSize: '0.42em', background: side.color, color: inkOn(side.color), padding: '0.06em 0.22em', borderRadius: '0.5em', border: '0.04em solid #ffe9a8' });
   inner.append(side.text, iconElement(side.icon));
   el.append(inner);
   return el;
@@ -90,11 +97,11 @@ const isShown = (el: Element | null) => {
 };
 const onScreen = (selectors: string[]) => selectors.map((s) => document.querySelector(s)).find(isShown) ?? null;
 
-/** `right`: how far right of the middle to pin it, in the big icon's size. */
-async function pin(el: Element, over: Element, target: Element | null, parts?: Element[], right = 0): Promise<void> {
+/** `right`, `down`: how far right of and below the middle to pin it, in the big icon's size. */
+async function pin(el: Element, over: Element, target: Element | null, parts?: Element[], right = 0, down = 0): Promise<void> {
   const box = over.getBoundingClientRect();
   const size = Math.min(110, box.height * 0.35);
-  const [cx, cy] = [box.left + box.width / 2 + right * size, box.top + box.height / 2];
+  const [cx, cy] = [box.left + box.width / 2 + right * size, box.top + box.height / 2 + down * size];
   Object.assign((el as HTMLElement).style, {
     position: 'fixed',
     left: `${cx}px`,

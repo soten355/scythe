@@ -21,7 +21,7 @@
   import { showMoment, type Moment } from './fly';
   import { inkOn } from './ink';
   import { BONUS_ICONS, ENCOUNTER_CARD_ICON, RECRUIT_ICON, RESOURCE_ICONS, STAR_ICON, STAR_KIND_ICONS, type Icon } from './icons';
-  import { gainsBetween, type GainKind } from './gains';
+  import { gainsBetween, recruitPayoutsIn, type GainKind } from './gains';
   import { buildPrompt, combatSummary, sectionHeadings, type Button, type Prompt, type RowStatus, type Selection } from './prompt';
   import { canSwitchSection, phase, previousSection, sectionChoices } from './turn';
   import { loadSettings } from './settings';
@@ -229,6 +229,20 @@
           sides: gains.map((g) => ({ text: `+${g.amount}`, icon: GAIN_ICONS[g.kind], targets: [`[data-stat="${seat}|${GAIN_STAT[g.kind]}"]`, `[data-player="${seat}"]`] })),
         });
       }
+    }
+    // Ongoing recruit bonuses: the player's and their neighbours', each on a chip of their colour, to that stat in their top bar.
+    const payouts = recruitPayoutsIn(states);
+    if (payouts.length) {
+      added.push({
+        icon: RECRUIT_ICON,
+        target: `[data-player="${before.currentPlayer}"]`,
+        sides: payouts.map(({ seat, bonus }) => ({
+          text: '+1',
+          icon: BONUS_ICONS[bonus],
+          color: color(seat),
+          targets: [`[data-stat="${seat}|${bonus}"]`, `[data-player="${seat}"]`],
+        })),
+      });
     }
     next.players.forEach((p, seat) => {
       for (const kind of p.stars.slice(before.players[seat]!.stars.length)) added.push({ icon: STAR_ICON, below: STAR_KIND_ICONS[kind], target: `[data-stars="${seat}"]` });

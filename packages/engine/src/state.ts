@@ -3,7 +3,7 @@
 import type { HexId } from './board';
 import { MAX_POWER, type Faction } from './faction';
 import { FACTORY, type GameSetup, type GameState, type Location, type PlayerState, type ResourcePile, type Section, type SectionIndex, type TurnStep } from './game';
-import { BOTTOM_COST_RESOURCE, upgradeables, type PlayerMat, type Resource } from './mat';
+import { BOTTOM_COST_RESOURCE, upgradeables, type PlayerMat, type RecruitBonus, type Resource } from './mat';
 
 export const SECTIONS: SectionIndex[] = [0, 1, 2, 3];
 export const MAX_POPULARITY = 18;
@@ -82,6 +82,20 @@ export function nextSeat(state: GameState, seat: number, step = 1): number {
 /** The players either side of `seat` in turn order (none in a solo game, one in a two-player game). */
 export const neighborSeats = (state: GameState, seat: number): number[] =>
   [...new Set([nextSeat(state, seat, -1), nextSeat(state, seat, 1)])].filter((s) => s !== seat);
+
+/**
+ * Who gets an ongoing recruit bonus when `seat` takes the bottom-row action of
+ * their mat's `section`: they and each neighbor with a recruit on that kind of
+ * action, each gaining 1 of that recruit's bonus.
+ */
+export function recruitPayouts(state: GameState, seat: number, section: SectionIndex): { seat: number; bonus: RecruitBonus }[] {
+  const kind = state.setup.players[seat]!.mat.sections[section].bottom.action;
+  return [seat, ...neighborSeats(state, seat)].flatMap((who) => {
+    const mat = state.setup.players[who]!.mat;
+    const recruited = state.players[who]!.recruits.find((s) => mat.sections[s].bottom.action === kind);
+    return recruited === undefined ? [] : [{ seat: who, bonus: mat.sections[recruited].bottom.recruitBonus }];
+  });
+}
 
 export function endTurn(state: GameState): GameState {
   const section = state.turn.step === 'chooseSection' ? null : state.turn.section;

@@ -4,7 +4,7 @@
 //   2 move / build (3 wood)       3 trade / enlist (4 food)
 import { describe, expect, it } from 'vitest';
 import { applyAction, legalActions, newGame, type Action, type GameState, type PlayerState, type ResourcePile } from './game';
-import { bottomCost, topValue } from './state';
+import { bottomCost, recruitPayouts, topValue } from './state';
 import { testMatA, testSetup } from './test-fixtures';
 
 const play = (state: GameState, ...actions: Action[]) => actions.reduce(applyAction, state);
@@ -276,6 +276,16 @@ describe('Enlist', () => {
     const pay: Action = { type: 'pay', hex: 'C2' };
     state = play(state, choose(1), { type: 'skipTop' }, pay, pay, pay, pay, { type: 'deploy', hex: 'C2', ability: 0 });
     expect(p0(state).coins).toBe(4 + 2 + 1 + 1);
+  });
+
+  it('says who a bottom-row action pays a recruit bonus to, for the app to show', () => {
+    // Both players have a recruit on Deploy (section 1 on both test mats): mat A's pays a coin.
+    let state = game({ recruits: [1] }, { A1: { metal: 3 }, C2: { metal: 4 } });
+    state = { ...state, players: [p0(state), { ...state.players[1]!, recruits: [1] }] };
+    const bonus1 = state.setup.players[1]!.mat.sections[1].bottom.recruitBonus;
+    expect(recruitPayouts(state, 0, 1)).toEqual([{ seat: 0, bonus: 'coins' }, { seat: 1, bonus: bonus1 }]);
+    // Upgrading (section 0) pays nobody: neither has a recruit there.
+    expect(recruitPayouts(state, 0, 0)).toEqual([]);
   });
 
   it("doesn't give the ongoing bonus on the Enlist that places the recruit", () => {

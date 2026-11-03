@@ -12,7 +12,7 @@ import type { Action, GameState, PlayerState, SectionIndex, TurnStep } from './g
 import { STRUCTURES, upgradeables, type BottomActionType, type RecruitBonus } from './mat';
 import { drawCombatCards } from './combat';
 import { hasRule } from './abilities';
-import { addResources, bottomCost, SECTIONS, controlledHexes, current, gain, neighborSeats, onBoard, structureOn, updatePlayer } from './state';
+import { addResources, bottomCost, SECTIONS, controlledHexes, current, gain, onBoard, recruitPayouts, structureOn, updatePlayer } from './state';
 
 type BottomStep = Extract<TurnStep, { step: 'bottom' }>;
 
@@ -102,15 +102,8 @@ export function applyEffect(state: GameState, seat: number, action: Action): Gam
 /** The section's coins for the current player, and 1 of each matching recruit bonus for them and their neighbors. */
 function rewards(state: GameState, section: SectionIndex): GameState {
   const { seat, player, mat } = current(state);
-  const kind = mat.sections[section].bottom.action;
   let next = updatePlayer(state, seat, gain(player, { coins: mat.sections[section].bottom.coins }));
-  for (const who of [seat, ...neighborSeats(state, seat)]) {
-    const theirMat = state.setup.players[who]!.mat;
-    const recruited = next.players[who]!.recruits.find((s) => theirMat.sections[s].bottom.action === kind);
-    if (recruited === undefined) continue;
-    const bonus = theirMat.sections[recruited].bottom.recruitBonus;
-    next = giveBonus(next, who, bonus, 1);
-  }
+  for (const { seat: who, bonus } of recruitPayouts(state, seat, section)) next = giveBonus(next, who, bonus, 1);
   return next;
 }
 
