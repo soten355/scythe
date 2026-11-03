@@ -136,7 +136,7 @@ function render() {
   const m = mat();
   root.innerHTML = `
     <header>
-      <a class="back" href="${import.meta.env.BASE_URL}">← Back to app</a>
+      <a class="back" href="${import.meta.env.BASE_URL}#workshop">← Workshop</a>
       <select data-act="pick">${state.mats.map((x, i) => `<option value="${i}" ${i === state.selected ? 'selected' : ''}>${esc(x.name || x.id)}</option>`).join('')}</select>
       <button data-act="new">New mat</button>
       <button data-act="duplicate">Duplicate</button>

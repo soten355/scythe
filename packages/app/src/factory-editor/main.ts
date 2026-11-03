@@ -69,7 +69,7 @@ function render() {
   const res = c.cost.resources ?? {};
   root.innerHTML = `
     <header>
-      <a class="back" href="${import.meta.env.BASE_URL}">← Back to app</a>
+      <a class="back" href="${import.meta.env.BASE_URL}#workshop">← Workshop</a>
       <select data-act="pick">${state.cards.map((x, i) => `<option value="${i}" ${i === state.selected ? 'selected' : ''}>${i + 1}. ${esc(x.name || x.id)}</option>`).join('')}</select>
       <button data-act="new">New card</button>
       <button data-act="duplicate">Duplicate</button>

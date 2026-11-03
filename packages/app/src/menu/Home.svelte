@@ -1,6 +1,6 @@
 <script lang="ts">
   // The opening menu: continue the last game, start a new one, pick a saved
-  // game, or open one of the editors.
+  // game, or open the workshop (the editors and tools).
   import { ENGINE_VERSION } from '@scythe/engine';
 
   let {
@@ -9,8 +9,8 @@
     onContinue,
     onNewGame,
     onSaves,
-  }: { canContinue: boolean; savedCount: number; onContinue: () => void; onNewGame: () => void; onSaves: () => void } = $props();
-  const base = import.meta.env.BASE_URL;
+    onWorkshop,
+  }: { canContinue: boolean; savedCount: number; onContinue: () => void; onNewGame: () => void; onSaves: () => void; onWorkshop: () => void } = $props();
 </script>
 
 <div class="home">
@@ -23,18 +23,7 @@
       <button class="primary" onclick={onNewGame}>New game</button>
     {/if}
     <button onclick={onSaves}>Saved games{savedCount ? ` (${savedCount})` : ''}</button>
-  </nav>
-  <nav class="tools">
-    <span>Workshop</span>
-    <a href="{base}editor.html">Map editor</a>
-    <a href="{base}mats.html">Mat editor</a>
-    <a href="{base}factions.html">Faction editor</a>
-    <a href="{base}encounters.html">Encounter card editor</a>
-    <a href="{base}factory.html">Factory card editor</a>
-    <a href="{base}objectives.html">Objective card editor</a>
-    <a href="{base}structure-bonuses.html">Structure bonus tile editor</a>
-    <a href="{base}themes.html">Theme editor</a>
-    <a href="{base}bot-check.html">Bot speed check</a>
+    <button onclick={onWorkshop}>🛠️ Workshop</button>
   </nav>
   <p class="meta">engine v{ENGINE_VERSION}</p>
 </div>
@@ -70,19 +59,6 @@
     background: var(--accent);
     color: #1e1a16;
     font-weight: 700;
-  }
-  .tools {
-    display: flex;
-    gap: 14px;
-    align-items: baseline;
-    font-size: 13px;
-  }
-  .tools span {
-    opacity: 0.6;
-  }
-  .tools a {
-    color: var(--accent);
-    text-decoration: none;
   }
   .meta {
     margin: 0;

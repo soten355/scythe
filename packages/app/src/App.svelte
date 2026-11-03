@@ -6,6 +6,7 @@
   import type { Level } from '@scythe/bots';
   import Game from './play/Game.svelte';
   import Home from './menu/Home.svelte';
+  import Workshop from './menu/Workshop.svelte';
   import NewGame from './menu/NewGame.svelte';
   import SavedGames from './menu/SavedGames.svelte';
   import { BUILT_IN } from './content/catalog';
@@ -19,7 +20,9 @@
 
   const store = new SaveStore();
 
-  let screen: 'home' | 'new' | 'saves' | 'game' = $state('home');
+  // The editors' back links come back to the workshop (#workshop).
+  let screen: 'home' | 'new' | 'saves' | 'workshop' | 'game' = $state(location.hash === '#workshop' ? 'workshop' : 'home');
+  if (location.hash) history.replaceState(null, '', location.pathname + location.search);
   /** The game open (as it was when opened: the game itself keeps its moves). */
   let current = $state.raw<{ key: number; save: SavedGame } | null>(null);
   let opened = 0;
@@ -127,7 +130,9 @@
 </script>
 
 {#if screen === 'home'}
-  <Home canContinue={resumable !== null} savedCount={saves.length} onContinue={() => resumable && play(resumable)} onNewGame={() => go('new')} onSaves={() => go('saves')} />
+  <Home canContinue={resumable !== null} savedCount={saves.length} onContinue={() => resumable && play(resumable)} onNewGame={() => go('new')} onSaves={() => go('saves')} onWorkshop={() => go('workshop')} />
+{:else if screen === 'workshop'}
+  <Workshop onBack={() => go('home')} />
 {:else if screen === 'new'}
   <NewGame {catalog} {library} {message} onStart={start} onImport={importContent} onRemove={removeContent} onBack={() => go(current ? 'game' : 'home')} backLabel={current ? 'Back to the game' : 'Menu'} />
 {:else if screen === 'saves'}

@@ -13,7 +13,7 @@ const root = document.getElementById('bot-check')!;
 
 root.innerHTML = `
   <header>
-    <a href="${import.meta.env.BASE_URL}">← Home</a>
+    <a href="${import.meta.env.BASE_URL}#workshop">← Workshop</a>
     <h1 style="margin:0;font-size:1.2em">Bot speed check</h1>
   </header>
   <section class="details" style="flex-direction:column;align-items:flex-start;max-width:46em">

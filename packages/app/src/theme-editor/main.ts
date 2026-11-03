@@ -140,7 +140,7 @@ function render() {
   const total = Object.values(theme.pictures).reduce((n, url) => n + sizeKb(url ?? ''), 0);
   root.innerHTML = `
     <header>
-      <a class="back" href="${import.meta.env.BASE_URL}">← Back to app</a>
+      <a class="back" href="${import.meta.env.BASE_URL}#workshop">← Workshop</a>
       <label>Theme<input type="text" data-name value="${esc(theme.name)}"></label>
       <span class="spacer"></span>
       <button data-act="open">Open theme file…</button>
