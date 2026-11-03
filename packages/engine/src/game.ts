@@ -32,8 +32,14 @@ export type Section = SectionIndex | typeof FACTORY;
 export interface GameSetup {
   seed: number;
   board: Board;
-  /** 1-7 seats, in seating order (clockwise). The lowest mat turn order goes first. */
+  /** 1-7 seats. The lowest mat turn order goes first; then see `turnOrder`. */
   players: { faction: Faction; mat: PlayerMat }[];
+  /**
+   * 'map': play goes clockwise around the map, by where each faction's home
+   * base is (see playOrder). None (games saved before Nov 2026): in the
+   * order of the seats.
+   */
+  turnOrder?: 'map';
   /** The encounter deck. None (as in games saved before encounters): no encounters, and no tokens on the map. */
   encounters?: EncounterCard[];
   /** The Factory deck. None (as in games saved before the Factory): no Factory cards. */

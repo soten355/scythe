@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { baseBoard, baseFactions, baseMats } from '@scythe/content';
 import type { Faction, PlayerMat } from '@scythe/engine';
-import { botsOf, defaultChoice, fitChoice, maxPlayers, MIN_PLAYERS, problems, setBot, setFaction, setMat, setPlayerCount, shuffleSeats, toSetup, type Catalog } from './setup';
+import { playOrder } from '@scythe/engine';
+import { BUILT_IN } from '../content/catalog';
+import { botsOf, defaultChoice, fitChoice, maxPlayers, MIN_PLAYERS, problems, setBot, setFaction, setMat, setPlayerCount, shuffleSeats, toSetup, turnOrderNames, type Catalog } from './setup';
 
 const [nordic, rusviet] = baseFactions as [Faction, Faction];
 const [mat1, mat2] = baseMats as [PlayerMat, PlayerMat];
@@ -80,6 +82,20 @@ describe('the new game choices', () => {
       [nordic.id, mat1.id],
       [rusviet.id, mat2.id],
     ]);
+  });
+
+  it('new games play clockwise around the map from the lowest mat, whatever order the seats are listed in', () => {
+    // Listed Nordic, Rusviet, Polonia, Crimea, Saxony; on the map: Nordic north-east, Rusviet east, Crimea south, Saxony south-west, Polonia west.
+    const five = { map: BUILT_IN.maps[0]!.id, players: BUILT_IN.factions.map((f, i) => ({ faction: f.id, mat: BUILT_IN.mats[i]!.id, bot: null })) };
+    const setup = toSetup(five, BUILT_IN, 1);
+    expect(setup.turnOrder).toBe('map');
+    const names = playOrder(setup).map((i) => setup.players[i]!.faction.name);
+    const n = names.indexOf('Nordic');
+    expect([...names.slice(n), ...names.slice(0, n)]).toEqual(['Nordic', 'Rusviet', 'Crimea', 'Saxony', 'Polonia']);
+    expect(turnOrderNames(five, BUILT_IN)).toEqual(['Nordic', 'Rusviet', 'Crimea', 'Saxony', 'Polonia']);
+    // The lowest mat starts: give Saxony mat 1 (swapping with Nordic).
+    const saxonyFirst = setMat(five, 4, BUILT_IN.mats[0]!.id);
+    expect(turnOrderNames(saxonyFirst, BUILT_IN)).toEqual(['Saxony', 'Polonia', 'Nordic', 'Rusviet', 'Crimea']);
   });
 
   it('picks that are no longer offered (removed from the library) are swapped for unused ones', () => {

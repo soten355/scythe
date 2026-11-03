@@ -2,6 +2,7 @@
 // faction, mat and who plays it (a person or a bot). Picking a faction or
 // mat another seat has swaps the two.
 import type { Level } from '@scythe/bots';
+import { playOrder } from '@scythe/engine';
 import type { Board, EncounterCard, Faction, FactoryCard, GameSetup, ObjectiveCard, PlayerMat, StructureBonusTile } from '@scythe/engine';
 
 /** A map to play on. The standard one comes first and is picked by default; more can be added later. */
@@ -137,6 +138,8 @@ export function toSetup(choice: SetupChoice, catalog: Catalog, seed: number): Ga
   return {
     seed,
     board: catalog.maps.find((m) => m.id === choice.map)!.board,
+    // Play goes clockwise around the map, from the lowest mat number.
+    turnOrder: 'map',
     players: choice.players.map((p) => ({
       faction: catalog.factions.find((f) => f.id === p.faction)!,
       mat: catalog.mats.find((m) => m.id === p.mat)!,
@@ -146,4 +149,13 @@ export function toSetup(choice: SetupChoice, catalog: Catalog, seed: number): Ga
     ...(catalog.objectives?.length && { objectives: catalog.objectives }),
     ...(catalog.structureBonuses?.length && { structureBonuses: catalog.structureBonuses }),
   };
+}
+
+/** The factions in the order they'll play: the lowest mat first, then clockwise around the map (check `problems` first). */
+export function turnOrderNames(choice: SetupChoice, catalog: Catalog): string[] {
+  const setup = toSetup(choice, catalog, 0);
+  const order = playOrder(setup);
+  const first = order.reduce((best, seat) => (setup.players[seat]!.mat.turnOrder < setup.players[best]!.mat.turnOrder ? seat : best), order[0]!);
+  const at = order.indexOf(first);
+  return [...order.slice(at), ...order.slice(0, at)].map((seat) => setup.players[seat]!.faction.name);
 }

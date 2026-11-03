@@ -12,7 +12,7 @@ import type { Action, GameState, PlayerState, SectionIndex, TurnStep } from './g
 import { STRUCTURES, upgradeables, type BottomActionType, type RecruitBonus } from './mat';
 import { drawCombatCards } from './combat';
 import { hasRule } from './abilities';
-import { addResources, bottomCost, SECTIONS, controlledHexes, current, gain, onBoard, structureOn, updatePlayer } from './state';
+import { addResources, bottomCost, SECTIONS, controlledHexes, current, gain, neighborSeats, onBoard, structureOn, updatePlayer } from './state';
 
 type BottomStep = Extract<TurnStep, { step: 'bottom' }>;
 
@@ -104,8 +104,7 @@ function rewards(state: GameState, section: SectionIndex): GameState {
   const { seat, player, mat } = current(state);
   const kind = mat.sections[section].bottom.action;
   let next = updatePlayer(state, seat, gain(player, { coins: mat.sections[section].bottom.coins }));
-  const n = state.players.length;
-  for (const who of new Set([seat, (seat + 1) % n, (seat + n - 1) % n])) {
+  for (const who of [seat, ...neighborSeats(state, seat)]) {
     const theirMat = state.setup.players[who]!.mat;
     const recruited = next.players[who]!.recruits.find((s) => theirMat.sections[s].bottom.action === kind);
     if (recruited === undefined) continue;

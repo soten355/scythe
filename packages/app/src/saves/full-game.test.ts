@@ -9,7 +9,7 @@ import { createSave, parseSaveFile, restore, saveFileText, updateSave } from './
 
 describe('a full 5-faction game', () => {
   // Games picked so each one takes a Factory card too (random moves rarely end on the Factory); mats rotate between games.
-  it.each([2, 6, 13])('plays to final scoring and comes back the same from a save file (game %i)', (seed) => {
+  it.each([3, 7, 37])('plays to final scoring and comes back the same from a save file (game %i)', (seed) => {
     const choice = { map: 'standard', players: BUILT_IN.factions.map((f, i) => ({ faction: f.id, mat: BUILT_IN.mats[(i + seed) % 5]!.id, bot: null })) };
     const setup = toSetup(choice, BUILT_IN, seed);
     expect(setup.players).toHaveLength(5);

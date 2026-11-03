@@ -2,7 +2,7 @@
 // control of hexes, resources on hexes and ending the turn.
 import type { HexId } from './board';
 import { MAX_POWER, type Faction } from './faction';
-import { FACTORY, type GameState, type Location, type PlayerState, type ResourcePile, type Section, type SectionIndex, type TurnStep } from './game';
+import { FACTORY, type GameSetup, type GameState, type Location, type PlayerState, type ResourcePile, type Section, type SectionIndex, type TurnStep } from './game';
 import { BOTTOM_COST_RESOURCE, upgradeables, type PlayerMat, type Resource } from './mat';
 
 export const SECTIONS: SectionIndex[] = [0, 1, 2, 3];
@@ -45,11 +45,49 @@ export const toBottomRow = (section: Section): TurnStep =>
   section === FACTORY ? { step: 'end', section } : { step: 'bottom', section, paid: 0 };
 
 /** Records the section used and passes play to the next seat clockwise. */
+/**
+ * Every seat in the order they play, clockwise from the top of the map: by
+ * the direction of each faction's home base from the middle of the board
+ * (with `turnOrder: 'map'`), or else in seat order. Who starts is separate:
+ * the lowest mat number (see newGame).
+ */
+export function playOrder(setup: GameSetup): number[] {
+  const seats = setup.players.map((_, i) => i);
+  if (setup.turnOrder !== 'map') return seats;
+  const { hexes, homeBasePositions } = setup.board;
+  // Axial coordinates to the board's own x (right) and y (down).
+  const at = ({ q, r }: { q: number; r: number }) => [Math.sqrt(3) * (q + r / 2), 1.5 * r] as const;
+  const all = Object.values(hexes).map(at);
+  const cx = all.reduce((n, [x]) => n + x, 0) / all.length;
+  const cy = all.reduce((n, [, y]) => n + y, 0) / all.length;
+  const angles = setup.players.map((p) => {
+    const pos = homeBasePositions[p.faction.homeBase];
+    if (!pos) return null;
+    const [x, y] = at(pos);
+    // 0 straight up, growing clockwise.
+    const a = Math.atan2(x - cx, cy - y);
+    return a < 0 ? a + 2 * Math.PI : a;
+  });
+  if (angles.some((a) => a === null)) return seats;
+  return seats.sort((i, j) => angles[i]! - angles[j]! || i - j);
+}
+
+/** Who plays after `seat`, or before it with `step` -1. */
+export function nextSeat(state: GameState, seat: number, step = 1): number {
+  const order = playOrder(state.setup);
+  const n = order.length;
+  return order[(((order.indexOf(seat) + step) % n) + n) % n]!;
+}
+
+/** The players either side of `seat` in turn order (none in a solo game, one in a two-player game). */
+export const neighborSeats = (state: GameState, seat: number): number[] =>
+  [...new Set([nextSeat(state, seat, -1), nextSeat(state, seat, 1)])].filter((s) => s !== seat);
+
 export function endTurn(state: GameState): GameState {
   const section = state.turn.step === 'chooseSection' ? null : state.turn.section;
   return {
     ...updatePlayer(state, state.currentPlayer, { lastSection: section }),
-    currentPlayer: (state.currentPlayer + 1) % state.players.length,
+    currentPlayer: nextSeat(state, state.currentPlayer),
     turn: { step: 'chooseSection' },
     turnsTaken: state.turnsTaken + 1,
   };

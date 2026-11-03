@@ -22,6 +22,7 @@ const width = arg('width', 8);
 const setup = (game: number): GameSetup => ({
   seed: 1000 + game,
   board: baseBoard,
+  turnOrder: 'map',
   players: Array.from({ length: players }, (_, i) => ({ faction: baseFactions[(i + game) % 5]!, mat: baseMats[(i + 2 * game) % 5]! })),
   encounters: sampleEncounters,
   factory: sampleFactoryCards,

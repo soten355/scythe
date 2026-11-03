@@ -10,7 +10,7 @@
   import type { Level } from '@scythe/bots';
   import { botName } from '../play/seats';
   import type { Library, LibraryKind } from '../content/library';
-  import { botsOf, defaultChoice, fitChoice, MAX_PLAYERS, maxPlayers, MIN_PLAYERS, problems, setFaction, setBot, setMat, setPlayerCount, shuffleSeats, toSetup, type Catalog } from './setup';
+  import { botsOf, defaultChoice, fitChoice, MAX_PLAYERS, maxPlayers, MIN_PLAYERS, problems, setFaction, setBot, setMat, setPlayerCount, shuffleSeats, toSetup, turnOrderNames, type Catalog } from './setup';
 
   let {
     catalog,
@@ -69,6 +69,8 @@
   }
   const most = $derived(maxPlayers(catalog));
   const issues = $derived(problems(choice, catalog));
+  /** Who plays when: the lowest mat first, then clockwise around the map. */
+  const order = $derived(issues.length ? [] : turnOrderNames(choice, catalog));
   const faction = (id: string) => catalog.factions.find((f) => f.id === id)!;
   const mat = (id: string) => catalog.mats.find((m) => m.id === id)!;
   /** The seat with the lowest mat number goes first. */
@@ -159,9 +161,12 @@
 
     <section class="col seats">
       <div class="seats-head">
-        <h3>Seats <small>clockwise{personCount > 1 ? ' · people pass the device' : ''}</small></h3>
+        <h3>Seats{#if personCount > 1}<small> · people pass the device</small>{/if}</h3>
         <button class="quiet small" onclick={() => (picked = shuffleSeats(choice, catalog, Math.random))}>🔀 Shuffle</button>
       </div>
+      {#if order.length > 1}
+        <p class="order">Turn order <small>(lowest mat first, then clockwise around the map)</small>: {order.join(' → ')}</p>
+      {/if}
       {#each choice.players as p, seat (seat)}
         {@const f = faction(p.faction)}
         {@const m = mat(p.mat)}
@@ -393,6 +398,13 @@
   .first {
     margin-left: 6px;
     color: var(--accent);
+  }
+  .order {
+    margin: 0 0 2px;
+    font-size: 12px;
+  }
+  .order small {
+    opacity: 0.6;
   }
   .issues {
     margin: 0;
