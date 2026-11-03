@@ -34,7 +34,7 @@ describe('the board theme', () => {
 
   it('shrinks pictures to suit each slot: big backgrounds, smaller hexes, small symbols (kept see-through)', () => {
     expect(pictureSpec('background')).toMatchObject({ max: 1600, type: 'image/jpeg' });
-    expect(pictureSpec('hex.forest')).toMatchObject({ max: 512, type: 'image/jpeg' });
+    expect(pictureSpec('hex.forest')).toMatchObject({ max: 512, type: 'image/png' });
     expect(pictureSpec('symbol.forest')).toMatchObject({ max: 256, type: 'image/png' });
     expect(pictureSpec('token.oil')).toMatchObject({ max: 256, type: 'image/png' });
   });

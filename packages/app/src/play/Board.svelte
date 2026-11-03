@@ -512,6 +512,8 @@
     <defs>
       {#each arts as a (a.terrain)}
         <pattern id="art-{a.terrain}" width="1" height="1" patternContentUnits="objectBoundingBox">
+          <!-- See-through parts of the art show the map picture behind, or else the terrain's colour. -->
+          {#if !look.background}<rect width="1" height="1" fill={look.fill(a.terrain)} />{/if}
           <image href={a.url} width="1" height="1" preserveAspectRatio="xMidYMid slice" />
         </pattern>
       {/each}
