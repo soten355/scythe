@@ -35,7 +35,7 @@ const sizeText = (b: { width: number; height: number }) => `Best at ${b.width} Ã
 
 /** Every slot, in the order the editor lists them. */
 export const SLOTS: Slot[] = [
-  { id: 'background', group: 'Map', label: 'Map background', hint: `Behind the hexes: a wide landscape, cropped to fit. ${sizeText(BEST.background)}.` },
+  { id: 'background', group: 'Map', label: 'Map picture', hint: `The whole map in one painting, made from the map guide so it lines up with the hexes; it zooms and pans with them. ${sizeText(BEST.background)}.` },
   ...TERRAINS.map((t): Slot => ({ id: `hex.${t}`, group: 'Hex art', label: TERRAIN_NAMES[t], hint: `Fills each hex, cropped to the hex shape. ${sizeText(BEST.hex)}.` })),
   ...TERRAINS.map((t): Slot => ({ id: `symbol.${t}`, group: 'Hex symbols', label: TERRAIN_NAMES[t], hint: `In the middle of the hex, on a see-through background. ${sizeText(BEST.small)}.` })),
   { id: 'symbol.tunnel', group: 'Markers', label: 'Tunnel', hint: `At the top of tunnel hexes, on a see-through background. ${sizeText(BEST.small)}.` },
@@ -63,11 +63,15 @@ export interface Theme {
   pictures: Partial<Record<SlotId, string>>;
   /** Hex colours (where there's no hex art, and while it loads). */
   colors: Partial<Record<Terrain, string>>;
-  /** Draw the terrain symbols over hex art too (off: the art says what the hex is). */
+  /** Draw the terrain symbols over hex art (or the map picture) too (off: the art says what the hex is). */
   symbolsOverArt: boolean;
+  /** With a map picture: it is the hexes' art, under see-through hexes (off: it sits behind hexes drawn as usual). */
+  paintedMap: boolean;
+  /** Over a map picture: faint hex edges, so the hexes can be told apart. */
+  hexEdges: boolean;
 }
 
-export const DEFAULT_THEME: Theme = { name: 'My theme', pictures: {}, colors: {}, symbolsOverArt: false };
+export const DEFAULT_THEME: Theme = { name: 'My theme', pictures: {}, colors: {}, symbolsOverArt: false, paintedMap: true, hexEdges: true };
 
 export const DEFAULT_COLORS: Record<Terrain, string> = {
   farm: '#d9c46a',
@@ -91,7 +95,12 @@ export const setColor = (theme: Theme, terrain: Terrain, color: string): Theme =
 
 /** What the board draws, with the theme's pictures and colours in place of the usual ones. */
 export interface BoardLook {
+  /** The map picture, drawn in the map guide's frame (see map-picture.ts). */
   background?: string;
+  /** The map picture is the hexes' art: hexes are drawn see-through over it. */
+  painted: boolean;
+  /** Faint edges on see-through hexes. */
+  edges: boolean;
   fill: (terrain: Terrain) => string;
   art: (terrain: Terrain) => string | undefined;
   symbol: (terrain: Terrain) => Icon | undefined;
@@ -106,14 +115,18 @@ export function boardLook(theme: Theme): BoardLook {
     const url = picture(slot);
     return url ? { image: url } : usual;
   };
+  const painted = !!picture('background') && theme.paintedMap;
   return {
     ...(picture('background') && { background: picture('background') }),
+    painted,
+    edges: theme.hexEdges,
     fill: (t) => theme.colors[t] ?? DEFAULT_COLORS[t],
-    art: (t) => picture(`hex.${t}`),
+    // A painted map replaces the hex art.
+    art: (t) => (painted ? undefined : picture(`hex.${t}`)),
     symbol: (t) => {
       const own = picture(`symbol.${t}`);
       if (own) return { image: own };
-      if (picture(`hex.${t}`) && !theme.symbolsOverArt) return undefined;
+      if ((painted || picture(`hex.${t}`)) && !theme.symbolsOverArt) return undefined;
       return TERRAIN_ICONS[t];
     },
     tunnel: asIcon('symbol.tunnel', TUNNEL_ICON),
@@ -158,5 +171,7 @@ export function parseThemeFile(text: string): Theme {
     pictures,
     colors,
     symbolsOverArt: data.symbolsOverArt === true,
+    paintedMap: data.paintedMap !== false,
+    hexEdges: data.hexEdges !== false,
   };
 }

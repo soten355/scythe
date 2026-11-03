@@ -10,8 +10,11 @@ import '../shared/forms.css';
 import './theme-editor.css';
 import { ask, esc, tell } from '../shared/editor-utils';
 import { SaveStore } from '../saves/store';
-import { exportTheme } from '../saves/files';
-import { corners, points, SIZE, type Point } from '../play/geometry';
+import { exportPicture, exportTheme } from '../saves/files';
+import { BUILT_IN } from '../content/catalog';
+import { mapPictureFrame } from '../play/map-picture';
+import { mapGuide } from '../theme/map-guide';
+import { center, corners, points, SIZE, type Point } from '../play/geometry';
 import type { Icon } from '../play/icons';
 import { boardLook, clearPicture, DEFAULT_COLORS, DEFAULT_THEME, parseThemeFile, setColor, setPicture, SLOTS, TERRAINS, type SlotId, type Theme } from '../theme/theme';
 import { pictureFor, sizeKb } from '../theme/pictures';
@@ -52,9 +55,27 @@ const icon = (i: Icon | undefined, x: number, y: number, size: number, faded = f
   return `<text x="${x}" y="${y}" font-size="${size}" text-anchor="middle" dominant-baseline="central" ${faded ? 'opacity="0.45"' : ''}>${esc(i.text)}</text>`;
 };
 
+/** The map the guide and preview use: the default one. */
+const MAP = BUILT_IN.maps[0]!.board;
+
+/** With a map picture: the whole default map over it, drawn as the board will draw it. */
+function mapPreview(): string {
+  const look = boardLook(theme);
+  const f = mapPictureFrame(MAP);
+  const hexes = Object.values(MAP.hexes)
+    .map((h) => {
+      const pts = points(corners(center(h)));
+      if (look.painted) return look.edges ? `<polygon points="${pts}" fill="none" stroke="rgb(255 246 220 / 0.28)" stroke-width="0.8"/>` : '';
+      return `<polygon points="${pts}" fill="${look.fill(h.terrain)}" stroke="#1e1a16" stroke-width="1"/>${icon(look.symbol(h.terrain), ...center(h), SIZE * 0.65, true)}`;
+    })
+    .join('');
+  return `<div class="preview"><svg viewBox="${f.x} ${f.y} ${f.width} ${f.height}"><image href="${esc(look.background!)}" x="${f.x}" y="${f.y}" width="${f.width}" height="${f.height}" preserveAspectRatio="none"/>${hexes}</svg></div>`;
+}
+
 /** A few hexes, one of each terrain, drawn as the board will draw them, with a tunnel, an encounter and resources on some. */
 function preview(): string {
   const look = boardLook(theme);
+  if (look.background) return mapPreview();
   const w = SIZE * Math.sqrt(3);
   const spots: Point[] = [
     [0, 0], [w, 0], [2 * w, 0], [3 * w, 0],
@@ -84,7 +105,7 @@ function preview(): string {
     return `<polygon points="${points(corners(c))}" fill="${fill}" stroke="#1e1a16" stroke-width="1.5"/>${icon(look.symbol(t), c[0], c[1], SIZE * 0.65, true)}${extra}`;
   }).join('');
   const pad = SIZE + 4;
-  return `<div class="preview" style="${look.background ? `background-image:url(${look.background})` : ''}">
+  return `<div class="preview">
     <svg viewBox="${-pad} ${-pad} ${3 * w + 2 * pad} ${SIZE * 1.5 + 2 * pad}">${defs ? `<defs>${defs}</defs>` : ''}${hexes}</svg>
   </div>`;
 }
@@ -101,6 +122,17 @@ function slotRow(id: SlotId, label: string, hint: string): string {
     <button data-act="choose" data-slot="${id}">${url ? 'Change…' : 'Choose…'}</button>
     ${url ? `<button data-act="clear" data-slot="${id}">Clear</button>` : ''}
   </div>`;
+}
+
+/** The map picture's settings, and the guide to paint it from. */
+function mapSettings(): string {
+  return `<div class="guide">
+      <span>Map guide: the default map's hexes in flat terrain colours, 1600 × 896, to paint the map picture from.</span>
+      <button data-act="guide">Save map guide</button>
+      <button data-act="guide-rivers">… with rivers</button>
+    </div>
+    <label class="check"><input type="checkbox" data-painted ${theme.paintedMap ? 'checked' : ''}> The map picture is the hexes' art (hexes see-through over it, no hex art)</label>
+    <label class="check"><input type="checkbox" data-edges ${theme.hexEdges ? 'checked' : ''} ${theme.paintedMap ? '' : 'disabled'}> Faint hex edges over the map picture</label>`;
 }
 
 function render() {
@@ -120,7 +152,8 @@ function render() {
         ${groups
           .map(
             (g) => `<section><h3>${esc(g)}</h3>
-              ${g === 'Hex symbols' ? `<label class="check"><input type="checkbox" data-over ${theme.symbolsOverArt ? 'checked' : ''}> Show symbols over hex art too</label>` : ''}
+              ${g === 'Map' ? mapSettings() : ''}
+              ${g === 'Hex symbols' ? `<label class="check"><input type="checkbox" data-over ${theme.symbolsOverArt ? 'checked' : ''}> Show symbols over hex art and the map picture too</label>` : ''}
               ${SLOTS.filter((s) => s.group === g).map((s) => slotRow(s.id, s.label, s.hint)).join('')}
             </section>`,
           )
@@ -160,6 +193,12 @@ root.addEventListener('click', async (e) => {
     case 'open':
       root.querySelector<HTMLInputElement>('[data-themefile]')!.click();
       break;
+    case 'guide':
+    case 'guide-rivers': {
+      const rivers = btn.dataset.act === 'guide-rivers';
+      await exportPicture(rivers ? 'scythe-map-guide-rivers.png' : 'scythe-map-guide.png', await mapGuide(MAP, rivers));
+      break;
+    }
     case 'reset':
       if (await ask('Go back to the usual look? Every picture and colour in this theme is removed from the device (save it to a file first to keep it).')) {
         await keep(DEFAULT_THEME, 'Back to the usual look.');
@@ -195,6 +234,10 @@ root.addEventListener('change', async (e) => {
     }
   } else if (el.dataset.color) {
     await keep(setColor(theme, el.dataset.color as Terrain, el.value));
+  } else if (el.dataset.painted !== undefined) {
+    await keep({ ...theme, paintedMap: el.checked });
+  } else if (el.dataset.edges !== undefined) {
+    await keep({ ...theme, hexEdges: el.checked });
   } else if (el.dataset.over !== undefined) {
     await keep({ ...theme, symbolsOverArt: el.checked });
   } else if (el.dataset.name !== undefined) {

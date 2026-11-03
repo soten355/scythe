@@ -87,8 +87,23 @@
   font-size: 0.85rem;
   opacity: 0.75;
 }
-.check {
+label.check {
   display: flex;
+  flex-direction: row;
+  justify-content: flex-start;
   gap: 6px;
   align-items: center;
+  text-align: left;
+}
+
+.guide {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+}
+.guide span {
+  flex: 1 1 100%;
+  opacity: 0.75;
 }

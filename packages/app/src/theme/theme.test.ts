@@ -56,6 +56,8 @@ describe('the board theme', () => {
     theme = setPicture(theme, 'token.oil', PNG);
     theme = setPicture(theme, 'background', JPEG);
     theme = setColor(theme, 'farm', '#aabbcc');
+    // The map picture behind hexes drawn as usual (not as the hexes' art: see below).
+    theme = { ...theme, paintedMap: false };
     const look = boardLook(theme);
     expect(look.art('forest')).toBe(JPEG);
     expect(look.symbol('forest')).toBeUndefined();
@@ -67,8 +69,28 @@ describe('the board theme', () => {
     expect(boardLook(clearPicture(theme, 'hex.forest')).art('forest')).toBeUndefined();
   });
 
+  it('with a map picture, draws see-through hexes over it (the picture is the hexes), with faint edges if wanted', () => {
+    let theme = setPicture(setPicture(DEFAULT_THEME, 'background', JPEG), 'hex.forest', JPEG);
+    let look = boardLook(theme);
+    expect(look.painted).toBe(true);
+    expect(look.edges).toBe(true);
+    // The picture replaces the hex art and, unless asked, the symbols.
+    expect(look.art('forest')).toBeUndefined();
+    expect(look.symbol('farm')).toBeUndefined();
+    expect(boardLook({ ...theme, symbolsOverArt: true }).symbol('farm')).toEqual(TERRAIN_ICONS.farm);
+    expect(boardLook({ ...theme, hexEdges: false }).edges).toBe(false);
+    // Turned off: the picture sits behind hexes drawn as usual.
+    theme = { ...theme, paintedMap: false };
+    look = boardLook(theme);
+    expect(look.painted).toBe(false);
+    expect(look.art('forest')).toBe(JPEG);
+    expect(look.symbol('farm')).toEqual(TERRAIN_ICONS.farm);
+    // No map picture: hexes as usual whatever the setting.
+    expect(boardLook(DEFAULT_THEME).painted).toBe(false);
+  });
+
   it('goes to a file and back', () => {
-    const theme = { ...setColor(setPicture(DEFAULT_THEME, 'hex.lake', JPEG), 'lake', '#123456'), name: 'Misty', symbolsOverArt: true };
+    const theme = { ...setColor(setPicture(DEFAULT_THEME, 'hex.lake', JPEG), 'lake', '#123456'), name: 'Misty', symbolsOverArt: true, paintedMap: false, hexEdges: false };
     expect(parseThemeFile(themeFileText(theme))).toEqual(theme);
   });
 
@@ -86,5 +108,7 @@ describe('the board theme', () => {
     expect(theme.pictures).toEqual({ 'hex.forest': JPEG });
     expect(theme.colors).toEqual({ farm: '#abc' });
     expect(theme.symbolsOverArt).toBe(false);
+    expect(theme.paintedMap).toBe(true);
+    expect(theme.hexEdges).toBe(true);
   });
 });

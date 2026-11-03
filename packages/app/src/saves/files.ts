@@ -4,12 +4,16 @@ import { contentFileName, contentFileText, type Library } from '../content/libra
 import { fileName, parseSaveFile, saveFileText, type SavedGame } from './save';
 import { themeFileName, themeFileText, type Theme } from '../theme/theme';
 
+async function shareFile(name: string, text: string): Promise<void> {
+  await share(new File([text], name, { type: 'application/json' }));
+}
+
 /**
  * Hands a file to the share sheet where there is one (iPhone: Save to Files,
  * AirDrop), otherwise downloads it.
  */
-async function shareFile(name: string, text: string): Promise<void> {
-  const file = new File([text], name, { type: 'application/json' });
+async function share(file: File): Promise<void> {
+  const name = file.name;
   if (navigator.canShare?.({ files: [file] })) {
     try {
       await navigator.share({ files: [file] });
@@ -30,6 +34,9 @@ export const exportSave = (save: SavedGame) => shareFile(fileName(save), saveFil
 export const exportContent = (content: Library) => shareFile(contentFileName(content), contentFileText(content));
 
 export const exportTheme = (theme: Theme) => shareFile(themeFileName(theme), themeFileText(theme));
+
+/** A picture made in the app (the map guide), to the share sheet or Downloads. */
+export const exportPicture = (name: string, picture: Blob) => share(new File([picture], name, { type: picture.type }));
 
 /** Reads and checks a chosen file. Throws, in plain words, if it's not a good save. */
 export async function readSaveFile(file: File): Promise<SavedGame> {

@@ -18,6 +18,7 @@
   import { between, fitView, panBy, worldOf, zoomAt, type Limits, type View } from './camera';
   import { boardArea, center, corners, points, sharedEdge, SIZE, spotsArea, type Point } from './geometry';
   import HexIcon from './HexIcon.svelte';
+  import { MAP_PICTURE, mapPictureFrame } from './map-picture';
   import { LABEL_Y, MECH, MEEPLE } from './shapes';
   import { boardLook, DEFAULT_THEME, TERRAINS, type BoardLook } from '../theme/theme';
   import { isLight } from './ink';
@@ -69,6 +70,8 @@
   const PIECES_PER_ROW = 4;
 
   const board = $derived(game.setup.board);
+  /** Where the map picture goes: the map guide's frame, so it lines up with the hexes (and zooms with them). */
+  const pictureFrame = $derived(look.background ? mapPictureFrame(board) : null);
   const hexes = $derived(Object.values(board.hexes));
   // --- Camera ---
   const HEX_W = SIZE * Math.sqrt(3);
@@ -477,7 +480,7 @@
 
 <svelte:window onpointermove={move} onpointerup={up} onpointercancel={up} />
 
-<div class="map" class:themed={!!look.background} style:background-image={look.background ? `url(${look.background})` : undefined} bind:clientWidth={W} bind:clientHeight={H}>
+<div class="map" bind:clientWidth={W} bind:clientHeight={H}>
 <svg
   bind:this={svg}
   viewBox={box}
@@ -486,6 +489,25 @@
   onpointerdown={down}
   onclickcapture={clickCapture}
 >
+  {#if pictureFrame && look.background}
+    {@const f = pictureFrame}
+    <!-- Its edges fade into the board's background (inside the guide's margin, so never over a hex). -->
+    {@const fx = (f.width * MAP_PICTURE.margin * 0.8) / MAP_PICTURE.width}
+    {@const fy = (f.height * MAP_PICTURE.margin * 0.8) / MAP_PICTURE.height}
+    <defs>
+      <linearGradient id="fade-down" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1e1a16" /><stop offset="1" stop-color="#1e1a16" stop-opacity="0" /></linearGradient>
+      <linearGradient id="fade-up" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#1e1a16" /><stop offset="1" stop-color="#1e1a16" stop-opacity="0" /></linearGradient>
+      <linearGradient id="fade-right" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#1e1a16" /><stop offset="1" stop-color="#1e1a16" stop-opacity="0" /></linearGradient>
+      <linearGradient id="fade-left" x1="1" y1="0" x2="0" y2="0"><stop offset="0" stop-color="#1e1a16" /><stop offset="1" stop-color="#1e1a16" stop-opacity="0" /></linearGradient>
+    </defs>
+    <g class="map-picture">
+      <image href={look.background} x={f.x} y={f.y} width={f.width} height={f.height} preserveAspectRatio="none" />
+      <rect x={f.x} y={f.y} width={f.width} height={fy} fill="url(#fade-down)" />
+      <rect x={f.x} y={f.y + f.height - fy} width={f.width} height={fy} fill="url(#fade-up)" />
+      <rect x={f.x} y={f.y} width={fx} height={f.height} fill="url(#fade-right)" />
+      <rect x={f.x + f.width - fx} y={f.y} width={fx} height={f.height} fill="url(#fade-left)" />
+    </g>
+  {/if}
   {#if arts.length}
     <defs>
       {#each arts as a (a.terrain)}
@@ -502,7 +524,10 @@
     <polygon
       points={points(corners(c))}
       fill={look.art(h.terrain) ? `url(#art-${h.terrain})` : look.fill(h.terrain)}
+      fill-opacity={look.painted ? 0 : undefined}
       class="hex"
+      class:painted={look.painted}
+      class:edges={look.painted && look.edges}
       class:tappable
       onclick={() => tappable && onTap(h.id)}
       role="button"
@@ -683,9 +708,8 @@
     height: 100%;
     overflow: hidden;
   }
-  .map.themed {
-    background-size: cover;
-    background-position: center;
+  .map-picture {
+    pointer-events: none;
   }
   .token-art {
     pointer-events: none;
@@ -722,6 +746,14 @@
   .hex {
     stroke: #2a241e;
     stroke-width: 1;
+  }
+  /* Over the map picture: see-through (still tappable), with faint edges or none. */
+  .hex.painted {
+    stroke: none;
+  }
+  .hex.painted.edges {
+    stroke: rgb(255 246 220 / 0.28);
+    stroke-width: 0.8;
   }
   .hex,
   .home {
