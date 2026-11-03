@@ -331,6 +331,8 @@ Each phase ends in something playable on the phone. A phase is done when its che
   - [ ] Units and crests (characters, mechs, workers, structures, faction crests)
   - [ ] Fight scene (fighters, backdrops)
   - [ ] Look and feel (colours, fonts, panels, menus)
+- [x] A dossier for each faction (owner's request, Nov 3, 2026)
+  - Done: tapping a faction in the top bar opens its own screen (`play/FactionDossier.svelte`, facts gathered in `play/dossier.ts`): its character and a mech standing in the scenery of the character's hex, its crest, mat and who plays it (a bot's leaning too); its stars and what it would score if the game ended now (and its place); coins, combat cards, power and popularity (with the tier and its rates); progress toward every star; what it has on the map; its faction and mech abilities (locked until that mech is out); recruits (ongoing and one-time bonuses); structures and upgrades; its Factory card and objectives. Tabs switch factions. Combat card values and objectives in hand show only to their owner (never a bot's, and in pass-and-play only the person holding the device); completed objectives show to all. The pass screen closes it.
 - [ ] Pictures on encounter cards (a picture, a story line, both or neither), chosen in the encounter card editor (owner's request, Nov 2, 2026)
   - Plan: pictures are shrunk to about 100 KB and stored once on the device; cards hold a short reference, so saves stay small. Deck files carry the pictures; a game opened without them shows the story instead. A built-in deck's pictures ship with the app. Pictures must be original (drawn, photographed or generated), never scans of the printed cards.
 - [ ] Optional 3D board

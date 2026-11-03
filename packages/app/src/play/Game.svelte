@@ -12,6 +12,7 @@
   import PlayerBar from './PlayerBar.svelte';
   import InlineIcon from './InlineIcon.svelte';
   import FactionEmblem from './FactionEmblem.svelte';
+  import FactionDossier from './FactionDossier.svelte';
   import FightScreen from './FightScreen.svelte';
   import GameOver from './GameOver.svelte';
   import GameOverMoment from './GameOverMoment.svelte';
@@ -30,7 +31,7 @@
   import { restore, updateSave, type SavedGame } from '../saves/save';
   import { exportSave } from '../saves/files';
   import { startBots } from '../bots/client';
-  import type { RemoteSeat } from '@scythe/bots';
+  import { personalityFor, type RemoteSeat } from '@scythe/bots';
   import { botName, isBot, needsPass, people } from './seats';
   import { botTurnsSince, paceOf } from './narrate';
   import type { BoardLook } from '../theme/theme';
@@ -143,6 +144,8 @@
   let revealed: CombatResult | null = $state(null);
   /** The same fight, played out on the fight screen first (before any pass screen or the summary). */
   let battle: Battle | null = $state(null);
+  /** Whose dossier is open (tapped in the top bar), if any. */
+  let dossier: number | null = $state(null);
   /** An "are you sure?" question shown in the game, and what to do on Yes. */
   let asking: { message: string; yes: () => void } | null = $state(null);
   const ask = (message: string, yes: () => void) => (asking = { message, yes });
@@ -479,7 +482,7 @@
 <div class="game">
   <header>
     <button class="menu" aria-label="Menu" aria-expanded={menuOpen} onclick={() => (menuOpen = !menuOpen)}>☰</button>
-    <PlayerBar game={shown} />
+    <PlayerBar game={shown} onOpen={(seat) => (dossier = seat)} />
   </header>
 
   <main>
@@ -562,6 +565,18 @@
 
   {#if showScores}
     <GameOver {game} {canUndo} onUndo={undo} onBoard={() => (viewingBoard = true)} {onNewGame} {onMenu} />
+  {/if}
+
+  {#if dossier !== null && !handoff}
+    <FactionDossier
+      game={shown}
+      seat={dossier}
+      secret={(seat) => isBot(bots, seat) || (people(bots, seats).length > 1 && seat !== viewer)}
+      playedBy={(seat) => (isBot(bots, seat) ? botName(bots![seat]!) : people(bots, seats).length > 1 ? 'A person' : 'You')}
+      leaning={(seat) => (isBot(bots, seat) ? personalityFor(game.setup.players[seat]!.faction.id).summary : undefined)}
+      onSwitch={(seat) => (dossier = seat)}
+      onClose={() => (dossier = null)}
+    />
   {/if}
 
   {#if menuOpen}

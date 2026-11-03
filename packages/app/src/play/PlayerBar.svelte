@@ -3,12 +3,13 @@
   // mechs, workers, territories controlled (the Factory counts three) and the
   // resources on hexes they control. Everyone else shrinks to
   // their name (just its first letter with four or more players, so all fit on
-  // a phone); everyone's stars always show.
+  // a phone); everyone's stars always show. Tapping a player opens their
+  // dossier (FactionDossier).
   import { controlledHexes, RESOURCES, territories, type GameState } from '@scythe/engine';
   import { cubicInOut } from 'svelte/easing';
   import { slide } from 'svelte/transition';
 
-  let { game }: { game: GameState } = $props();
+  let { game, onOpen }: { game: GameState; onOpen?: (seat: number) => void } = $props();
 
   const STAR_NAMES: Record<string, string> = {
     upgrades: 'all upgrades', mechs: 'all mechs', structures: 'all structures', recruits: 'all recruits',
@@ -30,7 +31,7 @@
 <div class="bar">
   {#each rows as { p, seat, faction, totals } (seat)}
     {@const current = seat === game.currentPlayer}
-    <div class="player" class:current style:--c={faction.color} data-player={seat}>
+    <button class="player" class:current style:--c={faction.color} data-player={seat} onclick={() => onOpen?.(seat)} aria-label="{faction.name}: see how they're doing">
       <span class="name" title={faction.name}>{compact && !current ? faction.name[0] : faction.name}</span>
       <span class="stars" data-stars={seat} title={p.stars.length ? `Stars: ${p.stars.map((k) => STAR_NAMES[k]).join(', ')}` : 'No stars yet'}>⭐ {p.stars.length}</span>
       {#if current}
@@ -47,7 +48,7 @@
           </span>
         </span>
       {/if}
-    </div>
+    </button>
   {/each}
 </div>
 
@@ -68,6 +69,12 @@
     border: 2px solid transparent;
     background: #2a241e;
     white-space: nowrap;
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+  }
+  .player:active {
+    filter: brightness(1.25);
   }
   .player.current {
     border-color: var(--c);
