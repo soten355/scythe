@@ -25,23 +25,36 @@ const TERRAIN_NAMES: Record<Terrain, string> = {
   farm: 'Farm', forest: 'Forest', mountain: 'Mountain', tundra: 'Tundra', village: 'Village', lake: 'Lake', factory: 'Factory',
 };
 
+/** The best size for a slot's pictures, in pixels (multiples of 16): hex art matches the hex's shape (about 7 wide to 8 tall). */
+const BEST = {
+  background: { width: 1600, height: 896 },
+  hex: { width: 448, height: 512 },
+  small: { width: 256, height: 256 },
+} as const;
+const sizeText = (b: { width: number; height: number }) => `Best at ${b.width} × ${b.height} pixels`;
+
 /** Every slot, in the order the editor lists them. */
 export const SLOTS: Slot[] = [
-  { id: 'background', group: 'Map', label: 'Map background', hint: 'Behind the hexes. Wide, landscape; it is cropped to fit.' },
-  ...TERRAINS.map((t): Slot => ({ id: `hex.${t}`, group: 'Hex art', label: TERRAIN_NAMES[t], hint: 'Fills each hex, cropped to the hex shape. Square works best.' })),
-  ...TERRAINS.map((t): Slot => ({ id: `symbol.${t}`, group: 'Hex symbols', label: TERRAIN_NAMES[t], hint: 'In the middle of the hex. Square, with a see-through background.' })),
-  { id: 'symbol.tunnel', group: 'Markers', label: 'Tunnel', hint: 'At the top of tunnel hexes. Square, see-through background.' },
-  { id: 'symbol.encounter', group: 'Markers', label: 'Encounter', hint: 'At the bottom of hexes with an encounter. Square, see-through background.' },
-  ...TOKENS.map((r): Slot => ({ id: `token.${r}`, group: 'Resource tokens', label: r[0]!.toUpperCase() + r.slice(1), hint: 'A resource on the map. Square, see-through background.' })),
+  { id: 'background', group: 'Map', label: 'Map background', hint: `Behind the hexes: a wide landscape, cropped to fit. ${sizeText(BEST.background)}.` },
+  ...TERRAINS.map((t): Slot => ({ id: `hex.${t}`, group: 'Hex art', label: TERRAIN_NAMES[t], hint: `Fills each hex, cropped to the hex shape. ${sizeText(BEST.hex)}.` })),
+  ...TERRAINS.map((t): Slot => ({ id: `symbol.${t}`, group: 'Hex symbols', label: TERRAIN_NAMES[t], hint: `In the middle of the hex, on a see-through background. ${sizeText(BEST.small)}.` })),
+  { id: 'symbol.tunnel', group: 'Markers', label: 'Tunnel', hint: `At the top of tunnel hexes, on a see-through background. ${sizeText(BEST.small)}.` },
+  { id: 'symbol.encounter', group: 'Markers', label: 'Encounter', hint: `At the bottom of hexes with an encounter, on a see-through background. ${sizeText(BEST.small)}.` },
+  ...TOKENS.map((r): Slot => ({ id: `token.${r}`, group: 'Resource tokens', label: r[0]!.toUpperCase() + r.slice(1), hint: `A resource on the map, on a see-through background. ${sizeText(BEST.small)}.` })),
 ];
 
 const SLOT_IDS = new Set<string>(SLOTS.map((s) => s.id));
 
-/** How big a slot's picture is kept (longest side, in pixels) and in what format: photos as JPEG, see-through pictures as PNG. */
-export function pictureSpec(slot: SlotId): { max: number; type: 'image/jpeg' | 'image/png' } {
-  if (slot === 'background') return { max: 1600, type: 'image/jpeg' };
-  if (slot.startsWith('hex.')) return { max: 512, type: 'image/jpeg' };
-  return { max: 256, type: 'image/png' };
+/**
+ * A slot's best picture size (`best`), how big its pictures are kept (longest
+ * side, `max`, the same: nothing is lost at the best size) and in what
+ * format: photos as JPEG, see-through pictures as PNG.
+ */
+export function pictureSpec(slot: SlotId): { best: { width: number; height: number }; max: number; type: 'image/jpeg' | 'image/png' } {
+  const spec = (best: { width: number; height: number }, type: 'image/jpeg' | 'image/png') => ({ best, max: Math.max(best.width, best.height), type });
+  if (slot === 'background') return spec(BEST.background, 'image/jpeg');
+  if (slot.startsWith('hex.')) return spec(BEST.hex, 'image/jpeg');
+  return spec(BEST.small, 'image/png');
 }
 
 export interface Theme {

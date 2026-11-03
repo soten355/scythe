@@ -18,11 +18,25 @@ describe('the board theme', () => {
     expect(SLOTS.every((s) => s.label && s.group)).toBe(true);
   });
 
+  it('tells the best size for each slot, in multiples of 16 pixels, fitting the hex shape for hex art', () => {
+    expect(pictureSpec('background').best).toEqual({ width: 1600, height: 896 });
+    expect(pictureSpec('hex.forest').best).toEqual({ width: 448, height: 512 });
+    expect(pictureSpec('symbol.tunnel').best).toEqual({ width: 256, height: 256 });
+    for (const slot of SLOTS) {
+      const { best, max } = pictureSpec(slot.id);
+      expect(best.width % 16).toBe(0);
+      expect(best.height % 16).toBe(0);
+      // Kept at that size: nothing is lost shrinking it.
+      expect(Math.max(best.width, best.height)).toBe(max);
+      expect(slot.hint).toContain(`${best.width} × ${best.height} pixels`);
+    }
+  });
+
   it('shrinks pictures to suit each slot: big backgrounds, smaller hexes, small symbols (kept see-through)', () => {
-    expect(pictureSpec('background')).toEqual({ max: 1600, type: 'image/jpeg' });
-    expect(pictureSpec('hex.forest')).toEqual({ max: 512, type: 'image/jpeg' });
-    expect(pictureSpec('symbol.forest')).toEqual({ max: 256, type: 'image/png' });
-    expect(pictureSpec('token.oil')).toEqual({ max: 256, type: 'image/png' });
+    expect(pictureSpec('background')).toMatchObject({ max: 1600, type: 'image/jpeg' });
+    expect(pictureSpec('hex.forest')).toMatchObject({ max: 512, type: 'image/jpeg' });
+    expect(pictureSpec('symbol.forest')).toMatchObject({ max: 256, type: 'image/png' });
+    expect(pictureSpec('token.oil')).toMatchObject({ max: 256, type: 'image/png' });
   });
 
   it('draws the usual look with no theme', () => {

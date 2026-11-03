@@ -129,7 +129,7 @@ function render() {
       <div class="side">
         <h3>Preview</h3>
         ${preview()}
-        <p class="note">Pictures are shrunk as they come in (hex art to 512 pixels, symbols and tokens to 256, the background to 1600) so the board stays quick on the phone. This theme: about ${total} KB.</p>
+        <p class="note">Best sizes, in pixels: hex art 448 × 512 (the hex's shape), the map background 1600 × 896, symbols, markers and tokens 256 × 256. Bigger pictures are shrunk to these as they come in, so the board stays quick on the phone. This theme: about ${total} KB.</p>
         <p class="note">Use your own pictures (drawn, photographed or generated), not scans of the published game.</p>
       </div>
     </div>
