@@ -5,6 +5,8 @@ import { maxCombatCards, type CombatResult, type GameState, type HexId } from '@
 
 export interface FightSide {
   seat: number;
+  /** The faction's ID (for its own pictures). */
+  factionId: string;
   name: string;
   color: string;
   character: boolean;
@@ -34,6 +36,7 @@ export function fightSides(state: GameState): FightView | null {
     const { faction } = state.setup.players[s.seat]!;
     return {
       seat: s.seat,
+      factionId: faction.id,
       name: faction.name,
       color: faction.color,
       character: p.character === hex,
@@ -81,7 +84,7 @@ export function battleOf(states: GameState[], result: CombatResult): Battle {
     };
     const found = states.map(units).find((u) => u.character || u.mechs) ?? { character: false, mechs: 1, workers: 0 };
     const { faction } = states[0]!.setup.players[shown.seat]!;
-    return { seat: shown.seat, name: faction.name, color: faction.color, ...found, power: shown.power, cards: shown.cards, total: shown.power + shown.cards.reduce((a, b) => a + b, 0) };
+    return { seat: shown.seat, factionId: faction.id, name: faction.name, color: faction.color, ...found, power: shown.power, cards: shown.cards, total: shown.power + shown.cards.reduce((a, b) => a + b, 0) };
   };
   return {
     hex: result.hex,

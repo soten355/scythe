@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { boardLook, clearPicture, DEFAULT_THEME, parseThemeFile, pictureSpec, setColor, setPicture, SLOTS, themeFileText, type Theme } from './theme';
+import { boardLook, clearPicture, copyFactionPictures, DEFAULT_THEME, FACTION_PARTS, factionSlot, parseThemeFile, pictureSpec, setColor, setPicture, SLOTS, themeFileText, type Theme } from './theme';
 import { ENCOUNTER_ICON, TERRAIN_ICONS, TUNNEL_ICON } from '../play/icons';
 
 const PNG = 'data:image/png;base64,iVBORw0KGgo=';
@@ -110,5 +110,56 @@ describe('the board theme', () => {
     expect(theme.symbolsOverArt).toBe(false);
     expect(theme.paintedMap).toBe(true);
     expect(theme.hexEdges).toBe(true);
+  });
+});
+
+describe("each faction's own pictures (set in the faction editor)", () => {
+  it('has a crest, the character, a mech, a worker and each structure, at sizes in multiples of 16', () => {
+    expect(FACTION_PARTS.map((p) => p.part)).toEqual(['crest', 'character', 'mech', 'worker', 'mine', 'mill', 'armory', 'monument']);
+    expect(factionSlot('nordic', 'mech')).toBe('faction.nordic.mech');
+    expect(pictureSpec('faction.nordic.crest')).toMatchObject({ best: { width: 256, height: 256 }, type: 'image/png' });
+    // Figures are taller than wide, and big enough for the fight screen.
+    expect(pictureSpec('faction.nordic.character')).toMatchObject({ best: { width: 384, height: 512 }, max: 512, type: 'image/png' });
+    expect(pictureSpec('faction.nordic.mine').best).toEqual({ width: 256, height: 256 });
+    for (const p of FACTION_PARTS) {
+      const { best } = pictureSpec(factionSlot('x', p.part));
+      expect(best.width % 16 + (best.height % 16)).toBe(0);
+      expect(p.hint).toContain(`${best.width} × ${best.height} pixels`);
+    }
+    // Not listed in the theme editor: they belong to the faction editor.
+    expect(SLOTS.some((s) => s.id.startsWith('faction.'))).toBe(false);
+  });
+
+  it('are drawn for that faction only, the usual pieces for the rest', () => {
+    const theme = setPicture(DEFAULT_THEME, factionSlot('rusviet', 'mech'), PNG);
+    const look = boardLook(theme);
+    expect(look.piece('rusviet', 'mech')).toBe(PNG);
+    expect(look.piece('rusviet', 'worker')).toBeUndefined();
+    expect(look.piece('nordic', 'mech')).toBeUndefined();
+  });
+
+  it('move with a faction whose ID changes, or are copied for a duplicate', () => {
+    let theme = setPicture(setPicture(DEFAULT_THEME, factionSlot('old', 'crest'), PNG), factionSlot('old', 'mine'), JPEG);
+    theme = setPicture(theme, factionSlot('other', 'crest'), JPEG);
+    const copied = copyFactionPictures(theme, 'old', 'copy');
+    expect(copied.pictures[factionSlot('copy', 'crest')]).toBe(PNG);
+    expect(copied.pictures[factionSlot('old', 'crest')]).toBe(PNG);
+    const moved = copyFactionPictures(theme, 'old', 'new', { move: true });
+    expect(moved.pictures[factionSlot('new', 'mine')]).toBe(JPEG);
+    expect(moved.pictures[factionSlot('old', 'mine')]).toBeUndefined();
+    expect(moved.pictures[factionSlot('other', 'crest')]).toBe(JPEG);
+    // A faction with an ID that contains another's ("old" in "old-2") keeps its own.
+    const near = setPicture(theme, factionSlot('old-2', 'crest'), JPEG);
+    expect(copyFactionPictures(near, 'old', 'new', { move: true }).pictures[factionSlot('old-2', 'crest')]).toBe(JPEG);
+  });
+
+  it('travel in the theme file, and nothing else under a faction is kept', () => {
+    const theme = setPicture(DEFAULT_THEME, factionSlot('my.faction', 'character'), PNG);
+    expect(parseThemeFile(themeFileText(theme))).toEqual(theme);
+    const odd = JSON.stringify({
+      format: 'scythe-theme',
+      pictures: { 'faction.nordic.crest': PNG, 'faction.nordic.hat': PNG, 'faction..crest': PNG, 'faction.nordic.mech': 'https://example.com/x.png' },
+    });
+    expect(parseThemeFile(odd).pictures).toEqual({ 'faction.nordic.crest': PNG });
   });
 });

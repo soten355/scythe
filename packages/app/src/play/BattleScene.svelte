@@ -55,7 +55,7 @@
       {#each group as kind, i (i)}
         <div class="member" class:back={i > 0} style:--i={i} style:z-index={-i}>
           <div class="figure" class:down={fallen}>
-            <FighterArt {kind} color={s.color} facing={side === 'left' ? 'right' : 'left'} broken={fallen} />
+            <FighterArt {kind} color={s.color} factionId={s.factionId} facing={side === 'left' ? 'right' : 'left'} broken={fallen} />
           </div>
           {#if fallen}
             <div class="wreck-smoke" aria-hidden="true"><i></i><i></i><i></i></div>

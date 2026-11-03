@@ -70,7 +70,7 @@
         <div class="figures" in:fly={{ x: side === 'left' ? -220 : 220, duration: 700, delay: 150 }}>
           {#each figures(s) as kind, i (i)}
             <div class="figure" class:back={i > 0} style:--i={i}>
-              <FighterArt {kind} color={s.color} facing={side === 'left' ? 'right' : 'left'} />
+              <FighterArt {kind} color={s.color} factionId={s.factionId} facing={side === 'left' ? 'right' : 'left'} />
             </div>
           {/each}
         </div>

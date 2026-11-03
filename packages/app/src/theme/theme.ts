@@ -1,17 +1,22 @@
 // The game's look, set in the theme editor: pictures (made by the owner, e.g.
 // in ComfyUI) for named slots, and colours. For now, the board: the map
 // background, a picture filling each terrain's hexes, each terrain's symbol,
-// the tunnel and encounter markers, and the resource tokens. Anything not
+// the tunnel and encounter markers, and the resource tokens. Each faction's
+// own pictures (crest, character, mech, worker, structures) are kept here
+// too, under the faction's ID, but set in the faction editor. Anything not
 // set keeps the usual look. Pictures are kept as data URLs, already shrunk
 // (see pictures.ts), so a theme is plain data: kept on the device and saved
 // to or opened from a .scythe-theme.json file.
-import type { Resource, Terrain } from '@scythe/engine';
+import type { Resource, Structure, Terrain } from '@scythe/engine';
 import { ENCOUNTER_ICON, TERRAIN_ICONS, TUNNEL_ICON, type Icon } from '../play/icons';
 
 export const TERRAINS: Terrain[] = ['farm', 'forest', 'mountain', 'tundra', 'village', 'lake', 'factory'];
 const TOKENS: Resource[] = ['oil', 'metal', 'wood', 'food'];
 
-export type SlotId = 'background' | `hex.${Terrain}` | `symbol.${Terrain | 'tunnel' | 'encounter'}` | `token.${Resource}`;
+/** A faction's own pictures: its crest, its units and its structures. */
+export type FactionPart = 'crest' | 'character' | 'mech' | 'worker' | Structure;
+
+export type SlotId = 'background' | `hex.${Terrain}` | `symbol.${Terrain | 'tunnel' | 'encounter'}` | `token.${Resource}` | `faction.${string}.${FactionPart}`;
 
 export interface Slot {
   id: SlotId;
@@ -30,8 +35,34 @@ const BEST = {
   background: { width: 1600, height: 896 },
   hex: { width: 448, height: 512 },
   small: { width: 256, height: 256 },
+  /** A standing figure: the character or a mech, on the map and big on the fight screen. */
+  figure: { width: 384, height: 512 },
 } as const;
 const sizeText = (b: { width: number; height: number }) => `Best at ${b.width} × ${b.height} pixels`;
+
+const ON_MAP = `On the map, on a see-through background. ${sizeText(BEST.small)}.`;
+const FIGURE = `Standing, facing right, on a see-through background: small on the map, big in fights and on the faction's screen. ${sizeText(BEST.figure)}.`;
+
+/** A faction's picture slots, in the order the faction editor lists them. */
+export const FACTION_PARTS: { part: FactionPart; label: string; hint: string }[] = [
+  { part: 'crest', label: 'Crest', hint: `The faction's emblem: on the side panel, the new game screen, its own screen and the final scores. On a see-through background. ${sizeText(BEST.small)}.` },
+  { part: 'character', label: 'Character', hint: FIGURE },
+  { part: 'mech', label: 'Mech', hint: FIGURE },
+  { part: 'worker', label: 'Worker', hint: ON_MAP },
+  { part: 'mine', label: 'Mine', hint: ON_MAP },
+  { part: 'mill', label: 'Mill', hint: ON_MAP },
+  { part: 'armory', label: 'Armory', hint: ON_MAP },
+  { part: 'monument', label: 'Monument', hint: ON_MAP },
+];
+const FACTION_PART_NAMES = new Set<string>(FACTION_PARTS.map((p) => p.part));
+
+export const factionSlot = (factionId: string, part: FactionPart): SlotId => `faction.${factionId}.${part}`;
+
+/** "faction.<id>.<part>" → its faction and part (the ID may itself hold dots), or null. */
+function readFactionSlot(slot: string): { id: string; part: FactionPart } | null {
+  const m = /^faction\.(.+)\.([a-z]+)$/.exec(slot);
+  return m && FACTION_PART_NAMES.has(m[2]!) ? { id: m[1]!, part: m[2] as FactionPart } : null;
+}
 
 /** Every slot, in the order the editor lists them. */
 export const SLOTS: Slot[] = [
@@ -55,6 +86,8 @@ export function pictureSpec(slot: SlotId): { best: { width: number; height: numb
   const spec = (best: { width: number; height: number }, type: 'image/jpeg' | 'image/png') => ({ best, max: Math.max(best.width, best.height), type });
   if (slot === 'background') return spec(BEST.background, 'image/jpeg');
   if (slot.startsWith('hex.')) return spec(BEST.hex, 'image/png');
+  const part = readFactionSlot(slot)?.part;
+  if (part === 'character' || part === 'mech') return spec(BEST.figure, 'image/png');
   return spec(BEST.small, 'image/png');
 }
 
@@ -92,6 +125,19 @@ export function clearPicture(theme: Theme, slot: SlotId): Theme {
   return { ...theme, pictures };
 }
 
+/** A faction's pictures copied to another ID (a duplicate), or moved there (its ID changed). */
+export function copyFactionPictures(theme: Theme, from: string, to: string, { move = false } = {}): Theme {
+  if (from === to) return theme;
+  const pictures = { ...theme.pictures };
+  for (const { part } of FACTION_PARTS) {
+    const url = pictures[factionSlot(from, part)];
+    if (!url) continue;
+    pictures[factionSlot(to, part)] = url;
+    if (move) delete pictures[factionSlot(from, part)];
+  }
+  return { ...theme, pictures };
+}
+
 export const setColor = (theme: Theme, terrain: Terrain, color: string): Theme => ({ ...theme, colors: { ...theme.colors, [terrain]: color } });
 
 /** What the board draws, with the theme's pictures and colours in place of the usual ones. */
@@ -108,6 +154,8 @@ export interface BoardLook {
   tunnel: Icon;
   encounter: Icon;
   token: (resource: Resource) => string | undefined;
+  /** A faction's own picture for one of its pieces (by faction ID), if it has one. */
+  piece: (factionId: string, part: FactionPart) => string | undefined;
 }
 
 export function boardLook(theme: Theme): BoardLook {
@@ -133,6 +181,7 @@ export function boardLook(theme: Theme): BoardLook {
     tunnel: asIcon('symbol.tunnel', TUNNEL_ICON),
     encounter: asIcon('symbol.encounter', ENCOUNTER_ICON),
     token: (r) => picture(`token.${r}`),
+    piece: (id, part) => picture(factionSlot(id, part)),
   };
 }
 
@@ -161,7 +210,7 @@ export function parseThemeFile(text: string): Theme {
   if (typeof data.formatVersion === 'number' && data.formatVersion > FORMAT_VERSION) throw new Error('This theme was made by a newer version of the app. Update the app to open it.');
   const pictures: Theme['pictures'] = {};
   for (const [slot, url] of Object.entries((data.pictures as Record<string, unknown>) ?? {})) {
-    if (SLOT_IDS.has(slot) && typeof url === 'string' && PICTURE.test(url)) pictures[slot as SlotId] = url;
+    if ((SLOT_IDS.has(slot) || readFactionSlot(slot)) && typeof url === 'string' && PICTURE.test(url)) pictures[slot as SlotId] = url;
   }
   const colors: Theme['colors'] = {};
   for (const [terrain, color] of Object.entries((data.colors as Record<string, unknown>) ?? {})) {

@@ -77,8 +77,8 @@
         </div>
       </div>
       <div class="figures">
-        <div class="mech"><FighterArt kind="mech" color={d.color} facing="right" /></div>
-        <div class="character"><FighterArt kind="character" color={d.color} facing="right" /></div>
+        <div class="mech"><FighterArt kind="mech" color={d.color} factionId={faction.id} facing="right" /></div>
+        <div class="character"><FighterArt kind="character" color={d.color} factionId={faction.id} facing="right" /></div>
       </div>
     </section>
 

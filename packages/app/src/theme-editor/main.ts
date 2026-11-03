@@ -164,6 +164,7 @@ function render() {
         ${preview()}
         <p class="note">Best sizes, in pixels: hex art 448 × 512 (the hex's shape), the map background 1600 × 896, symbols, markers and tokens 256 × 256. Bigger pictures are shrunk to these as they come in, so the board stays quick on the phone. This theme: about ${total} KB.</p>
         <p class="note">Use your own pictures (drawn, photographed or generated), not scans of the published game.</p>
+        <p class="note">Each faction's crest, units and structures are set in the faction editor (Workshop → Faction editor); they're kept in this theme too, and go with it in the theme file.</p>
       </div>
     </div>
     <input type="file" accept="image/*" data-picture hidden>
@@ -200,7 +201,7 @@ root.addEventListener('click', async (e) => {
       break;
     }
     case 'reset':
-      if (await ask('Go back to the usual look? Every picture and colour in this theme is removed from the device (save it to a file first to keep it).')) {
+      if (await ask('Go back to the usual look? Every picture and colour in this theme, the factions\' pictures too, is removed from the device (save it to a file first to keep it).')) {
         await keep(DEFAULT_THEME, 'Back to the usual look.');
       }
       break;

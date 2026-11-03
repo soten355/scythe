@@ -12,7 +12,7 @@
   // A unit that just moved (travel) glides hex by hex along its path, taking
   // moveMs per hex; its piece at the destination is hidden until it lands,
   // then whatever it carried hops off onto the hex.
-  import { isHomeBase, type GameState, type HexId, type Location, type Resource } from '@scythe/engine';
+  import { isHomeBase, type GameState, type HexId, type Location, type Resource, type Structure } from '@scythe/engine';
   import { tick, untrack } from 'svelte';
   import type { Travel } from './travel';
   import { between, fitView, panBy, worldOf, zoomAt, type Limits, type View } from './camera';
@@ -62,7 +62,9 @@
   /** Terrains with hex art: each hex is filled with its picture, cropped to the hex. */
   const arts = $derived(TERRAINS.flatMap((t) => (look.art(t) ? [{ terrain: t, url: look.art(t)! }] : [])));
   const RESOURCE_COLOR: Record<Resource, string> = { oil: '#1b1b1b', metal: '#9aa3ad', wood: '#7a4a24', food: '#f0d54a' };
-  const STRUCTURE_LETTER = { mine: 'Mi', mill: 'Ml', armory: 'Ar', monument: 'Mo' };
+  const STRUCTURE_LETTER: Record<Structure, string> = { mine: 'Mi', mill: 'Ml', armory: 'Ar', monument: 'Mo' };
+  /** The faction picture for each kind of unit. */
+  const PART = { character: 'character', mechs: 'mech', workers: 'worker' } as const;
   /** How far left of a hex's centre its pieces sit, and the gap between them. */
   const PIECES_LEFT = 6;
   const PIECE_STEP = 14;
@@ -229,7 +231,7 @@
   }
 
   /** Everything on a hex, grouped by player. */
-  type Pieces = { seat: number; color: string; initial: string; character: boolean; mechs: number; workers: number; structure?: string };
+  type Pieces = { seat: number; factionId: string; color: string; initial: string; character: boolean; mechs: number; workers: number; structure?: Structure };
   const piecesOn = $derived.by(() => {
     const on = new Map<HexId, Pieces[]>();
     game.players.forEach((p, i) => {
@@ -237,7 +239,7 @@
       const add = (hex: HexId, patch: Partial<Pieces>) => {
         const list = on.get(hex) ?? [];
         let mine = list.find((x) => x.color === f.color);
-        if (!mine) list.push((mine = { seat: i, color: f.color, initial: f.name[0] ?? '?', character: false, mechs: 0, workers: 0 }));
+        if (!mine) list.push((mine = { seat: i, factionId: f.id, color: f.color, initial: f.name[0] ?? '?', character: false, mechs: 0, workers: 0 }));
         Object.assign(mine, patch, {
           mechs: mine.mechs + (patch.mechs ?? 0),
           workers: mine.workers + (patch.workers ?? 0),
@@ -255,7 +257,7 @@
       const carried = i === game.currentPlayer ? (prompt.cargo?.workers ?? []) : [];
       // Workers on a lake ride on a mech there (see riding below).
       p.workers.forEach((w, wi) => isHomeBase(w) || carried.includes(wi) || isLake(w) || !shown(w, 'workers') || add(w, { workers: 1 }));
-      for (const [s, hex] of Object.entries(p.structures)) if (hex) add(hex, { structure: STRUCTURE_LETTER[s as keyof typeof STRUCTURE_LETTER] });
+      for (const [s, hex] of Object.entries(p.structures)) if (hex) add(hex, { structure: s as Structure });
     });
     return on;
   });
@@ -400,7 +402,7 @@
     const mechs = p.mechs.filter((m) => m === 'home').length;
     const workers = p.workers.filter((w, i) => w === 'home' && !carried.includes(i)).length;
     if (!mechs && !workers) return null;
-    return { seat, color: f.color, initial: f.name[0] ?? '?', character: false, mechs, workers };
+    return { seat, factionId: f.id, color: f.color, initial: f.name[0] ?? '?', character: false, mechs, workers };
   }
 
   /** Units of any faction standing on an unused home base (moved there with Wayfare). */
@@ -411,7 +413,7 @@
       const character = p.character === at;
       const mechs = p.mechs.filter((m) => m === at).length;
       const workers = p.workers.filter((w, i) => w === at && !carried.includes(i)).length;
-      return character || mechs || workers ? [{ seat, color: f.color, initial: f.name[0] ?? '?', character, mechs, workers }] : [];
+      return character || mechs || workers ? [{ seat, factionId: f.id, color: f.color, initial: f.name[0] ?? '?', character, mechs, workers }] : [];
     });
   }
 
@@ -457,19 +459,48 @@
       onkeydown={() => {}}
     />
   {/if}
-  {#if kind === 'structure'}
-    <rect x={x - 6} y={y - 6} width="12" height="12" fill={g.color} class="structure" class:light={isLight(g.color)} />
-    <text {x} y={y + 2} class="piece-text small" class:dark={isLight(g.color)}>{g.structure}</text>
-  {:else if kind === 'character'}
-    <circle cx={x} cy={y} r="6.5" fill={g.color} class="character" />
-    <text {x} y={y + LABEL_Y.character} class="piece-text" class:dark={isLight(g.color)}>{g.initial}</text>
-  {:else if kind === 'mechs'}
-    <path d={MECH} transform="translate({x} {y})" fill={g.color} class="mech" data-mech="{g.seat}|{at}" />
-    <text {x} y={y + LABEL_Y.mech} class="piece-text small" class:dark={isLight(g.color)}>{g.initial}</text>
-  {:else}
-    <path d={MEEPLE} transform="translate({x} {y})" fill={g.color} class="worker" data-spot={g.seat === game.currentPlayer ? `worker|${at}` : undefined} data-x={x} data-y={y} />
-    <text {x} y={y + LABEL_Y.worker} class="piece-text small" class:dark={isLight(g.color)}>{g.workers}</text>
+  {@const url = look.piece(g.factionId, kind === 'structure' ? g.structure! : PART[kind])}
+  {#if url}
+    <!-- The faction's own picture (from the faction editor), standing on a base in its colour. -->
+    {@render pieceArt(url, g.color, x, y, kind === 'character' || kind === 'mechs')}
   {/if}
+  {#if kind === 'structure'}
+    {#if !url}
+      <rect x={x - 6} y={y - 6} width="12" height="12" fill={g.color} class="structure" class:light={isLight(g.color)} />
+      <text {x} y={y + 2} class="piece-text small" class:dark={isLight(g.color)}>{STRUCTURE_LETTER[g.structure!]}</text>
+    {/if}
+  {:else if kind === 'character'}
+    {#if !url}
+      <circle cx={x} cy={y} r="6.5" fill={g.color} class="character" />
+      <text {x} y={y + LABEL_Y.character} class="piece-text" class:dark={isLight(g.color)}>{g.initial}</text>
+    {/if}
+  {:else if kind === 'mechs'}
+    <!-- Kept (unseen under a picture): a newly deployed mech flies to it. -->
+    <path d={MECH} transform="translate({x} {y})" fill={g.color} class="mech" class:ghost={url} data-mech="{g.seat}|{at}" />
+    {#if !url}<text {x} y={y + LABEL_Y.mech} class="piece-text small" class:dark={isLight(g.color)}>{g.initial}</text>{/if}
+  {:else}
+    <!-- Kept (unseen under a picture): workers fly to and from it. -->
+    <path d={MEEPLE} transform="translate({x} {y})" fill={g.color} class="worker" class:ghost={url} data-spot={g.seat === game.currentPlayer ? `worker|${at}` : undefined} data-x={x} data-y={y} />
+    {#if !url}
+      <text {x} y={y + LABEL_Y.worker} class="piece-text small" class:dark={isLight(g.color)}>{g.workers}</text>
+    {:else if g.workers > 1}
+      {@render countBadge(g.workers, g.color, x + 5, y + 5)}
+    {/if}
+  {/if}
+{/snippet}
+
+<!-- A faction's own picture of a piece: figures (character, mechs) stand taller than workers and structures. -->
+{#snippet pieceArt(url: string, color: string, x: number, y: number, figure: boolean)}
+  {@const w = figure ? 13 : 12}
+  {@const h = figure ? 17 : 12}
+  <ellipse cx={x} cy={y + (figure ? 7 : 5.5)} rx="6" ry="2.2" fill={color} class="piece-base" />
+  <image href={url} x={x - w / 2} y={y + (figure ? 7.5 : 6) - h} width={w} height={h} preserveAspectRatio="xMidYMax meet" class="piece-art" />
+{/snippet}
+
+<!-- How many workers stand there, when a picture shows only one. -->
+{#snippet countBadge(n: number, color: string, x: number, y: number)}
+  <circle cx={x} cy={y} r="3.4" fill={color} class="count-badge" />
+  <text {x} y={y + 1.5} class="piece-text tiny" class:dark={isLight(color)}>{n}</text>
 {/snippet}
 
 <!-- A resource's picture from the theme, over its coloured token (which stays as the spot things fly from and to). -->
@@ -604,7 +635,12 @@
         tabindex="-1"
         onkeydown={() => {}}
       />
-      <text x={home.c[0]} y={home.c[1] + 3.5} class="piece-text dark">{home.faction?.name[0]}</text>
+      {@const url = home.faction && look.piece(home.faction.id, 'character')}
+      {#if url}
+        <image href={url} x={home.c[0] - 7} y={home.c[1] - 10} width="14" height="18" preserveAspectRatio="xMidYMax meet" class="piece-art" />
+      {:else}
+        <text x={home.c[0]} y={home.c[1] + 3.5} class="piece-text dark">{home.faction?.name[0]}</text>
+      {/if}
     {/if}
     {#if home.others}
       {#each placePieces([home.others], [home.c[0] + PIECES_LEFT, home.c[1] + SIZE * 0.55 + 12]) as { g, kind, x, y }, i (i)}
@@ -671,12 +707,15 @@
       {#key moving.id}
         {@const end = spotOf(travelEnd!, moving.seat)}
         {@const f = game.setup.players[moving.seat]!.faction}
+        {@const url = look.piece(f.id, PART[moving.kind])}
         {@const chips = [
           ...(moving.workers ? [{ fill: f.color, n: moving.workers, dark: isLight(f.color) }] : []),
           ...(Object.entries(moving.resources) as [Resource, number][]).map(([r, n]) => ({ fill: RESOURCE_COLOR[r], n, dark: r === 'food' || r === 'metal' })),
         ]}
         <g class="travel" use:walk={moving}>
-          {#if moving.kind === 'mechs'}
+          {#if url}
+            {@render pieceArt(url, f.color, end[0], end[1], moving.kind !== 'workers')}
+          {:else if moving.kind === 'mechs'}
             <path d={MECH} transform="translate({end[0]} {end[1]})" fill={f.color} class="mech" />
             <text x={end[0]} y={end[1] + LABEL_Y.mech} class="piece-text small" class:dark={isLight(f.color)}>{f.name[0]}</text>
           {:else if moving.kind === 'workers'}
@@ -884,6 +923,28 @@
   /* A light faction's structure (Polonia's white) keeps a dark edge. */
   .structure.light {
     stroke: #1e1a16;
+  }
+  .piece-art,
+  .piece-base,
+  .count-badge {
+    pointer-events: none;
+  }
+  .piece-art {
+    filter: drop-shadow(0 0.6px 0.8px rgb(0 0 0 / 0.6));
+  }
+  .piece-base {
+    stroke: #1e1a16;
+    stroke-width: 0.6;
+  }
+  .count-badge {
+    stroke: #1e1a16;
+    stroke-width: 0.5;
+  }
+  .ghost {
+    opacity: 0;
+  }
+  .piece-text.tiny {
+    font-size: 4.5px;
   }
   .piece-text {
     font-size: 8px;

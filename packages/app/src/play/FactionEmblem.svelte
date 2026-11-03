@@ -1,11 +1,12 @@
 <script lang="ts">
-  // A faction's crest: a shield in its colour with its initial, over a cog.
-  // Drawn behind the side panel for now; a later art pass can swap in a
-  // painted background or the character's portrait here.
+  // A faction's crest: its own picture (set in the faction editor), or else a
+  // shield in its colour with its initial, over a cog.
   import type { Faction } from '@scythe/engine';
+  import { factionPicture } from '../theme/faction-art.svelte';
   import { isLight } from './ink';
 
   let { faction }: { faction: Faction } = $props();
+  const picture = $derived(factionPicture(faction.id, 'crest'));
 
   /** A cog outline: `teeth` square-ish teeth around a circle. */
   function cog(cx: number, cy: number, inner: number, outer: number, teeth: number): string {
@@ -19,6 +20,9 @@
   }
 </script>
 
+{#if picture}
+  <img src={picture} alt="" aria-hidden="true" />
+{:else}
 <svg viewBox="0 0 120 120" aria-hidden="true">
   <path d={cog(60, 58, 46, 55, 14)} fill="none" stroke={faction.color} stroke-width="3" opacity="0.7" />
   <circle cx="60" cy="58" r="38" fill="none" stroke={faction.color} stroke-width="1.5" opacity="0.6" />
@@ -27,10 +31,16 @@
     >{faction.name[0]}</text
   >
 </svg>
+{/if}
 
 <style>
-  svg {
+  svg,
+  img {
+    display: block;
     width: 100%;
     height: 100%;
+  }
+  img {
+    object-fit: contain;
   }
 </style>

@@ -1,11 +1,16 @@
 // Faction editor: enter or design factions (the faction mat), then export
-// them as data for packages/content. Plain DOM, no framework.
+// them as data for packages/content; and give each faction its own pictures
+// (crest, character, mech, worker, structures), kept in the theme on this
+// device under the faction's ID. Plain DOM, no framework.
 import { baseBoard, baseFactions } from '@scythe/content';
 import { MAX_POWER, RECRUIT_BONUSES, validateFaction, type Faction, type RecruitBonus } from '@scythe/engine';
 import '../shared/forms.css';
 import './faction-editor.css';
 import { addToGame, ask, esc, setPath, showExport, tell } from '../shared/editor-utils';
 import { exportContent } from '../saves/files';
+import { SaveStore } from '../saves/store';
+import { clearPicture, copyFactionPictures, FACTION_PARTS, factionSlot, setPicture, type SlotId, type Theme } from '../theme/theme';
+import { pictureFor, sizeKb } from '../theme/pictures';
 import { formatFactions, homeBaseClashes, newFaction } from './model';
 
 const STORAGE_KEY = 'scythe-faction-editor';
@@ -36,6 +41,25 @@ function load(): EditorState {
 let state = load();
 const save = () => localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 const faction = () => state.factions[state.selected]!;
+// ---- pictures (kept in the theme, on this device) ------------------------------
+
+const store = new SaveStore();
+/** The theme on the device; null until read (or if it can't be). */
+let theme: Theme | null = null;
+let pictureNote = '';
+
+/** Changes the theme as it is on the device now (the theme editor may have changed it since this page opened). */
+async function changeTheme(change: (t: Theme) => Theme, note: string) {
+  try {
+    theme = change(await store.theme());
+    await store.putTheme(theme);
+    pictureNote = note;
+  } catch {
+    pictureNote = "That couldn't be kept on this device (it may be out of room).";
+  }
+  render();
+}
+
 const update = (next: Faction) => {
   state = { ...state, factions: state.factions.map((f, i) => (i === state.selected ? next : f)) };
   save();
@@ -120,8 +144,29 @@ function render() {
     </div>
     <div class="faction-grid">${mechs}</div>
     <p class="note">Write ability descriptions in your own words rather than copying the printed text.</p>
+    ${pictures(f)}
     <div class="status"></div>`;
   renderStatus();
+}
+
+function pictures(f: Faction): string {
+  const rows = FACTION_PARTS.map(({ part, label, hint }) => {
+    const slot = factionSlot(f.id, part);
+    const url = theme?.pictures[slot];
+    return `<div class="slot">
+      <div class="thumb" style="--c:${esc(f.color)}">${url ? `<img src="${esc(url)}" alt="">` : '<span>—</span>'}</div>
+      <div class="what"><b>${esc(label)}</b><small>${esc(hint)}${url ? ` · ${sizeKb(url)} KB` : ''}</small></div>
+      <button data-act="choose" data-slot="${esc(slot)}" ${theme ? '' : 'disabled'}>${url ? 'Change…' : 'Choose…'}</button>
+      ${url ? `<button data-act="clear" data-slot="${esc(slot)}">Clear</button>` : ''}
+    </div>`;
+  }).join('');
+  return `<section class="pictures">
+      <h3>Pictures</h3>
+      <p class="note">This faction's own look in the game; anything left empty keeps the usual piece in its colour. Pictures are kept on this device with the theme, under the ID <b>${esc(f.id)}</b>, and go to other devices in the theme file (Workshop → Theme editor → Save theme file). Use your own pictures, not scans of the published game.</p>
+      <div class="slots">${rows}</div>
+      <p class="note picture-note">${esc(theme ? pictureNote : "The pictures on this device couldn't be read.")}</p>
+      <input type="file" accept="image/*" data-picture hidden>
+    </section>`;
 }
 
 function renderStatus() {
@@ -144,9 +189,40 @@ root.addEventListener('input', (e) => {
   renderStatus();
 });
 
-root.addEventListener('change', (e) => {
+/** The faction's ID when its ID box was entered, so its pictures can follow a new ID. */
+let idBefore: string | null = null;
+root.addEventListener('focusin', (e) => {
+  if ((e.target as HTMLElement).dataset.path === 'id') idBefore = faction().id;
+});
+
+let choosing: SlotId | null = null;
+
+root.addEventListener('change', async (e) => {
   const el = e.target as HTMLElement;
-  if (el instanceof HTMLSelectElement && el.dataset.act === 'pick') {
+  if (el instanceof HTMLInputElement && el.dataset.picture !== undefined) {
+    const file = el.files?.[0];
+    el.value = '';
+    if (!file || !choosing) return;
+    const slot = choosing;
+    pictureNote = 'Shrinking the picture…';
+    render();
+    try {
+      const url = await pictureFor(slot, file);
+      await changeTheme((t) => setPicture(t, slot, url), 'Saved on this device: the game uses it the next time it opens.');
+    } catch (err) {
+      pictureNote = err instanceof Error ? err.message : String(err);
+      render();
+    }
+  } else if (el.dataset.path === 'id') {
+    const from = idBefore;
+    idBefore = faction().id;
+    const to = faction().id.trim();
+    if (from && to && from !== to && FACTION_PARTS.some((p) => theme?.pictures[factionSlot(from, p.part)])) {
+      await changeTheme((t) => copyFactionPictures(t, from, to, { move: true }), `Its pictures moved to the new ID, ${to}.`);
+    } else {
+      render();
+    }
+  } else if (el instanceof HTMLSelectElement && el.dataset.act === 'pick') {
     state = { ...state, selected: Number(el.value) };
     save();
     render();
@@ -165,8 +241,23 @@ root.addEventListener('click', async (e) => {
     }
     case 'duplicate': {
       const copy = { ...JSON.parse(JSON.stringify(faction())), id: `${faction().id}-copy`, name: `${faction().name} (copy)` };
+      const from = faction().id;
       state = { factions: [...state.factions, copy], selected: state.factions.length };
+      save();
+      if (FACTION_PARTS.some((p) => theme?.pictures[factionSlot(from, p.part)])) {
+        await changeTheme((t) => copyFactionPictures(t, from, copy.id), 'Its pictures were copied too.');
+        return;
+      }
       break;
+    }
+    case 'choose':
+      choosing = btn!.dataset.slot as SlotId;
+      root.querySelector<HTMLInputElement>('[data-picture]')!.click();
+      return;
+    case 'clear': {
+      const slot = btn!.dataset.slot as SlotId;
+      await changeTheme((t) => clearPicture(t, slot), 'Picture removed.');
+      return;
     }
     case 'delete':
       if (!(await ask(`Delete "${faction().name}"?`))) return;
@@ -197,3 +288,10 @@ root.addEventListener('click', async (e) => {
 });
 
 render();
+store.theme().then(
+  (t) => {
+    theme = t;
+    render();
+  },
+  () => render(),
+);

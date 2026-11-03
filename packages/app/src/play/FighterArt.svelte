@@ -1,24 +1,34 @@
 <script lang="ts">
-  // A fighter for the fight screen: a pilot in a long coat with a pennant, or
-  // a riveted walker mech with a cannon arm and a smokestack. Original
-  // placeholder art in the faction's colour, gently animated; a later art
-  // pass (painted 2D or 3D) can replace this one file.
+  // A fighter for the fight screen: the faction's own picture of its
+  // character or mech (set in the faction editor; drawn facing right), or
+  // else a pilot in a long coat with a pennant, or a riveted walker mech with
+  // a cannon arm and a smokestack: original placeholder art in the faction's
+  // colour, gently animated.
+  import { factionPicture } from '../theme/faction-art.svelte';
+
   let {
     kind,
     color,
+    factionId,
     facing = 'right',
     broken = false,
   }: {
     kind: 'character' | 'mech';
     color: string;
+    /** Whose fighter: their own picture is used if they have one. */
+    factionId?: string;
     facing?: 'left' | 'right';
     /** Beaten in a fight: still, scorched, cracked, smouldering. */
     broken?: boolean;
   } = $props();
+  const picture = $derived(factionId ? factionPicture(factionId, kind) : undefined);
   // Gradient ids must be unique on the page.
   const id = `f${Math.random().toString(36).slice(2, 8)}`;
 </script>
 
+{#if picture}
+  <img src={picture} alt="" class="fighter picture {kind}" class:flip={facing === 'left'} class:broken style:--c={color} aria-hidden="true" />
+{:else}
 <svg viewBox="0 0 200 260" class="fighter {kind}" class:flip={facing === 'left'} class:broken style:--c={color} aria-hidden="true">
   <defs>
     <linearGradient id="{id}-paint" x1="0" y1="0" x2="1" y2="1">
@@ -128,6 +138,7 @@
     </g>
   {/if}
 </svg>
+{/if}
 
 <style>
   .fighter {
@@ -138,6 +149,34 @@
   }
   .flip {
     transform: scaleX(-1);
+  }
+  /* The faction's own picture: kept whole, standing on the ground line, breathing gently. */
+  .picture {
+    display: block;
+    object-fit: contain;
+    object-position: bottom;
+    transform-origin: bottom;
+    animation: breathe 3.2s ease-in-out infinite;
+  }
+  .picture.flip {
+    animation-name: breathe-flipped;
+  }
+  .picture.broken {
+    animation: none;
+  }
+  @keyframes breathe {
+    50% {
+      transform: scaleY(1.015);
+    }
+  }
+  @keyframes breathe-flipped {
+    from,
+    to {
+      transform: scaleX(-1);
+    }
+    50% {
+      transform: scaleX(-1) scaleY(1.015);
+    }
   }
   /* A beaten fighter: no idle motion, scorched and dark. */
   .broken {
