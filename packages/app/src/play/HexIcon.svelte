@@ -1,5 +1,5 @@
 <script lang="ts">
-  // One board symbol, centred on (x, y): text/emoji or an image file.
+  // One board symbol, centred on (x, y): text/emoji, an image file, or a picture from the theme (a data URL).
   import type { Icon } from './icons';
 
   let { icon, x, y, size, faded = false }: { icon: Icon; x: number; y: number; size: number; faded?: boolean } = $props();
@@ -7,7 +7,7 @@
 
 {#if 'image' in icon}
   <image
-    href={import.meta.env.BASE_URL + icon.image}
+    href={icon.image.startsWith('data:') ? icon.image : import.meta.env.BASE_URL + icon.image}
     x={x - size / 2}
     y={y - size / 2}
     width={size}

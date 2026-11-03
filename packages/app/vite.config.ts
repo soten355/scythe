@@ -11,8 +11,8 @@ export default defineConfig({
   worker: { format: 'es' },
   build: {
     rollupOptions: {
-      // play.html is the game; editor.html, mats.html, factions.html, encounters.html, factory.html, objectives.html and structure-bonuses.html are the map, player mat, faction, encounter, Factory and objective card, and structure bonus tile editors; bot-check.html times the bots on this device.
-      input: { main: 'index.html', play: 'play.html', editor: 'editor.html', mats: 'mats.html', factions: 'factions.html', encounters: 'encounters.html', factory: 'factory.html', objectives: 'objectives.html', structureBonuses: 'structure-bonuses.html', botCheck: 'bot-check.html' },
+      // play.html is the game; editor.html, mats.html, factions.html, encounters.html, factory.html, objectives.html and structure-bonuses.html are the map, player mat, faction, encounter, Factory and objective card, and structure bonus tile editors; themes.html is the theme editor; bot-check.html times the bots on this device.
+      input: { main: 'index.html', play: 'play.html', editor: 'editor.html', mats: 'mats.html', factions: 'factions.html', encounters: 'encounters.html', factory: 'factory.html', objectives: 'objectives.html', structureBonuses: 'structure-bonuses.html', themes: 'themes.html', botCheck: 'bot-check.html' },
     },
   },
   plugins: [

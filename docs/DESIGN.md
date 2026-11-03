@@ -322,6 +322,12 @@ Each phase ends in something playable on the phone. A phase is done when its che
 **Phase 4: Polish**
 
 - [ ] Art pass, animation, sound
+- [ ] Theme editor for the whole game, for the owner's own pictures (e.g. made in ComfyUI), in the app (owner's request, Nov 2, 2026)
+  - [x] The board
+    - Done (Nov 2, 2026): Workshop → Theme editor (`themes.html`, `src/theme-editor/`, model in `src/theme/theme.ts`). Slots: the map background; art for each of the 7 terrains, filling its hexes (cropped to the hex); each terrain's symbol (hidden over hex art unless asked for); the tunnel and encounter markers; the 4 resource tokens; and each terrain's colour. Pictures are shrunk as they come in (hex art 512 pixels, symbols and tokens 256, background 1600) and kept as data on the device (IndexedDB, beside the library), used by the game from the next time it opens. A theme saves to and opens from a `.scythe-theme.json` file (Mac ↔ phone); opening one keeps only known slots, inline pictures and plain colours. Pictures must be the owner's own, never scans of the published game.
+  - [ ] Units and crests (characters, mechs, workers, structures, faction crests)
+  - [ ] Fight scene (fighters, backdrops)
+  - [ ] Look and feel (colours, fonts, panels, menus)
 - [ ] Pictures on encounter cards (a picture, a story line, both or neither), chosen in the encounter card editor (owner's request, Nov 2, 2026)
   - Plan: pictures are shrunk to about 100 KB and stored once on the device; cards hold a short reference, so saves stay small. Deck files carry the pictures; a game opened without them shows the story instead. A built-in deck's pictures ship with the app. Pictures must be original (drawn, photographed or generated), never scans of the printed cards.
 - [ ] Optional 3D board

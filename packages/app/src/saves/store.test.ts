@@ -5,6 +5,7 @@ import type { GameSetup } from '@scythe/engine';
 import { createSave } from './save';
 import { SaveStore } from './store';
 import { EMPTY_LIBRARY } from '../content/library';
+import { DEFAULT_THEME, setPicture } from '../theme/theme';
 
 const setup: GameSetup = {
   seed: 1,
@@ -67,5 +68,14 @@ describe('save store', () => {
     const s = new SaveStore(idb);
     expect((await s.list()).map((g) => g.id)).toEqual(['old']);
     expect(await s.library()).toEqual(EMPTY_LIBRARY);
+  });
+
+  it('keeps the theme in use (the usual look until one is set)', async () => {
+    expect(await store.theme()).toEqual(DEFAULT_THEME);
+    const theme = { ...setPicture(DEFAULT_THEME, 'hex.farm', 'data:image/jpeg;base64,AA=='), name: 'Golden' };
+    await store.putTheme(theme);
+    expect(await store.theme()).toEqual(theme);
+    // Separate from the library.
+    expect(await store.library()).toEqual(EMPTY_LIBRARY);
   });
 });

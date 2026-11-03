@@ -6,7 +6,7 @@
 </script>
 
 {#if 'image' in icon}
-  <img src={import.meta.env.BASE_URL + icon.image} alt="" />
+  <img src={icon.image.startsWith('data:') ? icon.image : import.meta.env.BASE_URL + icon.image} alt="" />
 {:else}
   <span>{icon.text}</span>
 {/if}

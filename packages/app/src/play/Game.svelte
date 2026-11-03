@@ -33,12 +33,14 @@
   import type { RemoteSeat } from '@scythe/bots';
   import { botName, isBot, needsPass, people } from './seats';
   import { botTurnsSince, paceOf } from './narrate';
+  import type { BoardLook } from '../theme/theme';
 
   let {
     save,
     onSave,
     onNewGame,
     onMenu,
+    look,
   }: {
     /** The game to play (a new game is a save with no moves yet). */
     save: SavedGame;
@@ -48,6 +50,8 @@
     onNewGame: () => void;
     /** Back to the opening menu; this game stays to continue. */
     onMenu: () => void;
+    /** The board's pictures and colours, from the theme in use. */
+    look?: BoardLook;
   } = $props();
 
   // The save given never changes for a game: another game is a new Game.
@@ -478,7 +482,7 @@
           </button>
         {/if}
       </div>
-      <Board game={shown} {prompt} onTap={tap} onPick={(sel) => (selection = sel)} guideTo={guide(game, prompt)} paused={handoff !== null} {travel} moveMs={settings.moveMs} /></div>
+      <Board game={shown} {prompt} onTap={tap} onPick={(sel) => (selection = sel)} guideTo={guide(game, prompt)} paused={handoff !== null} {travel} moveMs={settings.moveMs} {look} /></div>
     <aside style:--c={color(seatNow)}>
       <!-- Whoever acts now: their crest shows, then fades behind the text as it appears (again each time play passes, once the pass screen is gone). -->
       {#key intro}

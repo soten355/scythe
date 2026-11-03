@@ -12,6 +12,7 @@
   import { createSave, restore, type SavedGame } from './saves/save';
   import { SaveStore } from './saves/store';
   import { exportSave, readSaveFile } from './saves/files';
+  import { boardLook, DEFAULT_THEME, type Theme } from './theme/theme';
   import { addToLibrary, catalogWith, EMPTY_LIBRARY, parseContentFile, removeFromLibrary, type Library, type LibraryKind } from './content/library';
 
   const builtIn = BUILT_IN;
@@ -39,6 +40,10 @@
   }
   void refresh();
   store.library().then((l) => (library = l), () => {});
+  /** The theme in use (made in the theme editor), for the board's look. */
+  let theme: Theme = $state.raw(DEFAULT_THEME);
+  store.theme().then((t) => (theme = t), () => {});
+  const look = $derived(boardLook(theme));
 
   /** The game Continue picks up: the one open, or the last one played that isn't finished. */
   const resumable = $derived(current?.save ?? saves.find((s) => !s.finished) ?? null);
@@ -132,7 +137,7 @@
 {#if current}
   <div class:hidden={screen !== 'game'}>
     {#key current.key}
-      <Game save={current.save} onSave={persist} onNewGame={() => go('new')} onMenu={() => go('home')} />
+      <Game save={current.save} onSave={persist} onNewGame={() => go('new')} onMenu={() => go('home')} {look} />
     {/key}
   </div>
 {/if}

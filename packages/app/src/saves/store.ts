@@ -1,12 +1,15 @@
-// Saved games and the player's own maps, factions and mats, on this device,
+// Saved games, the player's own maps, factions and mats, and the theme in use, on this device,
 // in IndexedDB (kept by installed home-screen apps, unlike some browser
 // storage). One record per game, by id; the library is a single record.
 import { EMPTY_LIBRARY, type Library } from '../content/library';
 import type { SavedGame } from './save';
+import { DEFAULT_THEME, type Theme } from '../theme/theme';
 
 const DB = 'scythe';
 const STORE = 'games';
 const LIBRARY = 'library';
+/** The theme in use, kept in the library's store under its own key. */
+const THEME = 'theme';
 
 const done = <T>(request: IDBRequest<T>) =>
   new Promise<T>((resolve, reject) => {
@@ -74,6 +77,16 @@ export class SaveStore {
 
   async putLibrary(library: Library): Promise<void> {
     await this.run('readwrite', (s) => s.put(plain(library), LIBRARY), LIBRARY);
+  }
+
+  /** The theme in use (pictures and colours); the usual look if none is set. */
+  async theme(): Promise<Theme> {
+    const saved = await this.run('readonly', (s) => s.get(THEME) as IDBRequest<Theme | undefined>, LIBRARY);
+    return { ...DEFAULT_THEME, ...saved };
+  }
+
+  async putTheme(theme: Theme): Promise<void> {
+    await this.run('readwrite', (s) => s.put(plain(theme), THEME), LIBRARY);
   }
 }
 

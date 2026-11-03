@@ -19,7 +19,7 @@
   import { boardArea, center, corners, points, sharedEdge, SIZE, spotsArea, type Point } from './geometry';
   import HexIcon from './HexIcon.svelte';
   import { LABEL_Y, MECH, MEEPLE } from './shapes';
-  import { ENCOUNTER_ICON, TERRAIN_ICONS, TUNNEL_ICON } from './icons';
+  import { boardLook, DEFAULT_THEME, TERRAINS, type BoardLook } from '../theme/theme';
   import { isLight } from './ink';
   import type { Prompt, Selection } from './prompt';
 
@@ -32,6 +32,7 @@
     paused = false,
     travel = null,
     moveMs = 350,
+    look = boardLook(DEFAULT_THEME),
   }: {
     game: GameState;
     prompt: Prompt;
@@ -42,6 +43,8 @@
     paused?: boolean;
     travel?: Travel | null;
     moveMs?: number;
+    /** Pictures and colours from the theme (the usual look by default). */
+    look?: BoardLook;
   } = $props();
 
   /** The travel that has landed (its piece is drawn normally again). */
@@ -55,15 +58,8 @@
     return { key: k, select: prompt.pieces?.get(k), selected: prompt.selectedPiece === k };
   };
 
-  const FILL: Record<string, string> = {
-    farm: '#d9c46a',
-    forest: '#4f7f48',
-    mountain: '#8d837a',
-    tundra: '#a9c7bd',
-    village: '#c9875c',
-    lake: '#5b8fc0',
-    factory: '#7a5a8a',
-  };
+  /** Terrains with hex art: each hex is filled with its picture, cropped to the hex. */
+  const arts = $derived(TERRAINS.flatMap((t) => (look.art(t) ? [{ terrain: t, url: look.art(t)! }] : [])));
   const RESOURCE_COLOR: Record<Resource, string> = { oil: '#1b1b1b', metal: '#9aa3ad', wood: '#7a4a24', food: '#f0d54a' };
   const STRUCTURE_LETTER = { mine: 'Mi', mill: 'Ml', armory: 'Ar', monument: 'Mo' };
   /** How far left of a hex's centre its pieces sit, and the gap between them. */
@@ -473,9 +469,15 @@
   {/if}
 {/snippet}
 
+<!-- A resource's picture from the theme, over its coloured token (which stays as the spot things fly from and to). -->
+{#snippet token(what: string, x: number, y: number, r: number)}
+  {@const url = what === 'worker' ? undefined : look.token(what as Resource)}
+  {#if url}<image href={url} x={x - r * 1.25} y={y - r * 1.25} width={r * 2.5} height={r * 2.5} class="token-art" />{/if}
+{/snippet}
+
 <svelte:window onpointermove={move} onpointerup={up} onpointercancel={up} />
 
-<div class="map" bind:clientWidth={W} bind:clientHeight={H}>
+<div class="map" class:themed={!!look.background} style:background-image={look.background ? `url(${look.background})` : undefined} bind:clientWidth={W} bind:clientHeight={H}>
 <svg
   bind:this={svg}
   viewBox={box}
@@ -484,13 +486,22 @@
   onpointerdown={down}
   onclickcapture={clickCapture}
 >
+  {#if arts.length}
+    <defs>
+      {#each arts as a (a.terrain)}
+        <pattern id="art-{a.terrain}" width="1" height="1" patternContentUnits="objectBoundingBox">
+          <image href={a.url} width="1" height="1" preserveAspectRatio="xMidYMid slice" />
+        </pattern>
+      {/each}
+    </defs>
+  {/if}
   {#each hexes as h (h.id)}
     {@const c = center(h)}
     {@const lit = prompt.highlights.has(h.id)}
     {@const tappable = lit || prompt.tapSelects.has(h.id)}
     <polygon
       points={points(corners(c))}
-      fill={FILL[h.terrain]}
+      fill={look.art(h.terrain) ? `url(#art-${h.terrain})` : look.fill(h.terrain)}
       class="hex"
       class:tappable
       onclick={() => tappable && onTap(h.id)}
@@ -498,10 +509,10 @@
       tabindex="-1"
       onkeydown={() => {}}
     />
-    {@const icon = TERRAIN_ICONS[h.terrain]}
+    {@const icon = look.symbol(h.terrain)}
     {#if icon}<HexIcon {icon} x={c[0]} y={c[1]} size={SIZE * 0.65} faded />{/if}
-    {#if h.tunnel}<HexIcon icon={TUNNEL_ICON} x={c[0]} y={c[1] - SIZE * 0.62} size={SIZE * 0.36} />{/if}
-    {#if game.encounterTokens.includes(h.id)}<HexIcon icon={ENCOUNTER_ICON} x={c[0]} y={c[1] + SIZE * 0.62} size={SIZE * 0.36} />{/if}
+    {#if h.tunnel}<HexIcon icon={look.tunnel} x={c[0]} y={c[1] - SIZE * 0.62} size={SIZE * 0.36} />{/if}
+    {#if game.encounterTokens.includes(h.id)}<HexIcon icon={look.encounter} x={c[0]} y={c[1] + SIZE * 0.62} size={SIZE * 0.36} />{/if}
     <text x={c[0] - SIZE * 0.5} y={c[1] - SIZE * 0.45} class="id">{h.id}</text>
   {/each}
 
@@ -601,6 +612,7 @@
           {#each chips as chip, ci (ci)}
             {@const cx = on.x + (ci - (chips.length - 1) / 2) * 10}
             <circle {cx} cy={on.y - 13} r="4.5" fill={chip.fill} class="cargo" data-spot={`cargo|${chip.what}`} />
+            {@render token(chip.what, cx, on.y - 13, 4.5)}
             <text x={cx} y={on.y - 11} class="piece-text small" class:dark={chip.dark}>{chip.n}</text>
           {/each}
         {/if}
@@ -610,6 +622,7 @@
         {#each ride.chips as chip, ci (ci)}
           {@const cx = ride.x + (ci - (ride.chips.length - 1) / 2) * 10}
           <circle {cx} cy={ride.y} r="4.5" fill={chip.fill} class="cargo" data-spot={chip.what === 'worker' ? `worker|${h.id}` : `pile|${h.id}|${chip.what}`} />
+          {@render token(chip.what, cx, ride.y, 4.5)}
           <text x={cx} y={ride.y + 2} class="piece-text small" class:dark={chip.dark}>{chip.n}</text>
         {/each}
       {/if}
@@ -620,6 +633,7 @@
       {#each pile as [res, n], i (res)}
         {@const x = c[0] - (pile.length - 1) * 7 + i * 14}
         <circle cx={x} cy={c[1] + SIZE * 0.3} r="6" fill={RESOURCE_COLOR[res]} class="resource" data-spot={`pile|${h.id}|${res}`} />
+        {@render token(res, x, c[1] + SIZE * 0.3, 6)}
         <text x={x} y={c[1] + SIZE * 0.3 + 3} class="piece-text" class:dark={res === 'food' || res === 'metal'}>{n}</text>
       {/each}
     {/each}
@@ -668,6 +682,13 @@
     width: 100%;
     height: 100%;
     overflow: hidden;
+  }
+  .map.themed {
+    background-size: cover;
+    background-position: center;
+  }
+  .token-art {
+    pointer-events: none;
   }
   svg {
     width: 100%;

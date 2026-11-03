@@ -1,7 +1,8 @@
-// Files: saves and content out to the Files app, AirDrop or Downloads, and
+// Files: saves, content and themes out to the Files app, AirDrop or Downloads, and
 // back in.
 import { contentFileName, contentFileText, type Library } from '../content/library';
 import { fileName, parseSaveFile, saveFileText, type SavedGame } from './save';
+import { themeFileName, themeFileText, type Theme } from '../theme/theme';
 
 /**
  * Hands a file to the share sheet where there is one (iPhone: Save to Files,
@@ -27,6 +28,8 @@ async function shareFile(name: string, text: string): Promise<void> {
 export const exportSave = (save: SavedGame) => shareFile(fileName(save), saveFileText(save));
 
 export const exportContent = (content: Library) => shareFile(contentFileName(content), contentFileText(content));
+
+export const exportTheme = (theme: Theme) => shareFile(themeFileName(theme), themeFileText(theme));
 
 /** Reads and checks a chosen file. Throws, in plain words, if it's not a good save. */
 export async function readSaveFile(file: File): Promise<SavedGame> {
