@@ -10,6 +10,8 @@ const STORE = 'games';
 const LIBRARY = 'library';
 /** The theme in use, kept in the library's store under its own key. */
 const THEME = 'theme';
+/** Encounter cards' pictures, each kept once in the library's store under "picture:<ref>". */
+const PICTURE = 'picture:';
 
 const done = <T>(request: IDBRequest<T>) =>
   new Promise<T>((resolve, reject) => {
@@ -87,6 +89,28 @@ export class SaveStore {
 
   async putTheme(theme: Theme): Promise<void> {
     await this.run('readwrite', (s) => s.put(plain(theme), THEME), LIBRARY);
+  }
+
+  /** Every encounter card picture kept on the device, by reference. */
+  async cardPictures(): Promise<Record<string, string>> {
+    // Keys alone are cheap to list; then only the pictures are read.
+    const keys = (await this.run('readonly', (s) => s.getAllKeys(), LIBRARY)).map(String).filter((k) => k.startsWith(PICTURE));
+    const db = await this.open();
+    const store = db.transaction(LIBRARY, 'readonly').objectStore(LIBRARY);
+    const urls = await Promise.all(keys.map((k) => done(store.get(k) as IDBRequest<string>)));
+    return Object.fromEntries(keys.map((k, i) => [k.slice(PICTURE.length), urls[i]!]));
+  }
+
+  /** Keeps encounter card pictures (one already kept under its reference is the same picture). */
+  async putCardPictures(pictures: Record<string, string>): Promise<void> {
+    const db = await this.open();
+    const tx = db.transaction(LIBRARY, 'readwrite');
+    const store = tx.objectStore(LIBRARY);
+    for (const [ref, url] of Object.entries(pictures)) store.put(url, PICTURE + ref);
+    await new Promise<void>((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = tx.onabort = () => reject(tx.error);
+    });
   }
 }
 

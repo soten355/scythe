@@ -3,14 +3,16 @@
 // Browser only (it draws on a canvas).
 import { pictureSpec, type SlotId } from './theme';
 
-export async function pictureFor(slot: SlotId, file: Blob): Promise<string> {
+export const pictureFor = (slot: SlotId, file: Blob): Promise<string> => shrinkPicture(file, pictureSpec(slot));
+
+/** Shrinks a picture so its longest side is at most `max`, as PNG (see-through kept) or JPEG. */
+export async function shrinkPicture(file: Blob, { max, type }: { max: number; type: 'image/jpeg' | 'image/png' }): Promise<string> {
   let bitmap: ImageBitmap;
   try {
     bitmap = await createImageBitmap(file);
   } catch {
     throw new Error("That file couldn't be read as a picture. Try a PNG or JPEG.");
   }
-  const { max, type } = pictureSpec(slot);
   const scale = Math.min(1, max / Math.max(bitmap.width, bitmap.height));
   const canvas = document.createElement('canvas');
   canvas.width = Math.max(1, Math.round(bitmap.width * scale));

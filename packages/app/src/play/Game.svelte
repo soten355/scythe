@@ -35,7 +35,8 @@
   import { botName, isBot, needsPass, people } from './seats';
   import { botTurnsSince, paceOf } from './narrate';
   import type { BoardLook } from '../theme/theme';
-  import { uiPicture } from '../theme/current.svelte';
+  import { cardPicture, uiPicture } from '../theme/current.svelte';
+  import { cardLook } from '../content/card-pictures';
 
   let {
     save,
@@ -627,6 +628,7 @@
 
   {#if prompt.encounter && !handoff && !battle && !revealed && !botNow}
     {@const e = prompt.encounter}
+    {@const shown = cardLook(e, cardPicture(e.picture))}
     {#if peeking}
       <button class="primary back-to-card" onclick={() => (peeking = false)}>⭐ Back to the encounter</button>
     {:else}
@@ -634,7 +636,14 @@
       <div class="ask" role="dialog" aria-modal="true" style:--c={color(game.currentPlayer)}>
         <div class="box encounter">
           <p class="heading"><b>⭐ {e.name}</b><span class="where">Encounter on {e.hex}</span></p>
-          {#if e.story}<p class="story">{e.story}</p>{/if}
+          {#if shown.picture}
+            <!-- The card's picture, with its story over the bottom when it shows both. -->
+            <div class="card-picture" style:background-image="url({shown.picture})">
+              {#if shown.story}<p class="story">{shown.story}</p>{/if}
+            </div>
+          {:else if shown.story}
+            <p class="story">{shown.story}</p>
+          {/if}
           <p class="note">{e.note}:</p>
           <div class="options">
             {#each e.options as o, i (i)}
@@ -1234,6 +1243,26 @@
   .encounter .story {
     font-style: italic;
     opacity: 0.85;
+  }
+  /* A wide band: short enough to leave room for the options on a phone held sideways. */
+  .encounter .card-picture {
+    position: relative;
+    height: clamp(80px, 30vh, 220px);
+    margin-bottom: 8px;
+    border-radius: 8px;
+    background: center / cover no-repeat;
+    display: flex;
+    align-items: flex-end;
+    overflow: hidden;
+  }
+  .encounter .card-picture .story {
+    margin: 0;
+    width: 100%;
+    padding: 18px 10px 6px;
+    opacity: 1;
+    color: #fff;
+    text-shadow: 0 1px 2px rgb(0 0 0 / 0.8);
+    background: linear-gradient(transparent, rgb(0 0 0 / 0.65));
   }
   .encounter .note {
     margin-bottom: 8px;

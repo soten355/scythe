@@ -267,6 +267,14 @@ describe('checking an encounter card', () => {
     expect(validateEncounterCard(cards[0]!)).toEqual([]);
   });
 
+  it('accepts a picture and what the card shows (story, picture, both or neither)', () => {
+    for (const show of ['story', 'picture', 'both', 'none'] as const) {
+      expect(validateEncounterCard({ ...cards[0]!, picture: 'pic-1a2b3c', show })).toEqual([]);
+    }
+    expect(validateEncounterCard({ ...cards[0]!, show: 'poster' as never })).toEqual(['what the card shows must be the story, the picture, both or neither']);
+    expect(validateEncounterCard({ ...cards[0]!, picture: 'https://example.com/x.png' })).toEqual(["the picture isn't one kept by the app"]);
+  });
+
   it('names what is missing or wrong', () => {
     const card = cards[0]!;
     const broken: EncounterCard = {

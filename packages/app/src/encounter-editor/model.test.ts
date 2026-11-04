@@ -24,6 +24,13 @@ describe('the encounter card editor', () => {
     expect(cleanCard(card).options[1].cost).toEqual({ coins: 2, power: 1 });
   });
 
+  it("keeps the card's picture and what it shows; leaves out the usual choice", () => {
+    const card = { ...newCard('c'), picture: 'pic-abc', show: 'picture' as const };
+    expect(cleanCard(card)).toMatchObject({ picture: 'pic-abc', show: 'picture' });
+    expect(cleanCard(newCard('c'))).not.toHaveProperty('picture');
+    expect(cleanCard(newCard('c'))).not.toHaveProperty('show');
+  });
+
   it('turns free actions on and off, in the usual order', () => {
     let card = toggleAction(newCard('c'), 0, 'enlist', true);
     card = toggleAction(card, 0, 'upgrade', true);

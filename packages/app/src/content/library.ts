@@ -7,6 +7,7 @@
 // built-in ones.
 import { validateEncounterCard, validateFaction, validateFactoryCard, validateMat, validateObjectiveCard, validateStructureBonus, type Board, type EncounterCard, type Faction, type FactoryCard, type ObjectiveCard, type PlayerMat, type StructureBonusTile } from '@scythe/engine';
 import type { Catalog, MapOption } from '../menu/setup';
+import { readPictures } from './card-pictures';
 
 const FORMAT = 'scythe-content';
 const FORMAT_VERSION = 1;
@@ -85,8 +86,9 @@ export function catalogWith(builtIn: Catalog, library: Library): Catalog {
   };
 }
 
-export function contentFileText(content: Library): string {
-  return JSON.stringify({ format: FORMAT, formatVersion: FORMAT_VERSION, ...content });
+/** A content file: what's given, and the encounter cards' pictures (by reference) if any. */
+export function contentFileText(content: Library, pictures: Record<string, string> = {}): string {
+  return JSON.stringify({ format: FORMAT, formatVersion: FORMAT_VERSION, ...content, ...(Object.keys(pictures).length && { pictures }) });
 }
 
 /** Named after the one thing in it, "scythe-encounters", "scythe-factory", "scythe-objectives" or "scythe-structure-bonuses" for a deck of cards (or the tiles) alone, or "scythe-content" when there are several. */
@@ -122,7 +124,7 @@ export function boardProblems(board: Board): string[] {
 }
 
 /** Reads a content file, or the map, factions and mats out of a save file. Throws, in plain words, if it's neither or something in it is broken. */
-export function parseContentFile(text: string): Library {
+export function parseContentFile(text: string): Library & { pictures?: Record<string, string> } {
   const neither = new Error("This file isn't a Scythe content or save file.");
   let data: Record<string, unknown>;
   try {
@@ -177,5 +179,7 @@ export function parseContentFile(text: string): Library {
   for (const c of content.factory) check(c, 'Factory card', () => validateFactoryCard(c));
   for (const c of content.objectives) check(c, 'objective card', () => validateObjectiveCard(c));
   for (const t of content.structureBonuses) check(t, 'structure bonus tile', () => validateStructureBonus(t));
-  return content;
+  // The encounter cards' pictures travel in content files (never in saves).
+  const pictures = data.format === FORMAT ? readPictures(data.pictures) : {};
+  return Object.keys(pictures).length ? { ...content, pictures } : content;
 }

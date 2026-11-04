@@ -53,6 +53,7 @@ import {
   type Structure,
   type TopUpgrade,
   type UnitRef,
+  type EncounterShow,
 } from '@scythe/engine';
 
 /** A place as the side panel names it: a hex ("B3"), your home base, or another one ("the W home base"). */
@@ -145,6 +146,9 @@ export interface Prompt {
   encounter?: {
     name: string;
     story: string;
+    /** The card's picture (a reference to one kept on the device) and what it shows; see content/card-pictures.ts. */
+    picture?: string;
+    show?: EncounterShow;
     hex: HexId;
     /** "Choose one" or, with Meander, "Choose up to two". */
     note: string;
@@ -1177,6 +1181,8 @@ function encounterPrompt(state: GameState, actions: Action[], selection: Selecti
     encounter: {
       name: card.name,
       story: card.story,
+      ...(card.picture && { picture: card.picture }),
+      ...(card.show && { show: card.show }),
       hex: turn.hex,
       note: limit === 1 ? 'Choose one' : turn.picked.length ? `Choose up to ${NUMBER_WORDS[limit - turn.picked.length] ?? limit - turn.picked.length} more` : `Choose up to ${NUMBER_WORDS[limit] ?? limit}`,
       options: card.options.map((o, i) => {

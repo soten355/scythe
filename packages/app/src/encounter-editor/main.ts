@@ -1,13 +1,18 @@
 // Encounter card editor: enter the encounter deck card by card (each card's
-// three options, their costs and rewards), then add it to the game or save
-// it to a file. Plain DOM, no framework.
-import { RESOURCES, type BottomActionType, type EncounterCard } from '@scythe/engine';
+// three options, their costs and rewards, and its picture and story), then
+// add it to the game or save it to a file. Pictures are kept on the device
+// (the cards hold a short reference) and go in the deck's file. Plain DOM, no
+// framework.
+import { RESOURCES, type BottomActionType, type EncounterCard, type EncounterShow } from '@scythe/engine';
 import '../shared/forms.css';
 import '../faction-editor/faction-editor.css';
 import './encounter-editor.css';
 import { EMPTY_LIBRARY } from '../content/library';
 import { addToGame, ask, esc, setPath, showExport, tell } from '../shared/editor-utils';
 import { exportContent } from '../saves/files';
+import { SaveStore } from '../saves/store';
+import { CARD_PICTURE, pictureRef, picturesFor } from '../content/card-pictures';
+import { shrinkPicture, sizeKb } from '../theme/pictures';
 import { costText, gainText } from '../play/prompt';
 import { cleanCard, deckProblems, editable, formatCards, newCard, nextId, toggleAction } from './model';
 
@@ -44,6 +49,18 @@ const update = (next: EncounterCard) => {
   state = { ...state, cards: state.cards.map((c, i) => (i === state.selected ? next : c)) };
   save();
 };
+
+// ---- pictures (kept on the device, by reference) ------------------------------
+
+const store = new SaveStore();
+let pictures: Record<string, string> = {};
+let pictureNote = '';
+const SHOWS: [EncounterShow, string][] = [
+  ['story', 'The story'],
+  ['picture', 'The picture'],
+  ['both', 'Both'],
+  ['none', 'Neither'],
+];
 
 // ---- rendering ---------------------------------------------------------------
 
@@ -119,10 +136,31 @@ function render() {
     <div class="story">
       <label>Story${area('story', c.story, 'A line or two that sets the scene, in your own words', 2)}</label>
     </div>
+    ${pictureRow(c)}
     <div class="options-grid">${[0, 1, 2].map(optionCard).join('')}</div>
     <p class="note">Enter each option's effects as printed on the card, but write the name, story and option text in your own words. Leave a box blank for none.</p>
     <div class="status"></div>`;
   renderStatus();
+}
+
+/** The card's picture, and what the card shows above its options. */
+function pictureRow(c: EncounterCard): string {
+  const url = c.picture ? pictures[c.picture] : undefined;
+  const show = c.show ?? (c.picture ? 'both' : 'story');
+  const missing = c.picture && !url ? ' (not on this device: open the deck file here to bring it)' : '';
+  return `<div class="picture-row">
+      <div class="card-thumb">${url ? `<img src="${esc(url)}" alt="">` : '<span>No picture</span>'}</div>
+      <div class="picture-controls">
+        <label class="show">Shows<select data-show>${SHOWS.map(([v, l]) => `<option value="${v}" ${v === show ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+        <div class="buttons">
+          <button data-act="pic-choose">${c.picture ? 'Change picture…' : 'Choose picture…'}</button>
+          ${c.picture ? '<button data-act="pic-clear">Clear picture</button>' : ''}
+        </div>
+        <small>Above the card's options in the game; with both, the story sits over the bottom of the picture. Best at ${CARD_PICTURE.best.width} × ${CARD_PICTURE.best.height} pixels; bigger pictures are shrunk${url ? ` · ${sizeKb(url)} KB` : ''}${missing}. Use your own pictures, not scans of the printed cards.</small>
+        ${pictureNote ? `<small class="picture-note">${esc(pictureNote)}</small>` : ''}
+      </div>
+      <input type="file" accept="image/*" data-picture hidden>
+    </div>`;
 }
 
 function renderStatus() {
@@ -153,6 +191,10 @@ root.addEventListener('change', (e) => {
     state = { ...state, selected: Number(el.value) };
     save();
     render();
+  } else if (el.dataset.show !== undefined) {
+    update({ ...card(), show: (el as unknown as HTMLSelectElement).value as EncounterShow });
+  } else if (el.dataset.picture !== undefined) {
+    void choosePicture(el);
   } else if (el.dataset.action) {
     update(toggleAction(card(), Number(el.dataset.option), el.dataset.action as BottomActionType, el.checked));
     renderStatus();
@@ -167,9 +209,39 @@ root.addEventListener('input', (e) => {
   if (option) option.textContent = `${state.selected + 1}. ${card().name || card().id}`;
 });
 
+async function choosePicture(input: HTMLInputElement) {
+  const file = input.files?.[0];
+  input.value = '';
+  if (!file) return;
+  const at = state.selected;
+  pictureNote = 'Shrinking the picture…';
+  render();
+  try {
+    const url = await shrinkPicture(file, CARD_PICTURE);
+    const ref = pictureRef(url);
+    await store.putCardPictures({ [ref]: url });
+    pictures = { ...pictures, [ref]: url };
+    if (state.selected === at) update({ ...card(), picture: ref });
+    pictureNote = 'Kept on this device. Add the deck to the game, or save it to a file, to use it.';
+  } catch (err) {
+    pictureNote = err instanceof Error ? err.message : "The picture couldn't be kept on this device (it may be out of room).";
+  }
+  render();
+}
+
 root.addEventListener('click', async (e) => {
   const btn = (e.target as HTMLElement).closest('button');
+  if (btn?.dataset.act !== 'pic-choose') pictureNote = '';
   switch (btn?.dataset.act) {
+    case 'pic-choose':
+      root.querySelector<HTMLInputElement>('[data-picture]')!.click();
+      return;
+    case 'pic-clear': {
+      // The picture stays kept (another card may use it); this card just stops showing it.
+      const { picture: _, ...rest } = card();
+      update(rest as EncounterCard);
+      break;
+    }
     case 'new':
       state = { cards: [...state.cards, newCard(nextId(state.cards))], selected: state.cards.length };
       break;
@@ -190,14 +262,14 @@ root.addEventListener('click', async (e) => {
       const problems = deckProblems(state.cards);
       if (problems.length) return tell(`Fix this first: ${problems.join('; ')}.`);
       const content = { ...EMPTY_LIBRARY, encounters: state.cards.map(cleanCard) };
-      if (btn!.dataset.act === 'file') return exportContent(content);
+      if (btn!.dataset.act === 'file') return exportContent(content, picturesFor(content.encounters, pictures));
       // The deck as it is now replaces any added before (cards deleted here leave the game too).
       return addToGame(content, (added) => `Added ${added.length} encounter card${added.length === 1 ? '' : 's'}. New games now draw encounters from your deck.`, 'encounters');
     }
     case 'export':
       showExport(
         'Export encounter cards',
-        `All ${state.cards.length} card(s). Copy this text and paste it into the chat with Claude.`,
+        `All ${state.cards.length} card(s). Copy this text and paste it into the chat with Claude. Pictures aren't in this text: "Save deck to a file" keeps them.`,
         formatCards(state.cards),
       );
       return;
@@ -209,3 +281,10 @@ root.addEventListener('click', async (e) => {
 });
 
 render();
+store.cardPictures().then(
+  (kept) => {
+    pictures = kept;
+    render();
+  },
+  () => {},
+);

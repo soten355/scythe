@@ -14,7 +14,7 @@
   import { SaveStore } from './saves/store';
   import { exportSave, readSaveFile } from './saves/files';
   import { boardLook, DEFAULT_THEME, uiStyle, type Theme } from './theme/theme';
-  import { useTheme } from './theme/current.svelte';
+  import { useCardPictures, useTheme } from './theme/current.svelte';
   import { addToLibrary, catalogWith, EMPTY_LIBRARY, parseContentFile, removeFromLibrary, type Library, type LibraryKind } from './content/library';
 
   const builtIn = BUILT_IN;
@@ -47,6 +47,7 @@
   /** The theme in use (made in the theme editor), for the board's look. */
   let theme: Theme = $state.raw(DEFAULT_THEME);
   store.theme().then((t) => ((theme = t), useTheme(t)), () => {});
+  store.cardPictures().then(useCardPictures, () => {});
   const look = $derived(boardLook(theme));
   // The look and feel: the theme's colours and fonts, set on the page for every screen to read.
   $effect(() => {
@@ -76,7 +77,13 @@
 
   async function importContent(file: File) {
     try {
-      const { library: next, added } = addToLibrary(library, builtIn, parseContentFile(await file.text()));
+      const content = parseContentFile(await file.text());
+      // Its encounter cards' pictures are kept on the device, apart from the cards.
+      if (content.pictures) {
+        await store.putCardPictures(content.pictures);
+        useCardPictures(await store.cardPictures());
+      }
+      const { library: next, added } = addToLibrary(library, builtIn, content);
       message = added.length ? `Added ${added.join(', ')}.` : 'Nothing new: everything in that file is already here.';
       await keep(next);
     } catch (e) {

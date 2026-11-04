@@ -56,7 +56,14 @@ export interface EncounterCard {
   /** A line or two of our own flavor text, shown above the options. */
   story: string;
   options: [EncounterOption, EncounterOption, EncounterOption];
+  /** The card's picture: a short reference ("pic-…") to one kept on the device, so saves stay small. Display only. */
+  picture?: string;
+  /** What the card shows above its options (display only); by default the story, and the picture too if it has one. */
+  show?: EncounterShow;
 }
+
+export type EncounterShow = 'story' | 'picture' | 'both' | 'none';
+const SHOWS: readonly string[] = ['story', 'picture', 'both', 'none'];
 
 type EncounterStep = Extract<TurnStep, { step: 'encounter' }>;
 
@@ -214,6 +221,8 @@ export function validateEncounterCard(card: EncounterCard): string[] {
   const amount = (n: unknown) => n === undefined || (typeof n === 'number' && Number.isInteger(n) && n >= 0);
   if (!card.name?.trim()) problems.push('name is missing');
   if (!card.id?.trim()) problems.push('ID is missing');
+  if (card.show !== undefined && !SHOWS.includes(card.show)) problems.push('what the card shows must be the story, the picture, both or neither');
+  if (card.picture !== undefined && !/^pic-[a-z0-9]{1,24}$/.test(card.picture)) problems.push("the picture isn't one kept by the app");
   if (!Array.isArray(card.options) || card.options.length !== 3) return [...problems, 'it needs three options'];
   card.options.forEach((o, i) => {
     const which = `option ${i + 1}`;

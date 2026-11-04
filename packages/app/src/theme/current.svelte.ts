@@ -1,12 +1,20 @@
 // The theme in use, for the parts of the game outside the board: each
 // faction's crest, character and mech (crests, the fight screens and the
 // faction's own screen), the fight backdrops, and the pictures behind the
-// menus and the side panel. The app sets the theme here
+// menus and the side panel. Also the encounter cards' pictures kept on the
+// device (they belong to the decks, not the theme). The app sets the theme here
 // once it's read from the device; components ask for a picture and redraw
 // when it changes.
 import { backdropPicture, DEFAULT_THEME, factionSlot, type FactionPart, type Theme } from './theme';
 
-const current = $state<{ theme: Theme }>({ theme: DEFAULT_THEME });
+const current = $state<{ theme: Theme; cards: Record<string, string> }>({ theme: DEFAULT_THEME, cards: {} });
+
+export function useCardPictures(pictures: Record<string, string>) {
+  current.cards = pictures;
+}
+
+/** An encounter card's picture, by its reference, if it's kept on this device. */
+export const cardPicture = (ref: string | undefined): string | undefined => (ref ? current.cards[ref] : undefined);
 
 export function useTheme(theme: Theme) {
   current.theme = theme;

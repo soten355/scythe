@@ -78,4 +78,14 @@ describe('save store', () => {
     // Separate from the library.
     expect(await store.library()).toEqual(EMPTY_LIBRARY);
   });
+
+  it("keeps encounter cards' pictures, each once by its reference, apart from the library and theme", async () => {
+    expect(await store.cardPictures()).toEqual({});
+    await store.putCardPictures({ 'pic-a': 'data:image/jpeg;base64,AA==', 'pic-b': 'data:image/jpeg;base64,BB==' });
+    await store.putCardPictures({ 'pic-a': 'data:image/jpeg;base64,AA==' });
+    expect(await store.cardPictures()).toEqual({ 'pic-a': 'data:image/jpeg;base64,AA==', 'pic-b': 'data:image/jpeg;base64,BB==' });
+    expect(await store.library()).toEqual(EMPTY_LIBRARY);
+    expect(await store.theme()).toEqual(DEFAULT_THEME);
+  });
 });
+

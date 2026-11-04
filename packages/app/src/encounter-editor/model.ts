@@ -48,7 +48,7 @@ export function cleanCard(card: EncounterCard): EncounterCard {
     const gain = { ...keep(counts), ...(RESOURCES.some((r) => res[r]) && { resources: res }), ...(actions.length && { actions: [...actions] }) };
     return { text: o.text.trim(), cost: keep(o.cost), gain };
   }) as EncounterCard['options'];
-  return { id: card.id.trim(), name: card.name.trim(), story: card.story.trim(), options };
+  return { id: card.id.trim(), name: card.name.trim(), story: card.story.trim(), options, ...(card.picture && { picture: card.picture }), ...(card.show && { show: card.show }) };
 }
 
 /** Problems with the whole deck, each naming its card; empty when it's ready. */

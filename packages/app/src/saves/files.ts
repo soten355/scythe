@@ -31,7 +31,8 @@ async function share(file: File): Promise<void> {
 
 export const exportSave = (save: SavedGame) => shareFile(fileName(save), saveFileText(save));
 
-export const exportContent = (content: Library) => shareFile(contentFileName(content), contentFileText(content));
+/** Content to a file, with its encounter cards' pictures (by reference) if any. */
+export const exportContent = (content: Library, pictures?: Record<string, string>) => shareFile(contentFileName(content), contentFileText(content, pictures));
 
 export const exportTheme = (theme: Theme) => shareFile(themeFileName(theme), themeFileText(theme));
 

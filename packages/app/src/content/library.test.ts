@@ -87,6 +87,17 @@ describe('content files', () => {
     expect(parseContentFile(contentFileText(content))).toEqual(content);
   });
 
+  it("carries the encounter cards' pictures, only proper ones", () => {
+    const JPEG = 'data:image/jpeg;base64,/9j/4AAQ';
+    const content = { maps: [], factions: [], mats: [], encounters: [], factory: [], objectives: [], structureBonuses: [] };
+    expect(parseContentFile(contentFileText(content, { 'pic-a': JPEG })).pictures).toEqual({ 'pic-a': JPEG });
+    // None in the file: none read (and none written).
+    expect(contentFileText(content)).not.toContain('pictures');
+    expect(parseContentFile(contentFileText(content)).pictures).toBeUndefined();
+    const odd = JSON.stringify({ format: 'scythe-content', pictures: { 'pic-a': JPEG, 'pic-b': 'https://example.com/x.png' } });
+    expect(parseContentFile(odd).pictures).toEqual({ 'pic-a': JPEG });
+  });
+
   it('names the file after what is in it', () => {
     expect(contentFileName({ maps: [], factions: [myFaction], mats: [], encounters: [], factory: [], objectives: [], structureBonuses: [] })).toBe('scythe-wolves.scythe-content.json');
     expect(contentFileName({ maps: [myMap], factions: [myFaction], mats: [myMat], encounters: [], factory: [], objectives: [], structureBonuses: [] })).toBe('scythe-content.scythe-content.json');
