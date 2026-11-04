@@ -5,11 +5,14 @@
   // misty lake (for Seaworthy and Submerge fights on the water). The
   // fighters stand on the ground line (70% down); the scenery above it is
   // anchored to that line and the ground below it to its top, so the two
-  // always meet whatever the screen shape. Original placeholder art.
+  // always meet whatever the screen shape. Original placeholder art, used
+  // unless the theme has a picture for this terrain (set in the theme editor).
+  import { backdropNow } from '../theme/current.svelte';
   import { backdropFor, rand, ridge, treeline } from './scenery';
 
   let { terrain }: { terrain: string } = $props();
   const kind = $derived(backdropFor(terrain));
+  const picture = $derived(backdropNow(terrain));
 
   // Scenery that never changes, worked out once.
   const forest = {
@@ -53,6 +56,10 @@
   const CHIMNEYS: [number, number][] = [[140, 120], [300, 170], [690, 150], [860, 110]];
 </script>
 
+{#if picture}
+  <!-- The theme's picture: its ground line (70% down) stays where the fighters stand, whatever the screen shape. -->
+  <div class="backdrop picture" aria-hidden="true"><img src={picture} alt="" /></div>
+{:else}
 <div class="backdrop {kind}" aria-hidden="true">
   <div class="sky"></div>
 
@@ -284,6 +291,7 @@
     {/each}
   {/if}
 </div>
+{/if}
 
 <style>
   .backdrop {
@@ -293,6 +301,16 @@
   }
   .backdrop > * {
     position: absolute;
+  }
+  .picture {
+    background: #1e1a16;
+  }
+  .picture img {
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: 50% 70%;
   }
   .sky {
     inset: 0;

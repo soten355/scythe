@@ -1,7 +1,8 @@
 // Theme editor: put your own pictures (made in ComfyUI or anywhere) into the
 // game. For now, the board: the map background, art for each terrain's
 // hexes, each terrain's symbol, the tunnel and encounter markers, and the
-// resource tokens, plus the hex colours. Every change is kept on this device
+// resource tokens, plus the hex colours; and the backdrop behind fights on
+// each terrain. Every change is kept on this device
 // at once and used by the game the next time it opens; themes can be saved
 // to a file and opened on another device. Plain DOM, no framework; shares
 // its look with the other editors.
@@ -162,7 +163,7 @@ function render() {
       <div class="side">
         <h3>Preview</h3>
         ${preview()}
-        <p class="note">Best sizes, in pixels: hex art 448 × 512 (the hex's shape), the map background 1600 × 896, symbols, markers and tokens 256 × 256. Bigger pictures are shrunk to these as they come in, so the board stays quick on the phone. This theme: about ${total} KB.</p>
+        <p class="note">Best sizes, in pixels: hex art 448 × 512 (the hex's shape), the map background and fight backdrops 1600 × 896, symbols, markers and tokens 256 × 256. Bigger pictures are shrunk to these as they come in, so the board stays quick on the phone. This theme: about ${total} KB.</p>
         <p class="note">Use your own pictures (drawn, photographed or generated), not scans of the published game.</p>
         <p class="note">Each faction's crest, units and structures are set in the faction editor (Workshop → Faction editor); they're kept in this theme too, and go with it in the theme file.</p>
       </div>

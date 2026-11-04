@@ -14,7 +14,7 @@
   import { SaveStore } from './saves/store';
   import { exportSave, readSaveFile } from './saves/files';
   import { boardLook, DEFAULT_THEME, type Theme } from './theme/theme';
-  import { useFactionArt } from './theme/faction-art.svelte';
+  import { useTheme } from './theme/current.svelte';
   import { addToLibrary, catalogWith, EMPTY_LIBRARY, parseContentFile, removeFromLibrary, type Library, type LibraryKind } from './content/library';
 
   const builtIn = BUILT_IN;
@@ -46,7 +46,7 @@
   store.library().then((l) => (library = l), () => {});
   /** The theme in use (made in the theme editor), for the board's look. */
   let theme: Theme = $state.raw(DEFAULT_THEME);
-  store.theme().then((t) => ((theme = t), useFactionArt(t)), () => {});
+  store.theme().then((t) => ((theme = t), useTheme(t)), () => {});
   const look = $derived(boardLook(theme));
 
   /** The game Continue picks up: the one open, or the last one played that isn't finished. */

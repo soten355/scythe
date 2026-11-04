@@ -2,7 +2,7 @@
   // A faction's crest: its own picture (set in the faction editor), or else a
   // shield in its colour with its initial, over a cog.
   import type { Faction } from '@scythe/engine';
-  import { factionPicture } from '../theme/faction-art.svelte';
+  import { factionPicture } from '../theme/current.svelte';
   import { isLight } from './ink';
 
   let { faction }: { faction: Faction } = $props();

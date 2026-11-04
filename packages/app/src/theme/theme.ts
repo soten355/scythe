@@ -1,7 +1,8 @@
 // The game's look, set in the theme editor: pictures (made by the owner, e.g.
 // in ComfyUI) for named slots, and colours. For now, the board: the map
 // background, a picture filling each terrain's hexes, each terrain's symbol,
-// the tunnel and encounter markers, and the resource tokens. Each faction's
+// the tunnel and encounter markers, the resource tokens, and the backdrop
+// behind fights on each terrain. Each faction's
 // own pictures (crest, character, mech, worker, structures) are kept here
 // too, under the faction's ID, but set in the faction editor. Anything not
 // set keeps the usual look. Pictures are kept as data URLs, already shrunk
@@ -16,7 +17,7 @@ const TOKENS: Resource[] = ['oil', 'metal', 'wood', 'food'];
 /** A faction's own pictures: its crest, its units and its structures. */
 export type FactionPart = 'crest' | 'character' | 'mech' | 'worker' | Structure;
 
-export type SlotId = 'background' | `hex.${Terrain}` | `symbol.${Terrain | 'tunnel' | 'encounter'}` | `token.${Resource}` | `faction.${string}.${FactionPart}`;
+export type SlotId = 'background' | `hex.${Terrain}` | `symbol.${Terrain | 'tunnel' | 'encounter'}` | `token.${Resource}` | `backdrop.${Terrain}` | `faction.${string}.${FactionPart}`;
 
 export interface Slot {
   id: SlotId;
@@ -72,6 +73,12 @@ export const SLOTS: Slot[] = [
   { id: 'symbol.tunnel', group: 'Markers', label: 'Tunnel', hint: `At the top of tunnel hexes, on a see-through background. ${sizeText(BEST.small)}.` },
   { id: 'symbol.encounter', group: 'Markers', label: 'Encounter', hint: `At the bottom of hexes with an encounter, on a see-through background. ${sizeText(BEST.small)}.` },
   ...TOKENS.map((r): Slot => ({ id: `token.${r}`, group: 'Resource tokens', label: r[0]!.toUpperCase() + r.slice(1), hint: `A resource on the map, on a see-through background. ${sizeText(BEST.small)}.` })),
+  ...TERRAINS.map((t): Slot => ({
+    id: `backdrop.${t}`,
+    group: 'Fight backdrops',
+    label: TERRAIN_NAMES[t],
+    hint: `Behind fights on this terrain, and behind a faction's own screen when its character stands here${t === 'village' ? " (without one, villages use the farm's)" : ''}. The fighters stand on the ground about 70% of the way down, covering the middle; the picture is cropped at the top and bottom on wide screens. ${sizeText(BEST.background)}.`,
+  })),
 ];
 
 const SLOT_IDS = new Set<string>(SLOTS.map((s) => s.id));
@@ -84,7 +91,7 @@ const SLOT_IDS = new Set<string>(SLOTS.map((s) => s.id));
  */
 export function pictureSpec(slot: SlotId): { best: { width: number; height: number }; max: number; type: 'image/jpeg' | 'image/png' } {
   const spec = (best: { width: number; height: number }, type: 'image/jpeg' | 'image/png') => ({ best, max: Math.max(best.width, best.height), type });
-  if (slot === 'background') return spec(BEST.background, 'image/jpeg');
+  if (slot === 'background' || slot.startsWith('backdrop.')) return spec(BEST.background, 'image/jpeg');
   if (slot.startsWith('hex.')) return spec(BEST.hex, 'image/png');
   const part = readFactionSlot(slot)?.part;
   if (part === 'character' || part === 'mech') return spec(BEST.figure, 'image/png');
@@ -136,6 +143,12 @@ export function copyFactionPictures(theme: Theme, from: string, to: string, { mo
     if (move) delete pictures[factionSlot(from, part)];
   }
   return { ...theme, pictures };
+}
+
+/** The picture behind a fight on this terrain, if the theme has one (a village without its own borrows the farm's). */
+export function backdropPicture(theme: Theme, terrain: string): string | undefined {
+  if (!(TERRAINS as string[]).includes(terrain)) return undefined;
+  return theme.pictures[`backdrop.${terrain as Terrain}`] ?? (terrain === 'village' ? theme.pictures['backdrop.farm'] : undefined);
 }
 
 export const setColor = (theme: Theme, terrain: Terrain, color: string): Theme => ({ ...theme, colors: { ...theme.colors, [terrain]: color } });

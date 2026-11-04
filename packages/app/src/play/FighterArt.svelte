@@ -4,7 +4,7 @@
   // else a pilot in a long coat with a pennant, or a riveted walker mech with
   // a cannon arm and a smokestack: original placeholder art in the faction's
   // colour, gently animated.
-  import { factionPicture } from '../theme/faction-art.svelte';
+  import { factionPicture } from '../theme/current.svelte';
 
   let {
     kind,

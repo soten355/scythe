@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { boardLook, clearPicture, copyFactionPictures, DEFAULT_THEME, FACTION_PARTS, factionSlot, parseThemeFile, pictureSpec, setColor, setPicture, SLOTS, themeFileText, type Theme } from './theme';
+import { backdropPicture, boardLook, clearPicture, copyFactionPictures, DEFAULT_THEME, FACTION_PARTS, factionSlot, parseThemeFile, pictureSpec, setColor, setPicture, SLOTS, themeFileText, type Theme } from './theme';
 import { ENCOUNTER_ICON, TERRAIN_ICONS, TUNNEL_ICON } from '../play/icons';
 
 const PNG = 'data:image/png;base64,iVBORw0KGgo=';
@@ -161,5 +161,27 @@ describe("each faction's own pictures (set in the faction editor)", () => {
       pictures: { 'faction.nordic.crest': PNG, 'faction.nordic.hat': PNG, 'faction..crest': PNG, 'faction.nordic.mech': 'https://example.com/x.png' },
     });
     expect(parseThemeFile(odd).pictures).toEqual({ 'faction.nordic.crest': PNG });
+  });
+});
+
+describe('fight backdrops', () => {
+  it('has one for each terrain, a wide picture kept as JPEG', () => {
+    for (const t of ['farm', 'forest', 'mountain', 'tundra', 'village', 'lake', 'factory']) {
+      const slot = SLOTS.find((s) => s.id === `backdrop.${t}`);
+      expect(slot?.group).toBe('Fight backdrops');
+    }
+    expect(pictureSpec('backdrop.forest')).toEqual({ best: { width: 1600, height: 896 }, max: 1600, type: 'image/jpeg' });
+  });
+
+  it("shows the terrain's own picture; a village without one borrows the farm's, as the drawn scenery does", () => {
+    let theme = setPicture(DEFAULT_THEME, 'backdrop.forest', JPEG);
+    expect(backdropPicture(theme, 'forest')).toBe(JPEG);
+    expect(backdropPicture(theme, 'mountain')).toBeUndefined();
+    expect(backdropPicture(theme, 'village')).toBeUndefined();
+    theme = setPicture(theme, 'backdrop.farm', PNG);
+    expect(backdropPicture(theme, 'village')).toBe(PNG);
+    expect(backdropPicture(setPicture(theme, 'backdrop.village', JPEG), 'village')).toBe(JPEG);
+    // Anything else (no terrain known) is drawn as usual.
+    expect(backdropPicture(theme, '')).toBeUndefined();
   });
 });
