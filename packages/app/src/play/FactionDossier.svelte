@@ -9,6 +9,7 @@
   import type { GameState } from '@scythe/engine';
   import { fade, fly } from 'svelte/transition';
   import FactionEmblem from './FactionEmblem.svelte';
+  import FactionPortrait from './FactionPortrait.svelte';
   import FightBackdrop from './FightBackdrop.svelte';
   import FighterArt from './FighterArt.svelte';
   import InlineIcon from './InlineIcon.svelte';
@@ -70,6 +71,7 @@
     <section class="hero" in:fly={{ x: -30, duration: 380 }}>
       <div class="heading">
         <div class="crest"><FactionEmblem {faction} /></div>
+        <FactionPortrait factionId={faction.id} color={d.color} size={72} />
         <div>
           <h2>{d.name}</h2>
           <p class="sub">{d.mat} mat (#{d.matNumber}) · {playedBy(seat)}</p>

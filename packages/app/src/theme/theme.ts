@@ -17,7 +17,7 @@ export const TERRAINS: Terrain[] = ['farm', 'forest', 'mountain', 'tundra', 'vil
 const TOKENS: Resource[] = ['oil', 'metal', 'wood', 'food'];
 
 /** A faction's own pictures: its crest, its units and its structures. */
-export type FactionPart = 'crest' | 'character' | 'mech' | 'worker' | Structure;
+export type FactionPart = 'crest' | 'portrait' | 'character' | 'mech' | 'worker' | Structure;
 
 export type SlotId = 'background' | `hex.${Terrain}` | `symbol.${Terrain | 'tunnel' | 'encounter'}` | `token.${Resource}` | `backdrop.${Terrain}` | 'ui.menu' | 'ui.panel' | `faction.${string}.${FactionPart}`;
 
@@ -40,6 +40,8 @@ const BEST = {
   small: { width: 256, height: 256 },
   /** Behind the side panel in a game: tall and narrow. */
   panel: { width: 512, height: 1024 },
+  /** The character's face, shown in a circle. */
+  portrait: { width: 512, height: 512 },
   /** A standing figure: the character or a mech, on the map and big on the fight screen. */
   figure: { width: 384, height: 512 },
 } as const;
@@ -51,6 +53,7 @@ const FIGURE = `Standing, facing right, on a see-through background: small on th
 /** A faction's picture slots, in the order the faction editor lists them. */
 export const FACTION_PARTS: { part: FactionPart; label: string; hint: string }[] = [
   { part: 'crest', label: 'Crest', hint: `The faction's emblem: on the side panel, the new game screen, its own screen and the final scores. On a see-through background. ${sizeText(BEST.small)}.` },
+  { part: 'portrait', label: 'Portrait', hint: `The character's face, shown in a circle ringed in the faction's colour: on the new game screen, the faction's own screen, fights and the final scores. Keep the face in the middle; the corners are cut off. ${sizeText(BEST.portrait)}.` },
   { part: 'character', label: 'Character', hint: FIGURE },
   { part: 'mech', label: 'Mech', hint: FIGURE },
   { part: 'worker', label: 'Worker', hint: ON_MAP },
@@ -102,6 +105,7 @@ export function pictureSpec(slot: SlotId): { best: { width: number; height: numb
   if (slot.startsWith('hex.')) return spec(BEST.hex, 'image/png');
   const part = readFactionSlot(slot)?.part;
   if (part === 'character' || part === 'mech') return spec(BEST.figure, 'image/png');
+  if (part === 'portrait') return spec(BEST.portrait, 'image/png');
   return spec(BEST.small, 'image/png');
 }
 

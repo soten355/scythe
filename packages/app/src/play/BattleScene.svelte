@@ -7,6 +7,7 @@
   import { onMount } from 'svelte';
   import { lineup, type Battle } from './fight';
   import FighterArt from './FighterArt.svelte';
+  import FactionPortrait from './FactionPortrait.svelte';
 
   let { battle, onDone }: { battle: Battle; onDone: () => void } = $props();
 
@@ -66,7 +67,7 @@
 
     <!-- What they played: power and each card flip in, then the total. -->
     <div class="tally {side}" class:won={from('verdict') && won} class:lost={from('verdict') && !won} style:--c={s.color}>
-      <h2>{s.name}</h2>
+      <h2 class="named"><FactionPortrait factionId={s.factionId} color={s.color} size={34} />{s.name}</h2>
       <div class="sum">
         <span class="chip power" style:--d="0ms">⚡ {s.power}</span>
         {#each s.cards as card, i (i)}
@@ -103,6 +104,15 @@
 </div>
 
 <style>
+  /* The faction's portrait (if it has one) beside its name. */
+  h2.named {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .right h2.named {
+    flex-direction: row-reverse;
+  }
   .scene {
     position: absolute;
     inset: 0;

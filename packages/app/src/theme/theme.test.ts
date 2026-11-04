@@ -115,12 +115,14 @@ describe('the board theme', () => {
 
 describe("each faction's own pictures (set in the faction editor)", () => {
   it('has a crest, the character, a mech, a worker and each structure, at sizes in multiples of 16', () => {
-    expect(FACTION_PARTS.map((p) => p.part)).toEqual(['crest', 'character', 'mech', 'worker', 'mine', 'mill', 'armory', 'monument']);
+    expect(FACTION_PARTS.map((p) => p.part)).toEqual(['crest', 'portrait', 'character', 'mech', 'worker', 'mine', 'mill', 'armory', 'monument']);
     expect(factionSlot('nordic', 'mech')).toBe('faction.nordic.mech');
     expect(pictureSpec('faction.nordic.crest')).toMatchObject({ best: { width: 256, height: 256 }, type: 'image/png' });
     // Figures are taller than wide, and big enough for the fight screen.
     expect(pictureSpec('faction.nordic.character')).toMatchObject({ best: { width: 384, height: 512 }, max: 512, type: 'image/png' });
     expect(pictureSpec('faction.nordic.mine').best).toEqual({ width: 256, height: 256 });
+    // The character's face, shown round: square, sharp enough for the faction's own screen.
+    expect(pictureSpec('faction.nordic.portrait')).toMatchObject({ best: { width: 512, height: 512 }, type: 'image/png' });
     for (const p of FACTION_PARTS) {
       const { best } = pictureSpec(factionSlot('x', p.part));
       expect(best.width % 16 + (best.height % 16)).toBe(0);

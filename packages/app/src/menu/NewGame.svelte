@@ -6,6 +6,7 @@
   // offered after the built-in ones, and can be added or removed here.
   import { untrack } from 'svelte';
   import FactionEmblem from '../play/FactionEmblem.svelte';
+  import FactionPortrait from '../play/FactionPortrait.svelte';
   import type { GameSetup } from '@scythe/engine';
   import type { Level } from '@scythe/bots';
   import { botName } from '../play/seats';
@@ -172,6 +173,7 @@
         {@const m = mat(p.mat)}
         <div class="seat" style:--c={f.color}>
           <div class="crest"><FactionEmblem faction={f} /></div>
+          <FactionPortrait factionId={f.id} color={f.color} size={40} />
           <div class="picks">
             <label>
               <span>Played by</span>

@@ -10,6 +10,7 @@
   import FightBackdrop from './FightBackdrop.svelte';
   import { fightSides, lineup, type Battle, type FightSide } from './fight';
   import FighterArt from './FighterArt.svelte';
+  import FactionPortrait from './FactionPortrait.svelte';
   import type { Button, Prompt, Selection } from './prompt';
   import type { GameState } from '@scythe/engine';
 
@@ -75,7 +76,7 @@
           {/each}
         </div>
         <div class="card">
-          <h2>{s.name}</h2>
+          <h2 class="named"><FactionPortrait factionId={s.factionId} color={s.color} size={40} />{s.name}</h2>
           <p class="role">{role}</p>
           <p class="stats">⚡ {s.power} power · 🃏 {plural(s.cards, 'card')}, plays up to {s.maxCards}</p>
           {#if s.mechs || s.workers}
@@ -132,6 +133,15 @@
 {/if}
 
 <style>
+  /* The faction's portrait (if it has one) beside its name. */
+  h2.named {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .right h2.named {
+    flex-direction: row-reverse;
+  }
   .fight {
     position: fixed;
     inset: 0;

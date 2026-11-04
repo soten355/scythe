@@ -8,6 +8,7 @@
   import { countText } from './structure-bonus-text';
   import { fade, fly } from 'svelte/transition';
   import FactionEmblem from './FactionEmblem.svelte';
+  import FactionPortrait from './FactionPortrait.svelte';
   import { STAR_KIND_ICONS } from './icons';
   import InlineIcon from './InlineIcon.svelte';
 
@@ -66,8 +67,13 @@
           <tr class:first={r.place === 1} style:--f={f.color} in:fly={{ x: 40, duration: 400, delay: 200 + i * 120 }}>
             <td class="place">{PLACES[r.place - 1]}</td>
             <td class="name">
-              <b>{f.name}</b>
-              <small>❤️ {r.popularity}: {tier(r.popularity)} tier</small>
+              <div class="named">
+                <FactionPortrait factionId={f.id} color={f.color} size={32} />
+                <div>
+                  <b>{f.name}</b>
+                  <small>❤️ {r.popularity}: {tier(r.popularity)} tier</small>
+                </div>
+              </div>
             </td>
             <td><b>{r.coins}</b><small>in hand</small></td>
             <td>
@@ -173,6 +179,11 @@
   }
   .name {
     text-align: left;
+  }
+  .named {
+    display: flex;
+    align-items: center;
+    gap: 8px;
   }
   td.name b {
     color: color-mix(in srgb, var(--f) 55%, white);
