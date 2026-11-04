@@ -2,7 +2,8 @@
 // in ComfyUI) for named slots, and colours. For now, the board: the map
 // background, a picture filling each terrain's hexes, each terrain's symbol,
 // the tunnel and encounter markers, the resource tokens, and the backdrop
-// behind fights on each terrain. Each faction's
+// behind fights on each terrain; and the look and feel: the menus' and
+// panels' colours, fonts and pictures. Each faction's
 // own pictures (crest, character, mech, worker, structures) are kept here
 // too, under the faction's ID, but set in the faction editor. Anything not
 // set keeps the usual look. Pictures are kept as data URLs, already shrunk
@@ -10,6 +11,7 @@
 // to or opened from a .scythe-theme.json file.
 import type { Resource, Structure, Terrain } from '@scythe/engine';
 import { ENCOUNTER_ICON, TERRAIN_ICONS, TUNNEL_ICON, type Icon } from '../play/icons';
+import { inkOn } from '../play/ink';
 
 export const TERRAINS: Terrain[] = ['farm', 'forest', 'mountain', 'tundra', 'village', 'lake', 'factory'];
 const TOKENS: Resource[] = ['oil', 'metal', 'wood', 'food'];
@@ -17,7 +19,7 @@ const TOKENS: Resource[] = ['oil', 'metal', 'wood', 'food'];
 /** A faction's own pictures: its crest, its units and its structures. */
 export type FactionPart = 'crest' | 'character' | 'mech' | 'worker' | Structure;
 
-export type SlotId = 'background' | `hex.${Terrain}` | `symbol.${Terrain | 'tunnel' | 'encounter'}` | `token.${Resource}` | `backdrop.${Terrain}` | `faction.${string}.${FactionPart}`;
+export type SlotId = 'background' | `hex.${Terrain}` | `symbol.${Terrain | 'tunnel' | 'encounter'}` | `token.${Resource}` | `backdrop.${Terrain}` | 'ui.menu' | 'ui.panel' | `faction.${string}.${FactionPart}`;
 
 export interface Slot {
   id: SlotId;
@@ -36,6 +38,8 @@ const BEST = {
   background: { width: 1600, height: 896 },
   hex: { width: 448, height: 512 },
   small: { width: 256, height: 256 },
+  /** Behind the side panel in a game: tall and narrow. */
+  panel: { width: 512, height: 1024 },
   /** A standing figure: the character or a mech, on the map and big on the fight screen. */
   figure: { width: 384, height: 512 },
 } as const;
@@ -73,6 +77,8 @@ export const SLOTS: Slot[] = [
   { id: 'symbol.tunnel', group: 'Markers', label: 'Tunnel', hint: `At the top of tunnel hexes, on a see-through background. ${sizeText(BEST.small)}.` },
   { id: 'symbol.encounter', group: 'Markers', label: 'Encounter', hint: `At the bottom of hexes with an encounter, on a see-through background. ${sizeText(BEST.small)}.` },
   ...TOKENS.map((r): Slot => ({ id: `token.${r}`, group: 'Resource tokens', label: r[0]!.toUpperCase() + r.slice(1), hint: `A resource on the map, on a see-through background. ${sizeText(BEST.small)}.` })),
+  { id: 'ui.menu', group: 'Menus and panels', label: 'Menu picture', hint: `Behind the menus: in full on the opening menu, dimmed behind the others so their words stay readable. ${sizeText(BEST.background)}.` },
+  { id: 'ui.panel', group: 'Menus and panels', label: 'Side panel picture', hint: `Behind the side panel in a game, dimmed under its words; cropped to the panel's shape. ${sizeText(BEST.panel)}.` },
   ...TERRAINS.map((t): Slot => ({
     id: `backdrop.${t}`,
     group: 'Fight backdrops',
@@ -91,12 +97,57 @@ const SLOT_IDS = new Set<string>(SLOTS.map((s) => s.id));
  */
 export function pictureSpec(slot: SlotId): { best: { width: number; height: number }; max: number; type: 'image/jpeg' | 'image/png' } {
   const spec = (best: { width: number; height: number }, type: 'image/jpeg' | 'image/png') => ({ best, max: Math.max(best.width, best.height), type });
-  if (slot === 'background' || slot.startsWith('backdrop.')) return spec(BEST.background, 'image/jpeg');
+  if (slot === 'background' || slot === 'ui.menu' || slot.startsWith('backdrop.')) return spec(BEST.background, 'image/jpeg');
+  if (slot === 'ui.panel') return spec(BEST.panel, 'image/jpeg');
   if (slot.startsWith('hex.')) return spec(BEST.hex, 'image/png');
   const part = readFactionSlot(slot)?.part;
   if (part === 'character' || part === 'mech') return spec(BEST.figure, 'image/png');
   return spec(BEST.small, 'image/png');
 }
+
+/** The menus' and panels' colours. */
+export type UiColor = 'background' | 'panel' | 'raised' | 'line' | 'text' | 'accent' | 'highlight';
+
+export const DEFAULT_UI_COLORS: Record<UiColor, string> = {
+  background: '#1e1a16',
+  panel: '#2a241e',
+  raised: '#3a3129',
+  line: '#4a4036',
+  text: '#efe6d4',
+  accent: '#c9a227',
+  highlight: '#ffd23f',
+};
+
+/** Each colour, the CSS variable the app reads it from, and where it shows (in the editor's order). */
+export const UI_COLORS: { id: UiColor; variable: string; label: string; hint: string }[] = [
+  { id: 'background', variable: '--bg', label: 'Background', hint: 'Behind the menus and around the map' },
+  { id: 'panel', variable: '--panel', label: 'Panels', hint: 'The side panel, the top bar, the mat drawer, pop-up menus' },
+  { id: 'raised', variable: '--raised', label: 'Buttons and cards', hint: 'Buttons, list rows, the cards on the menus' },
+  { id: 'line', variable: '--line', label: 'Borders', hint: 'Lines between parts of the panels' },
+  { id: 'text', variable: '--fg', label: 'Text', hint: 'Words on the menus and panels' },
+  { id: 'accent', variable: '--accent', label: 'Accent', hint: 'Main buttons, titles and frames' },
+  { id: 'highlight', variable: '--glow', label: 'Highlight', hint: 'What you can tap now and what is chosen, on the map and the mat' },
+];
+
+export type FontId = 'system' | 'rounded' | 'georgia' | 'newyork' | 'palatino' | 'baskerville' | 'didot' | 'avenir' | 'futura' | 'typewriter' | 'copperplate' | 'mono';
+
+/** Fonts already on both the iPhone and the Mac, so nothing is downloaded; each falls back to a generic family. */
+export const FONTS: { id: FontId; label: string; stack: string }[] = [
+  { id: 'system', label: 'System (plain)', stack: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" },
+  { id: 'rounded', label: 'Rounded', stack: "ui-rounded, 'SF Pro Rounded', -apple-system, sans-serif" },
+  { id: 'avenir', label: 'Avenir Next', stack: "'Avenir Next', Avenir, 'Segoe UI', sans-serif" },
+  { id: 'futura', label: 'Futura', stack: "Futura, 'Trebuchet MS', sans-serif" },
+  { id: 'georgia', label: 'Georgia', stack: "Georgia, 'Times New Roman', serif" },
+  { id: 'newyork', label: 'New York', stack: "ui-serif, 'New York', Georgia, serif" },
+  { id: 'palatino', label: 'Palatino', stack: "Palatino, 'Palatino Linotype', 'Book Antiqua', serif" },
+  { id: 'baskerville', label: 'Baskerville', stack: "Baskerville, 'Baskerville Old Face', Georgia, serif" },
+  { id: 'didot', label: 'Didot', stack: "Didot, 'Bodoni 72', Georgia, serif" },
+  { id: 'copperplate', label: 'Copperplate', stack: "Copperplate, 'Copperplate Gothic Light', Georgia, serif" },
+  { id: 'typewriter', label: 'Typewriter', stack: "'American Typewriter', 'Courier New', monospace" },
+  { id: 'mono', label: 'Monospace', stack: 'ui-monospace, Menlo, Consolas, monospace' },
+];
+const FONT_IDS = new Set<string>(FONTS.map((f) => f.id));
+const fontStack = (id: FontId) => (FONTS.find((f) => f.id === id) ?? FONTS[0]!).stack;
 
 export interface Theme {
   name: string;
@@ -110,9 +161,15 @@ export interface Theme {
   paintedMap: boolean;
   /** Over a map picture: faint hex edges, so the hexes can be told apart. */
   hexEdges: boolean;
+  /** The menus' and panels' colours (anything not set keeps the usual one). */
+  uiColors: Partial<Record<UiColor, string>>;
+  /** Words on the menus and panels. */
+  bodyFont: FontId;
+  /** Titles, and the round card and structure bonus tile. */
+  headingFont: FontId;
 }
 
-export const DEFAULT_THEME: Theme = { name: 'My theme', pictures: {}, colors: {}, symbolsOverArt: false, paintedMap: true, hexEdges: true };
+export const DEFAULT_THEME: Theme = { name: 'My theme', pictures: {}, colors: {}, symbolsOverArt: false, paintedMap: true, hexEdges: true, uiColors: {}, bodyFont: 'system', headingFont: 'georgia' };
 
 export const DEFAULT_COLORS: Record<Terrain, string> = {
   farm: '#d9c46a',
@@ -143,6 +200,18 @@ export function copyFactionPictures(theme: Theme, from: string, to: string, { mo
     if (move) delete pictures[factionSlot(from, part)];
   }
   return { ...theme, pictures };
+}
+
+/** The CSS variables the app's menus and panels read: the colours and fonts chosen, and readable text on the accent and highlight. */
+export function uiStyle(theme: Theme): Record<string, string> {
+  const color = (id: UiColor) => theme.uiColors?.[id] ?? DEFAULT_UI_COLORS[id];
+  const style: Record<string, string> = {};
+  for (const c of UI_COLORS) style[c.variable] = color(c.id);
+  style['--on-accent'] = inkOn(color('accent'));
+  style['--on-glow'] = inkOn(color('highlight'));
+  style['--font-body'] = fontStack(theme.bodyFont ?? DEFAULT_THEME.bodyFont);
+  style['--font-heading'] = fontStack(theme.headingFont ?? DEFAULT_THEME.headingFont);
+  return style;
 }
 
 /** The picture behind a fight on this terrain, if the theme has one (a village without its own borrows the farm's). */
@@ -229,6 +298,11 @@ export function parseThemeFile(text: string): Theme {
   for (const [terrain, color] of Object.entries((data.colors as Record<string, unknown>) ?? {})) {
     if ((TERRAINS as string[]).includes(terrain) && typeof color === 'string' && COLOR.test(color)) colors[terrain as Terrain] = color;
   }
+  const uiColors: Theme['uiColors'] = {};
+  for (const [id, color] of Object.entries((data.uiColors as Record<string, unknown>) ?? {})) {
+    if (id in DEFAULT_UI_COLORS && typeof color === 'string' && COLOR.test(color)) uiColors[id as UiColor] = color;
+  }
+  const font = (v: unknown, usual: FontId): FontId => (typeof v === 'string' && FONT_IDS.has(v) ? (v as FontId) : usual);
   return {
     name: typeof data.name === 'string' && data.name.trim() ? data.name.trim().slice(0, 60) : DEFAULT_THEME.name,
     pictures,
@@ -236,5 +310,8 @@ export function parseThemeFile(text: string): Theme {
     symbolsOverArt: data.symbolsOverArt === true,
     paintedMap: data.paintedMap !== false,
     hexEdges: data.hexEdges !== false,
+    uiColors,
+    bodyFont: font(data.bodyFont, DEFAULT_THEME.bodyFont),
+    headingFont: font(data.headingFont, DEFAULT_THEME.headingFont),
   };
 }

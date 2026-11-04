@@ -1,8 +1,9 @@
 // Theme editor: put your own pictures (made in ComfyUI or anywhere) into the
 // game. For now, the board: the map background, art for each terrain's
 // hexes, each terrain's symbol, the tunnel and encounter markers, and the
-// resource tokens, plus the hex colours; and the backdrop behind fights on
-// each terrain. Every change is kept on this device
+// resource tokens, plus the hex colours; the backdrop behind fights on
+// each terrain; and the look and feel (the menus' and panels' colours, fonts
+// and pictures). Every change is kept on this device
 // at once and used by the game the next time it opens; themes can be saved
 // to a file and opened on another device. Plain DOM, no framework; shares
 // its look with the other editors.
@@ -17,7 +18,7 @@ import { mapPictureFrame } from '../play/map-picture';
 import { mapGuide } from '../theme/map-guide';
 import { center, corners, points, SIZE, type Point } from '../play/geometry';
 import type { Icon } from '../play/icons';
-import { boardLook, clearPicture, DEFAULT_COLORS, DEFAULT_THEME, parseThemeFile, setColor, setPicture, SLOTS, TERRAINS, type SlotId, type Theme } from '../theme/theme';
+import { boardLook, clearPicture, DEFAULT_COLORS, DEFAULT_THEME, DEFAULT_UI_COLORS, FONTS, parseThemeFile, setColor, setPicture, SLOTS, TERRAINS, UI_COLORS, uiStyle, type FontId, type SlotId, type Theme, type UiColor } from '../theme/theme';
 import { pictureFor, sizeKb } from '../theme/pictures';
 
 const store = new SaveStore();
@@ -136,6 +137,44 @@ function mapSettings(): string {
     <label class="check"><input type="checkbox" data-edges ${theme.hexEdges ? 'checked' : ''} ${theme.paintedMap ? '' : 'disabled'}> Faint hex edges over the map picture</label>`;
 }
 
+/** The menus' and panels' colours and fonts. */
+function lookAndFeel(): string {
+  const fontPick = (key: 'bodyFont' | 'headingFont', label: string) =>
+    `<label class="font">${label}<select data-font="${key}">${FONTS.map((f) => `<option value="${f.id}" ${theme[key] === f.id ? 'selected' : ''} style="font-family:${esc(f.stack)}">${esc(f.label)}</option>`).join('')}</select></label>`;
+  const colors = UI_COLORS.map((c) => {
+    const set = theme.uiColors[c.id];
+    return `<div class="slot ui-color">
+      <input type="color" data-ui-color="${c.id}" value="${set ?? DEFAULT_UI_COLORS[c.id]}">
+      <div class="what"><b>${esc(c.label)}</b><small>${esc(c.hint)}</small></div>
+      ${set ? `<button data-act="ui-color-reset" data-ui="${c.id}" title="Back to the usual colour">Usual</button>` : ''}
+    </div>`;
+  }).join('');
+  return `<div class="fonts">${fontPick('headingFont', 'Titles')}${fontPick('bodyFont', 'Words')}</div>
+    <div class="ui-colors">${colors}</div>`;
+}
+
+/** A little menu and panel in the chosen colours and fonts. */
+function uiPreview(): string {
+  const vars = Object.entries(uiStyle(theme)).map(([k, v]) => `${k}:${v}`).join(';');
+  const menu = theme.pictures['ui.menu'];
+  const panel = theme.pictures['ui.panel'];
+  return `<div class="ui-preview" style="${esc(vars)}">
+    <div class="ui-menu" ${menu ? `style="background-image:url('${esc(menu)}')"` : ''}>
+      <h1>Scythe</h1>
+      <span class="ui-btn primary">Continue</span>
+      <span class="ui-btn">New game</span>
+    </div>
+    <div class="ui-panel" ${panel ? `style="background-image:url('${esc(panel)}')"` : ''}>
+      <div class="ui-panel-body">
+        <b>Nordic: choose a section</b>
+        <span class="ui-btn chosen">Move / Build</span>
+        <span class="ui-btn">Trade / Enlist</span>
+        <span class="ui-btn primary">End turn</span>
+      </div>
+    </div>
+  </div>`;
+}
+
 function render() {
   const groups = [...new Set(SLOTS.map((s) => s.group))];
   const total = Object.values(theme.pictures).reduce((n, url) => n + sizeKb(url ?? ''), 0);
@@ -154,6 +193,7 @@ function render() {
           .map(
             (g) => `<section><h3>${esc(g)}</h3>
               ${g === 'Map' ? mapSettings() : ''}
+              ${g === 'Menus and panels' ? lookAndFeel() : ''}
               ${g === 'Hex symbols' ? `<label class="check"><input type="checkbox" data-over ${theme.symbolsOverArt ? 'checked' : ''}> Show symbols over hex art and the map picture too</label>` : ''}
               ${SLOTS.filter((s) => s.group === g).map((s) => slotRow(s.id, s.label, s.hint)).join('')}
             </section>`,
@@ -163,6 +203,7 @@ function render() {
       <div class="side">
         <h3>Preview</h3>
         ${preview()}
+        ${uiPreview()}
         <p class="note">Best sizes, in pixels: hex art 448 × 512 (the hex's shape), the map background and fight backdrops 1600 × 896, symbols, markers and tokens 256 × 256. Bigger pictures are shrunk to these as they come in, so the board stays quick on the phone. This theme: about ${total} KB.</p>
         <p class="note">Use your own pictures (drawn, photographed or generated), not scans of the published game.</p>
         <p class="note">Each faction's crest, units and structures are set in the faction editor (Workshop → Faction editor); they're kept in this theme too, and go with it in the theme file.</p>
@@ -201,6 +242,12 @@ root.addEventListener('click', async (e) => {
       await exportPicture(rivers ? 'scythe-map-guide-rivers.png' : 'scythe-map-guide.png', await mapGuide(MAP, rivers));
       break;
     }
+    case 'ui-color-reset': {
+      const uiColors = { ...theme.uiColors };
+      delete uiColors[btn.dataset.ui as UiColor];
+      await keep({ ...theme, uiColors });
+      break;
+    }
     case 'reset':
       if (await ask('Go back to the usual look? Every picture and colour in this theme, the factions\' pictures too, is removed from the device (save it to a file first to keep it).')) {
         await keep(DEFAULT_THEME, 'Back to the usual look.');
@@ -234,6 +281,10 @@ root.addEventListener('change', async (e) => {
     } catch (err) {
       await tell(err instanceof Error ? err.message : String(err));
     }
+  } else if (el.dataset.uiColor) {
+    await keep({ ...theme, uiColors: { ...theme.uiColors, [el.dataset.uiColor]: el.value } });
+  } else if (el.dataset.font) {
+    await keep({ ...theme, [el.dataset.font]: el.value as FontId });
   } else if (el.dataset.color) {
     await keep(setColor(theme, el.dataset.color as Terrain, el.value));
   } else if (el.dataset.painted !== undefined) {

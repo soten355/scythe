@@ -275,7 +275,7 @@
   }
   h2 {
     margin: 0;
-    font-family: Georgia, 'Times New Roman', serif;
+    font-family: var(--font-heading);
     font-size: clamp(24px, 5vh, 38px);
     color: color-mix(in srgb, var(--c) 45%, white);
   }

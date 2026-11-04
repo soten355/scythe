@@ -203,8 +203,8 @@
 
 <style>
   .drawer {
-    background: #2a241e;
-    border-top: 1px solid #4a4036;
+    background: var(--panel);
+    border-top: 1px solid var(--line);
     font-size: 11px;
   }
   .sections {
@@ -218,7 +218,7 @@
   }
   .toggle {
     background: none;
-    border: 1px solid #4a4036;
+    border: 1px solid var(--line);
     border-radius: 6px;
     padding: 0 8px;
     min-width: 52px;
@@ -226,14 +226,14 @@
   .section {
     flex: 1;
     text-align: left;
-    background: #1e1a16;
-    border: 2px solid #3a3129;
+    background: var(--bg);
+    border: 2px solid var(--raised);
     border-radius: 6px;
     padding: 4px 6px;
     opacity: 1;
   }
   .chip {
-    background: #3a3129;
+    background: var(--raised);
     border: 1px solid #fff6c8;
     border-radius: 5px;
     padding: 1px 6px;
@@ -241,9 +241,9 @@
     animation: glow 1.4s ease-in-out infinite;
   }
   .chip.chosen {
-    border-color: #ffd23f;
-    background: #ffd23f;
-    color: #1e1a16;
+    border-color: var(--glow);
+    background: var(--glow);
+    color: var(--on-glow);
     animation: none;
   }
   @keyframes glow {
@@ -268,7 +268,7 @@
     color: #9be08a;
   }
   .objective.done b {
-    color: #ffd23f;
+    color: var(--glow);
   }
   .objective.closed {
     opacity: 0.45;
@@ -279,8 +279,8 @@
   }
   .section.active,
   .section.active.choosable {
-    border-color: #ffd23f;
-    background: #3a3020;
+    border-color: var(--glow);
+    background: color-mix(in srgb, var(--glow) 16%, var(--bg));
   }
   .section.last {
     opacity: 0.45;
@@ -299,7 +299,7 @@
   .bottom {
     margin-top: 2px;
     padding-top: 2px;
-    border-top: 1px dashed #4a4036;
+    border-top: 1px dashed var(--line);
   }
   .dim {
     opacity: 0.65;

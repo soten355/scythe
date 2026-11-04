@@ -110,7 +110,7 @@
     gap: 10px;
     padding: 7px 10px;
     border-radius: 8px;
-    background: #2a241e;
+    background: var(--panel);
   }
   li.empty {
     justify-content: center;
@@ -125,7 +125,7 @@
     height: 14px;
     border-radius: 50%;
     background: var(--c);
-    border: 2px solid #2a241e;
+    border: 2px solid var(--panel);
     margin-left: -5px;
   }
   .dot:first-child {
@@ -163,7 +163,7 @@
   button {
     font: inherit;
     color: var(--fg);
-    background: #3a3129;
+    background: var(--raised);
     border: 1px solid var(--accent);
     border-radius: 7px;
     padding: 6px 10px;
@@ -171,7 +171,7 @@
   }
   button.primary {
     background: var(--accent);
-    color: #1e1a16;
+    color: var(--on-accent);
     font-weight: 700;
     padding: 6px 18px;
   }

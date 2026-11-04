@@ -35,6 +35,7 @@
   import { botName, isBot, needsPass, people } from './seats';
   import { botTurnsSince, paceOf } from './narrate';
   import type { BoardLook } from '../theme/theme';
+  import { uiPicture } from '../theme/current.svelte';
 
   let {
     save,
@@ -54,6 +55,8 @@
     /** The board's pictures and colours, from the theme in use. */
     look?: BoardLook;
   } = $props();
+  /** The theme's picture behind the side panel, if any. */
+  const panelPicture = $derived(uiPicture('ui.panel'));
 
   // The save given never changes for a game: another game is a new Game.
   // svelte-ignore state_referenced_locally
@@ -501,6 +504,7 @@
       </div>
       <Board game={shown} {prompt} onTap={tap} onPick={(sel) => (selection = sel)} guideTo={guide(game, prompt)} paused={handoff !== null} {travel} moveMs={settings.moveMs} {look} /></div>
     <aside style:--c={color(seatNow)}>
+      {#if panelPicture}<div class="panel-picture" style:background-image="url({panelPicture})" aria-hidden="true"></div>{/if}
       <!-- Whoever acts now: their crest shows, then fades behind the text as it appears (again each time play passes, once the pass screen is gone). -->
       {#key intro}
         <div class="emblem"><FactionEmblem faction={game.setup.players[seatNow]!.faction} /></div>
@@ -752,7 +756,7 @@
     min-width: 150px;
     padding: 4px;
     border-radius: 8px;
-    background: #2a241e;
+    background: var(--panel);
     box-shadow: 0 6px 18px rgb(0 0 0 / 0.5);
   }
   .menu-list > * {
@@ -787,7 +791,7 @@
     gap: 6px;
     padding: 6px;
     border-left: 3px solid var(--c);
-    background: #241f1a;
+    background: color-mix(in srgb, var(--panel) 75%, var(--bg));
     font-size: 13px;
   }
   @keyframes text-in {
@@ -826,7 +830,21 @@
     }
   }
   /* Everything in the side panel sits above the crest. */
-  aside > :not(.emblem) {
+  /* The theme's side panel picture, dimmed under the words (the crest still shows over it). */
+  .panel-picture {
+    position: absolute;
+    z-index: 0;
+    inset: 0;
+    background: center / cover no-repeat;
+    pointer-events: none;
+  }
+  .panel-picture::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: color-mix(in srgb, var(--panel) 72%, transparent);
+  }
+  aside > :not(.emblem, .panel-picture) {
     position: relative;
     z-index: 1;
   }
@@ -846,7 +864,7 @@
   }
   hr {
     border: none;
-    border-top: 1px solid #4a4036;
+    border-top: 1px solid var(--line);
     margin: 8px 0;
   }
   .done,
@@ -905,7 +923,7 @@
   }
   .slot.empty {
     border-style: dashed;
-    border-color: #4a4036;
+    border-color: var(--line);
     opacity: 0.6;
   }
   .trash {
@@ -953,7 +971,7 @@
   button {
     font: inherit;
     color: var(--fg);
-    background: #3a3129;
+    background: var(--raised);
     border: 1px solid var(--accent);
     border-radius: 7px;
     padding: 8px;
@@ -961,7 +979,7 @@
     min-height: 36px;
   }
   button.quiet {
-    border-color: #4a4036;
+    border-color: var(--line);
     background: none;
   }
   button.primary {
@@ -969,7 +987,7 @@
     font-weight: 700;
     font-size: 15px;
     background: var(--accent);
-    color: #1e1a16;
+    color: var(--on-accent);
   }
   button.dim {
     opacity: 0.4;
@@ -980,8 +998,8 @@
     padding: 4px;
   }
   button.chosen {
-    border-color: #ffd23f;
-    background: #4a3d1e;
+    border-color: var(--glow);
+    background: color-mix(in srgb, var(--glow) 22%, var(--panel));
   }
   button:disabled {
     opacity: 0.35;
@@ -1077,7 +1095,7 @@
     background: #e9dcc0;
     color: #2a241e;
     box-shadow: 0 2px 6px rgb(0 0 0 / 0.4);
-    font-family: Georgia, 'Times New Roman', serif;
+    font-family: var(--font-heading);
     line-height: 1;
   }
   .round small {
@@ -1183,12 +1201,12 @@
     border-radius: 4px;
     background: #e9dcc0;
     color: #2a241e;
-    font-family: Georgia, 'Times New Roman', serif;
+    font-family: var(--font-heading);
     font-size: 17px;
   }
   .hand .card.chosen {
-    background: #ffd23f;
-    box-shadow: 0 0 0 2px #ffd23f;
+    background: var(--glow);
+    box-shadow: 0 0 0 2px var(--glow);
   }
   .total {
     text-align: right;

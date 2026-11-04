@@ -13,7 +13,7 @@
   import { createSave, restore, type SavedGame } from './saves/save';
   import { SaveStore } from './saves/store';
   import { exportSave, readSaveFile } from './saves/files';
-  import { boardLook, DEFAULT_THEME, type Theme } from './theme/theme';
+  import { boardLook, DEFAULT_THEME, uiStyle, type Theme } from './theme/theme';
   import { useTheme } from './theme/current.svelte';
   import { addToLibrary, catalogWith, EMPTY_LIBRARY, parseContentFile, removeFromLibrary, type Library, type LibraryKind } from './content/library';
 
@@ -48,6 +48,11 @@
   let theme: Theme = $state.raw(DEFAULT_THEME);
   store.theme().then((t) => ((theme = t), useTheme(t)), () => {});
   const look = $derived(boardLook(theme));
+  // The look and feel: the theme's colours and fonts, set on the page for every screen to read.
+  $effect(() => {
+    for (const [name, value] of Object.entries(uiStyle(theme))) document.documentElement.style.setProperty(name, value);
+  });
+  const menuPicture = $derived(theme.pictures['ui.menu']);
 
   /** The game Continue picks up: the one open, or the last one played that isn't finished. */
   const resumable = $derived(current?.save ?? saves.find((s) => !s.finished) ?? null);
@@ -130,6 +135,11 @@
   }
 </script>
 
+{#if menuPicture && screen !== 'game'}
+  <!-- The theme's menu picture: in full behind the opening menu, dimmed behind the others. -->
+  <div class="menu-picture" class:dim={screen !== 'home'} style:background-image="url({menuPicture})" aria-hidden="true"></div>
+{/if}
+
 {#if screen === 'home'}
   <Home canContinue={resumable !== null} savedCount={saves.length} onContinue={() => resumable && play(resumable)} onNewGame={() => go('new')} onSaves={() => go('saves')} onWorkshop={() => go('workshop')} />
 {:else if screen === 'workshop'}
@@ -151,5 +161,21 @@
 <style>
   .hidden {
     display: none;
+  }
+  .menu-picture {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background: center / cover no-repeat;
+  }
+  /* A soft pool of the background colour behind the opening menu's buttons, so they read over any picture. */
+  .menu-picture::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse 34% 60% at 50% 50%, color-mix(in srgb, var(--bg) 70%, transparent), transparent);
+  }
+  .menu-picture.dim::after {
+    background: color-mix(in srgb, var(--bg) 82%, transparent);
   }
 </style>

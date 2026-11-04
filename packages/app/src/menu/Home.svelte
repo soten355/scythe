@@ -51,13 +51,13 @@
     padding: 11px;
     border-radius: 8px;
     border: 1px solid var(--accent);
-    background: #3a3129;
+    background: var(--raised);
     color: var(--fg);
     cursor: pointer;
   }
   button.primary {
     background: var(--accent);
-    color: #1e1a16;
+    color: var(--on-accent);
     font-weight: 700;
   }
   .meta {

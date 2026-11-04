@@ -289,7 +289,7 @@
     font-weight: 700;
   }
   .power {
-    background: #3a3129;
+    background: var(--raised);
     border: 1px solid var(--accent);
   }
   .card {
@@ -368,7 +368,7 @@
     padding: 6px 0 8px;
     text-align: center;
     background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--c) 70%, #120d0a) 20%, color-mix(in srgb, var(--c) 70%, #120d0a) 80%, transparent);
-    border-block: 2px solid color-mix(in srgb, var(--c) 50%, #ffd23f);
+    border-block: 2px solid color-mix(in srgb, var(--c) 50%, var(--glow));
     animation: band 0.5s cubic-bezier(0.2, 1.4, 0.4, 1) both;
   }
   @keyframes band {
@@ -381,7 +381,7 @@
     letter-spacing: 0.4em;
     text-transform: uppercase;
     font-size: 12px;
-    color: #ffd23f;
+    color: var(--glow);
   }
   .who {
     font-size: clamp(28px, 8vh, 60px);
@@ -406,7 +406,7 @@
     border-radius: 7px;
     border: 1px solid var(--accent);
     background: var(--accent);
-    color: #1e1a16;
+    color: var(--on-accent);
     cursor: pointer;
   }
   .skip {

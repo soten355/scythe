@@ -260,7 +260,7 @@
     margin: 0 0 6px;
     padding: 5px 8px;
     border-radius: 6px;
-    background: #3a3129;
+    background: var(--raised);
     font-size: 12px;
   }
   .yours {
@@ -300,7 +300,7 @@
   button {
     font: inherit;
     color: var(--fg);
-    background: #3a3129;
+    background: var(--raised);
     border: 1px solid var(--accent);
     border-radius: 7px;
     padding: 6px 10px;
@@ -308,7 +308,7 @@
   }
   button.primary {
     background: var(--accent);
-    color: #1e1a16;
+    color: var(--on-accent);
     font-weight: 700;
     padding: 6px 18px;
   }
@@ -321,8 +321,8 @@
     padding: 2px 6px;
   }
   button.chosen {
-    border-color: #ffd23f;
-    background: #4a3d1e;
+    border-color: var(--glow);
+    background: color-mix(in srgb, var(--glow) 22%, var(--panel));
   }
   button:disabled {
     opacity: 0.35;
@@ -362,7 +362,7 @@
     padding: 5px 8px;
     border-left: 4px solid var(--c);
     border-radius: 6px;
-    background: #2a241e;
+    background: var(--panel);
   }
   .crest {
     width: 40px;
@@ -386,7 +386,7 @@
   select {
     font: inherit;
     color: var(--fg);
-    background: #3a3129;
+    background: var(--raised);
     border: 1px solid #5a4d3e;
     border-radius: 6px;
     padding: 3px 4px;

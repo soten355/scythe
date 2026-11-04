@@ -106,7 +106,7 @@
     gap: 6px;
     padding: calc(env(safe-area-inset-top) + 8px) calc(env(safe-area-inset-right) + 12px) calc(env(safe-area-inset-bottom) + 8px)
       calc(env(safe-area-inset-left) + 12px);
-    background: radial-gradient(ellipse at top, color-mix(in srgb, var(--c) 35%, #1e1a16), #120e0b 70%);
+    background: radial-gradient(ellipse at top, color-mix(in srgb, var(--c) 35%, var(--bg)), #120e0b 70%);
     font-size: 13px;
   }
   header {
@@ -123,7 +123,7 @@
     letter-spacing: 0.35em;
     text-transform: uppercase;
     font-size: 11px;
-    color: #ffd23f;
+    color: var(--glow);
   }
   h2 {
     margin: 0;
@@ -189,7 +189,7 @@
     background: color-mix(in srgb, var(--f) 22%, rgb(20 14 10 / 0.8));
   }
   tr.first .place {
-    color: #ffd23f;
+    color: var(--glow);
   }
   .note {
     margin: 0;
@@ -205,7 +205,7 @@
   button {
     font: inherit;
     color: var(--fg);
-    background: #3a3129;
+    background: var(--raised);
     border: 1px solid var(--accent);
     border-radius: 7px;
     padding: 6px 14px;
@@ -213,7 +213,7 @@
   }
   button.primary {
     background: var(--accent);
-    color: #1e1a16;
+    color: var(--on-accent);
     font-weight: 700;
   }
   button.quiet {

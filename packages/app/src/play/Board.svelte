@@ -526,10 +526,10 @@
     {@const fx = (f.width * MAP_PICTURE.margin * 0.8) / MAP_PICTURE.width}
     {@const fy = (f.height * MAP_PICTURE.margin * 0.8) / MAP_PICTURE.height}
     <defs>
-      <linearGradient id="fade-down" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1e1a16" /><stop offset="1" stop-color="#1e1a16" stop-opacity="0" /></linearGradient>
-      <linearGradient id="fade-up" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#1e1a16" /><stop offset="1" stop-color="#1e1a16" stop-opacity="0" /></linearGradient>
-      <linearGradient id="fade-right" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#1e1a16" /><stop offset="1" stop-color="#1e1a16" stop-opacity="0" /></linearGradient>
-      <linearGradient id="fade-left" x1="1" y1="0" x2="0" y2="0"><stop offset="0" stop-color="#1e1a16" /><stop offset="1" stop-color="#1e1a16" stop-opacity="0" /></linearGradient>
+      <linearGradient id="fade-down" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color: var(--bg)" /><stop offset="1" style="stop-color: var(--bg)" stop-opacity="0" /></linearGradient>
+      <linearGradient id="fade-up" x1="0" y1="1" x2="0" y2="0"><stop offset="0" style="stop-color: var(--bg)" /><stop offset="1" style="stop-color: var(--bg)" stop-opacity="0" /></linearGradient>
+      <linearGradient id="fade-right" x1="0" y1="0" x2="1" y2="0"><stop offset="0" style="stop-color: var(--bg)" /><stop offset="1" style="stop-color: var(--bg)" stop-opacity="0" /></linearGradient>
+      <linearGradient id="fade-left" x1="1" y1="0" x2="0" y2="0"><stop offset="0" style="stop-color: var(--bg)" /><stop offset="1" style="stop-color: var(--bg)" stop-opacity="0" /></linearGradient>
     </defs>
     <g class="map-picture">
       <image href={look.background} x={f.x} y={f.y} width={f.width} height={f.height} preserveAspectRatio="none" />
@@ -831,7 +831,7 @@
   }
   .outline.selected,
   .home.selected {
-    stroke: #ffd23f;
+    stroke: var(--glow);
     stroke-width: 4;
     animation: none;
   }
@@ -877,7 +877,7 @@
   }
   .pick-ring.picked {
     fill: rgba(255, 210, 63, 0.3);
-    stroke: #ffd23f;
+    stroke: var(--glow);
     stroke-width: 2.5;
     animation: none;
   }
@@ -891,21 +891,21 @@
     stroke-width: 2;
   }
   .character.picked {
-    stroke: #ffd23f;
+    stroke: var(--glow);
     stroke-width: 3;
   }
   .travel {
     pointer-events: none;
   }
   .flight {
-    stroke: #ffd23f;
+    stroke: var(--glow);
     stroke-width: 1;
     transform-box: fill-box;
     transform-origin: center;
     pointer-events: none;
   }
   .cargo {
-    stroke: #ffd23f;
+    stroke: var(--glow);
     stroke-width: 1;
   }
   .character,

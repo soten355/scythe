@@ -80,7 +80,7 @@
     padding: 6px 12px;
     border-radius: 8px;
     border: 1px solid var(--accent);
-    background: #3a3129;
+    background: var(--raised);
     color: var(--fg);
     cursor: pointer;
   }
@@ -106,7 +106,7 @@
     align-items: center;
     padding: 10px 12px;
     border-radius: 8px;
-    background: #2a241e;
+    background: var(--panel);
     border: 1px solid rgb(201 162 39 / 0.35);
     color: var(--fg);
     text-decoration: none;
@@ -114,7 +114,7 @@
   .tool:active,
   .tool:hover {
     border-color: var(--accent);
-    background: #3a3129;
+    background: var(--raised);
   }
   .icon {
     font-size: 24px;

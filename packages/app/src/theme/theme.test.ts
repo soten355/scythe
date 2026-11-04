@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { backdropPicture, boardLook, clearPicture, copyFactionPictures, DEFAULT_THEME, FACTION_PARTS, factionSlot, parseThemeFile, pictureSpec, setColor, setPicture, SLOTS, themeFileText, type Theme } from './theme';
+import { backdropPicture, DEFAULT_UI_COLORS, FONTS, uiStyle, UI_COLORS, boardLook, clearPicture, copyFactionPictures, DEFAULT_THEME, FACTION_PARTS, factionSlot, parseThemeFile, pictureSpec, setColor, setPicture, SLOTS, themeFileText, type Theme } from './theme';
 import { ENCOUNTER_ICON, TERRAIN_ICONS, TUNNEL_ICON } from '../play/icons';
 
 const PNG = 'data:image/png;base64,iVBORw0KGgo=';
@@ -183,5 +183,52 @@ describe('fight backdrops', () => {
     expect(backdropPicture(setPicture(theme, 'backdrop.village', JPEG), 'village')).toBe(JPEG);
     // Anything else (no terrain known) is drawn as usual.
     expect(backdropPicture(theme, '')).toBeUndefined();
+  });
+});
+
+describe('look and feel', () => {
+  it('starts as the usual look: the usual colours and fonts', () => {
+    const style = uiStyle(DEFAULT_THEME);
+    expect(style['--bg']).toBe('#1e1a16');
+    expect(style['--panel']).toBe('#2a241e');
+    expect(style['--accent']).toBe('#c9a227');
+    expect(style['--glow']).toBe('#ffd23f');
+    expect(style['--fg']).toBe('#efe6d4');
+    expect(style['--font-body']).toContain('-apple-system');
+    expect(style['--font-heading']).toContain('Georgia');
+    for (const c of UI_COLORS) expect(style[c.variable]).toBe(DEFAULT_UI_COLORS[c.id]);
+  });
+
+  it('uses the colours and fonts chosen, with text on the accent and highlight that stays readable', () => {
+    const theme: Theme = { ...DEFAULT_THEME, uiColors: { accent: '#1a3a6a', highlight: '#ffffff', panel: '#102030' }, bodyFont: 'avenir', headingFont: 'copperplate' };
+    const style = uiStyle(theme);
+    expect(style['--accent']).toBe('#1a3a6a');
+    expect(style['--on-accent']).toBe('#ffffff');
+    expect(style['--on-glow']).toBe('#1e1a16');
+    expect(style['--panel']).toBe('#102030');
+    expect(style['--bg']).toBe('#1e1a16');
+    expect(style['--font-body']).toBe(FONTS.find((f) => f.id === 'avenir')!.stack);
+    expect(style['--font-heading']).toBe(FONTS.find((f) => f.id === 'copperplate')!.stack);
+  });
+
+  it('only offers fonts already on the iPhone and the Mac (nothing to download)', () => {
+    expect(FONTS.length).toBeGreaterThanOrEqual(8);
+    // Each ends in a generic family, so something always shows.
+    for (const f of FONTS) expect(f.stack).toMatch(/(serif|sans-serif|monospace)$/);
+  });
+
+  it('has a picture behind the menus and behind the side panel', () => {
+    expect(SLOTS.find((s) => s.id === 'ui.menu')?.group).toBe('Menus and panels');
+    expect(pictureSpec('ui.menu')).toMatchObject({ best: { width: 1600, height: 896 }, type: 'image/jpeg' });
+    expect(pictureSpec('ui.panel')).toMatchObject({ best: { width: 512, height: 1024 }, type: 'image/jpeg' });
+  });
+
+  it('goes to a file and back, keeping only known colours and fonts', () => {
+    const theme: Theme = { ...DEFAULT_THEME, uiColors: { text: '#ffeedd' }, bodyFont: 'palatino', headingFont: 'didot' };
+    expect(parseThemeFile(themeFileText(theme))).toEqual(theme);
+    const odd = parseThemeFile(JSON.stringify({ format: 'scythe-theme', uiColors: { text: '#abc', sky: '#123456', accent: 'url(x)' }, bodyFont: 'comic', headingFont: 42 }));
+    expect(odd.uiColors).toEqual({ text: '#abc' });
+    expect(odd.bodyFont).toBe(DEFAULT_THEME.bodyFont);
+    expect(odd.headingFont).toBe(DEFAULT_THEME.headingFont);
   });
 });

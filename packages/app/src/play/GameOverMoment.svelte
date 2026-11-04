@@ -72,7 +72,7 @@
     padding: 0;
     font: inherit;
     color: var(--fg);
-    background: radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--c) 35%, #1e1a16) 0%, #120f0c 70%);
+    background: radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--c) 35%, var(--bg)) 0%, #120f0c 70%);
     cursor: pointer;
   }
   /* Slowly turning light behind the star. */

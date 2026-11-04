@@ -309,7 +309,7 @@
   button {
     font: inherit;
     color: var(--fg);
-    background: #3a3129;
+    background: var(--raised);
     border: 1px solid var(--accent);
     border-radius: 7px;
     padding: 4px 10px;
@@ -330,12 +330,12 @@
     border-color: #6a5a3a;
   }
   button.chosen {
-    border-color: #ffd23f;
-    background: #4a3d1e;
+    border-color: var(--glow);
+    background: color-mix(in srgb, var(--glow) 22%, var(--panel));
     box-shadow: 0 0 8px rgb(255 210 63 / 0.6);
   }
   .cc.chosen {
-    background: linear-gradient(#fff6c8, #ffd23f);
+    background: linear-gradient(#fff6c8, var(--glow));
     transform: translateY(-4px);
   }
   button:disabled {
@@ -343,7 +343,7 @@
   }
   button.primary {
     background: var(--accent);
-    color: #1e1a16;
+    color: var(--on-accent);
     font-weight: 700;
   }
   button.quiet {

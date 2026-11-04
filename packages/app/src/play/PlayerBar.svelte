@@ -67,7 +67,7 @@
     padding: 3px 8px;
     border-radius: 6px;
     border: 2px solid transparent;
-    background: #2a241e;
+    background: var(--panel);
     white-space: nowrap;
     font: inherit;
     color: inherit;
