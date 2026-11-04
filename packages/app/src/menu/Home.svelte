@@ -1,6 +1,7 @@
 <script lang="ts">
   // The opening menu: continue the last game, start a new one, pick a saved
-  // game, or open the workshop (the editors and tools).
+  // game, browse the codex (factions, mats, cards), or open the workshop
+  // (the editors and tools).
   import { ENGINE_VERSION } from '@scythe/engine';
 
   let {
@@ -9,8 +10,9 @@
     onContinue,
     onNewGame,
     onSaves,
+    onCodex,
     onWorkshop,
-  }: { canContinue: boolean; savedCount: number; onContinue: () => void; onNewGame: () => void; onSaves: () => void; onWorkshop: () => void } = $props();
+  }: { canContinue: boolean; savedCount: number; onContinue: () => void; onNewGame: () => void; onSaves: () => void; onCodex: () => void; onWorkshop: () => void } = $props();
 </script>
 
 <div class="home">
@@ -23,6 +25,7 @@
       <button class="primary" onclick={onNewGame}>New game</button>
     {/if}
     <button onclick={onSaves}>Saved games{savedCount ? ` (${savedCount})` : ''}</button>
+    <button onclick={onCodex}>📖 Codex</button>
     <button onclick={onWorkshop}>🛠️ Workshop</button>
   </nav>
   <p class="meta">engine v{ENGINE_VERSION}</p>

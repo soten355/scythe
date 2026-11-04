@@ -7,6 +7,7 @@
   import Game from './play/Game.svelte';
   import Home from './menu/Home.svelte';
   import Workshop from './menu/Workshop.svelte';
+  import Codex from './menu/Codex.svelte';
   import NewGame from './menu/NewGame.svelte';
   import SavedGames from './menu/SavedGames.svelte';
   import { BUILT_IN } from './content/catalog';
@@ -22,7 +23,7 @@
   const store = new SaveStore();
 
   // The editors' back links come back to the workshop (#workshop).
-  let screen: 'home' | 'new' | 'saves' | 'workshop' | 'game' = $state(location.hash === '#workshop' ? 'workshop' : 'home');
+  let screen: 'home' | 'new' | 'saves' | 'workshop' | 'codex' | 'game' = $state(location.hash === '#workshop' ? 'workshop' : 'home');
   if (location.hash) history.replaceState(null, '', location.pathname + location.search);
   /** The game open (as it was when opened: the game itself keeps its moves). */
   let current = $state.raw<{ key: number; save: SavedGame } | null>(null);
@@ -63,7 +64,7 @@
     message = '';
     if (to === 'home' || to === 'saves') void refresh();
     // The editors may have added to the library since.
-    if (to === 'new') store.library().then((l) => (library = l), () => {});
+    if (to === 'new' || to === 'codex') store.library().then((l) => (library = l), () => {});
   }
 
   async function keep(next: Library) {
@@ -148,7 +149,9 @@
 {/if}
 
 {#if screen === 'home'}
-  <Home canContinue={resumable !== null} savedCount={saves.length} onContinue={() => resumable && play(resumable)} onNewGame={() => go('new')} onSaves={() => go('saves')} onWorkshop={() => go('workshop')} />
+  <Home canContinue={resumable !== null} savedCount={saves.length} onContinue={() => resumable && play(resumable)} onNewGame={() => go('new')} onSaves={() => go('saves')} onCodex={() => go('codex')} onWorkshop={() => go('workshop')} />
+{:else if screen === 'codex'}
+  <Codex {catalog} {builtIn} board={builtIn.maps[0]!.board} onBack={() => go('home')} />
 {:else if screen === 'workshop'}
   <Workshop onBack={() => go('home')} />
 {:else if screen === 'new'}
