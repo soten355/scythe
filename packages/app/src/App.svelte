@@ -151,7 +151,7 @@
 {#if screen === 'home'}
   <Home canContinue={resumable !== null} savedCount={saves.length} onContinue={() => resumable && play(resumable)} onNewGame={() => go('new')} onSaves={() => go('saves')} onCodex={() => go('codex')} onWorkshop={() => go('workshop')} />
 {:else if screen === 'codex'}
-  <Codex {catalog} {builtIn} board={builtIn.maps[0]!.board} onBack={() => go('home')} />
+  <Codex {catalog} {builtIn} board={builtIn.maps[0]!.board} {look} onBack={() => go('home')} />
 {:else if screen === 'workshop'}
   <Workshop onBack={() => go('home')} />
 {:else if screen === 'new'}

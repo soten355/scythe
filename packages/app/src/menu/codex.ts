@@ -1,16 +1,18 @@
-// The codex: everything new games use (factions, mats, and the encounter,
+// The codex: everything new games use (maps, factions, mats, and the encounter,
 // Factory and objective decks and the structure bonus tiles), browsed one at
 // a time from the main menu. This file turns each into what the codex shows,
 // in the words the game uses; Codex.svelte draws it.
+import { newGame, type GameState } from '@scythe/engine';
 import type { Board, EncounterCard, Faction, FactoryCard, ObjectiveCard, PlayerMat, RecruitBonus, StructureBonusTile, Terrain, Upgradeable } from '@scythe/engine';
 import type { Catalog } from './setup';
 import { costText, gainText, moveText } from '../play/prompt';
 import { objectiveText } from '../play/objective-text';
 import { countText } from '../play/structure-bonus-text';
 
-export type CodexKind = 'factions' | 'mats' | 'encounters' | 'factory' | 'objectives' | 'structureBonuses';
+export type CodexKind = 'maps' | 'factions' | 'mats' | 'encounters' | 'factory' | 'objectives' | 'structureBonuses';
 
 export const CODEX_TABS: { kind: CodexKind; label: string; icon: string }[] = [
+  { kind: 'maps', label: 'Maps', icon: '🗺️' },
   { kind: 'factions', label: 'Factions', icon: '🛡️' },
   { kind: 'mats', label: 'Mats', icon: '🗂️' },
   { kind: 'encounters', label: 'Encounters', icon: '⭐' },
@@ -22,7 +24,7 @@ export const CODEX_TABS: { kind: CodexKind; label: string; icon: string }[] = [
 /** What a tab lists, in order, and whether it's the made-up sample deck (no deck of your own added yet). */
 export function codexList(catalog: Catalog, builtIn: Catalog, kind: CodexKind): { items: { id: string; name: string }[]; sample: boolean } {
   const all = (kind === 'mats' ? [...catalog.mats].sort((a, b) => a.turnOrder - b.turnOrder) : (catalog[kind] ?? [])) as { id: string; name: string }[];
-  const deck = kind !== 'factions' && kind !== 'mats';
+  const deck = kind !== 'maps' && kind !== 'factions' && kind !== 'mats';
   return { items: all.map(({ id, name }) => ({ id, name })), sample: deck && all.length > 0 && all === builtIn[kind] };
 }
 
@@ -40,6 +42,44 @@ export function factionFacts(f: Faction, board: Board) {
     mechAbilities: f.mechAbilities,
     recruits: f.recruitBonuses.map((r) => `+${r.amount} ${r.amount === 1 ? BONUS[r.bonus] : BONUS[r.bonus] === 'popularity' || BONUS[r.bonus] === 'power' ? BONUS[r.bonus] : `${BONUS[r.bonus]}s`}`),
   };
+}
+
+const TERRAIN_NAMES: Record<Terrain, string> = { farm: 'Farms', forest: 'Forests', mountain: 'Mountains', tundra: 'Tundra', village: 'Villages', lake: 'Lakes', factory: 'Factory' };
+const ORDER: Terrain[] = ['farm', 'forest', 'mountain', 'tundra', 'village', 'lake', 'factory'];
+const PLACES: Record<string, string> = { n: 'North', ne: 'North-east', e: 'East', se: 'South-east', s: 'South', sw: 'South-west', w: 'West', nw: 'North-west' };
+
+/** What a map holds: each kind of land, rivers, tunnels, encounter spots, and who starts at each home base. */
+export function mapFacts(board: Board, factions: Faction[]) {
+  const hexes = Object.values(board.hexes);
+  return {
+    terrains: ORDER.map((terrain) => ({ terrain, name: TERRAIN_NAMES[terrain], count: hexes.filter((h) => h.terrain === terrain).length })).filter((t) => t.count > 0),
+    hexes: hexes.filter((h) => h.terrain !== 'lake').length,
+    rivers: board.rivers.length,
+    tunnels: hexes.filter((h) => h.tunnel).length,
+    encounters: hexes.filter((h) => h.encounter).length,
+    homes: Object.keys(board.homeBases).map((id) => ({
+      id,
+      place: PLACES[id] ?? id.toUpperCase(),
+      factions: factions.filter((f) => f.homeBase === id).map(({ name, color }) => ({ name, color })),
+    })),
+  };
+}
+
+/**
+ * The map as a game on it starts: every faction with a home base on it (the
+ * first for each home base) with its character at home and its workers out,
+ * and the encounter tokens down. With no faction to start there, just the map.
+ */
+export function mapStart(board: Board, factions: Faction[], mats: PlayerMat[], encounters?: EncounterCard[]): GameState {
+  const seated = factions.filter((f, i) => board.homeBases[f.homeBase] && factions.findIndex((g) => g.homeBase === f.homeBase) === i);
+  const sorted = [...mats].sort((a, b) => a.turnOrder - b.turnOrder);
+  const players = seated.slice(0, sorted.length).map((faction, i) => ({ faction, mat: sorted[i]! }));
+  if (players.length) return newGame({ seed: 1, board, players, ...(encounters?.length && { encounters }) });
+  // No one to start: a game needs a player, so set one aside afterwards.
+  const stand = factions[0] && sorted[0] && Object.keys(board.homeBases)[0];
+  if (!stand) throw new Error('a map to show needs a faction, a mat and a home base');
+  const game = newGame({ seed: 1, board, players: [{ faction: { ...factions[0]!, homeBase: stand }, mat: sorted[0]! }], ...(encounters?.length && { encounters }) });
+  return { ...game, players: [] };
 }
 
 const NAMES = { move: 'Move', trade: 'Trade', produce: 'Produce', bolster: 'Bolster', upgrade: 'Upgrade', deploy: 'Deploy', build: 'Build', enlist: 'Enlist' } as const;

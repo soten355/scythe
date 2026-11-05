@@ -3,7 +3,7 @@ import { baseBoard, baseFactions, baseMats } from '@scythe/content';
 import type { PlayerMat } from '@scythe/engine';
 import { BUILT_IN } from '../content/catalog';
 import { catalogWith, EMPTY_LIBRARY } from '../content/library';
-import { CODEX_TABS, codexList, encounterFacts, factionFacts, factoryFacts, matFacts, objectiveFacts, tileFacts } from './codex';
+import { CODEX_TABS, codexList, mapFacts, mapStart, encounterFacts, factionFacts, factoryFacts, matFacts, objectiveFacts, tileFacts } from './codex';
 
 const mat: PlayerMat = {
   id: 'm',
@@ -22,7 +22,7 @@ const mat: PlayerMat = {
 
 describe('the codex', () => {
   it('has a tab for factions, mats, and each deck and the tiles', () => {
-    expect(CODEX_TABS.map((t) => t.kind)).toEqual(['factions', 'mats', 'encounters', 'factory', 'objectives', 'structureBonuses']);
+    expect(CODEX_TABS.map((t) => t.kind)).toEqual(['maps', 'factions', 'mats', 'encounters', 'factory', 'objectives', 'structureBonuses']);
   });
 
   it('lists what new games use, and says when a deck is the made-up sample', () => {
@@ -78,5 +78,35 @@ describe('the codex', () => {
     const tile = tileFacts(BUILT_IN.structureBonuses![0]!);
     expect(tile.pays.length).toBeGreaterThan(0);
     expect(tile.pays[0]).toMatch(/^\d+\+ → \d+ coins?$/);
+  });
+
+  it('lists the maps, the default first', () => {
+    const maps = codexList(catalogWith(BUILT_IN, EMPTY_LIBRARY), BUILT_IN, 'maps');
+    expect(maps.items[0]).toEqual({ id: 'standard', name: 'Standard map' });
+    expect(maps.sample).toBe(false);
+  });
+
+  it("counts a map's land, rivers, tunnels and encounters, and says who starts at each home base", () => {
+    const facts = mapFacts(baseBoard, baseFactions);
+    const land = Object.values(baseBoard.hexes).filter((h) => h.terrain !== 'lake' && h.terrain !== 'factory');
+    expect(facts.terrains.reduce((n, t) => n + (t.terrain === 'lake' || t.terrain === 'factory' ? 0 : t.count), 0)).toBe(land.length);
+    expect(facts.terrains.every((t) => t.count > 0)).toBe(true);
+    expect(facts.rivers).toBe(baseBoard.rivers.length);
+    expect(facts.tunnels).toBe(Object.values(baseBoard.hexes).filter((h) => h.tunnel).length);
+    expect(facts.encounters).toBe(Object.values(baseBoard.hexes).filter((h) => h.encounter).length);
+    expect(facts.homes).toHaveLength(Object.keys(baseBoard.homeBases).length);
+    for (const f of baseFactions) expect(facts.homes.find((h) => h.factions.some((g) => g.name === f.name && g.color === f.color))).toBeTruthy();
+  });
+
+  it('sets the map up as a game starts, with every faction that has a home base on it', () => {
+    const game = mapStart(baseBoard, baseFactions, baseMats, BUILT_IN.encounters);
+    expect(game.players).toHaveLength(baseFactions.length);
+    expect(game.players.every((p) => p.character === 'home' && p.workers.length === 2)).toBe(true);
+    expect(game.encounterTokens.length).toBe(Object.values(baseBoard.hexes).filter((h) => h.encounter).length);
+  });
+
+  it('still shows a map with no faction to start on it', () => {
+    const game = mapStart(baseBoard, [{ ...baseFactions[0]!, homeBase: 'nowhere' }], baseMats);
+    expect(game.players).toEqual([]);
   });
 });

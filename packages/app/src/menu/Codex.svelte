@@ -1,13 +1,16 @@
 <script lang="ts">
   // The codex: browse everything new games use, one at a time and large:
-  // factions, mats, encounter cards, Factory cards, objectives and structure
+  // maps (set up as a game starts on them), factions, mats, encounter cards, Factory cards, objectives and structure
   // bonus tiles. Tabs pick the kind; ‹ › (or swiping, or the arrow keys)
   // step through them; the list jumps to one. What each shows comes from
   // codex.ts; the pictures from the theme and the device.
-  import type { Board } from '@scythe/engine';
+  import type { Board as BoardData } from '@scythe/engine';
   import { fade, fly } from 'svelte/transition';
   import type { Catalog } from './setup';
-  import { CODEX_TABS, codexList, encounterFacts, factionFacts, factoryFacts, matFacts, objectiveFacts, tileFacts, type CodexKind } from './codex';
+  import Board from '../play/Board.svelte';
+  import type { Prompt } from '../play/prompt';
+  import type { BoardLook } from '../theme/theme';
+  import { CODEX_TABS, codexList, mapFacts, mapStart, encounterFacts, factionFacts, factoryFacts, matFacts, objectiveFacts, tileFacts, type CodexKind } from './codex';
   import { cardLook } from '../content/card-pictures';
   import { cardPicture } from '../theme/current.svelte';
   import FactionEmblem from '../play/FactionEmblem.svelte';
@@ -16,9 +19,9 @@
   import FighterArt from '../play/FighterArt.svelte';
   import { inkOn } from '../play/ink';
 
-  let { catalog, builtIn, board, onBack }: { catalog: Catalog; builtIn: Catalog; board: Board; onBack: () => void } = $props();
+  let { catalog, builtIn, board, look, onBack }: { catalog: Catalog; builtIn: Catalog; board: BoardData; look: BoardLook; onBack: () => void } = $props();
 
-  let kind = $state<CodexKind>('factions');
+  let kind = $state<CodexKind>('maps');
   let index = $state(0);
   /** Which way the last step went, so the page slides in from that side. */
   let direction = $state(1);
@@ -47,7 +50,8 @@
 
   // Swiping left or right on the page steps through.
   let startX: number | null = null;
-  const down = (e: PointerEvent) => (startX = e.clientX);
+  // (Not on a map: dragging there moves around the map.)
+  const down = (e: PointerEvent) => (startX = kind === 'maps' ? null : e.clientX);
   function up(e: PointerEvent) {
     if (startX === null) return;
     const dx = e.clientX - startX;
@@ -55,12 +59,17 @@
     if (Math.abs(dx) > 50) step(dx < 0 ? 1 : -1);
   }
 
+  const map = $derived(kind === 'maps' ? catalog.maps[at] : undefined);
+  const mapGame = $derived(map && mapStart(map.board, catalog.factions, catalog.mats, catalog.encounters));
+  /** Nothing to do on a map in the codex: it's only to look at. */
+  const LOOK_ONLY: Prompt = { title: '', buttons: [], highlights: new Set(), tapActions: new Map(), tapSelects: new Map() };
   const faction = $derived(kind === 'factions' ? catalog.factions[at] : undefined);
   const mat = $derived(kind === 'mats' ? [...catalog.mats].sort((a, b) => a.turnOrder - b.turnOrder)[at] : undefined);
   const encounter = $derived(kind === 'encounters' ? catalog.encounters?.[at] : undefined);
   const factory = $derived(kind === 'factory' ? catalog.factory?.[at] : undefined);
   const objective = $derived(kind === 'objectives' ? catalog.objectives?.[at] : undefined);
   const tile = $derived(kind === 'structureBonuses' ? catalog.structureBonuses?.[at] : undefined);
+  const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
   const SAMPLE: Partial<Record<CodexKind, string>> = {
     encounters: 'Made-up sample cards until you add your own from the encounter card editor.',
     factory: 'Made-up sample cards until you add your own from the Factory card editor.',
@@ -89,6 +98,38 @@
         <div class="slide" in:fly={{ x: 40 * direction, duration: 260 }}>
           {#if count === 0}
             <p class="empty">Nothing here yet.</p>
+          {:else if map && mapGame}
+            {@const m = mapFacts(map.board, catalog.factions)}
+            <div class="map">
+              <div class="board"><Board game={mapGame} prompt={LOOK_ONLY} onTap={() => {}} onPick={() => {}} {look} /></div>
+              <div class="facts">
+                <div>
+                  <h2>{map.name}</h2>
+                  <p class="chips">
+                    <span>{m.hexes} land hexes</span>
+                    <span>{plural(m.rivers, 'river')}</span>
+                    <span>{plural(m.tunnels, 'tunnel')}</span>
+                    <span>{plural(m.encounters, 'encounter spot')}</span>
+                  </p>
+                </div>
+                <div class="box">
+                  <h3>The land</h3>
+                  <div class="terrains">
+                    {#each m.terrains as t (t.terrain)}<span class="terrain" style:--t={look.fill(t.terrain)}><i></i>{t.name} <b>{t.count}</b></span>{/each}
+                  </div>
+                </div>
+                <div class="box">
+                  <h3>Home bases</h3>
+                  {#each m.homes as h (h.id)}
+                    <p class="home">
+                      <span class="place">{h.place}</span>
+                      {#each h.factions as f (f.name)}<span class="who" style:--c={f.color}>{f.name}</span>{:else}<span class="dim">no faction</span>{/each}
+                    </p>
+                  {/each}
+                </div>
+                <p class="dim">As a game starts: each faction's character at home and its workers beside it. Pinch or scroll to zoom, drag to look around.</p>
+              </div>
+            </div>
           {:else if faction}
             {@const f = factionFacts(faction, board)}
             <div class="faction" style:--c={faction.color} style:--ink={inkOn(faction.color)}>
@@ -252,6 +293,7 @@
     cursor: pointer;
   }
   button.quiet {
+    white-space: nowrap;
     background: none;
     border-color: transparent;
     color: var(--accent);
@@ -393,6 +435,79 @@
     footer {
       padding: 4px 8px;
     }
+    .map .facts {
+      width: 40%;
+      font-size: 12px;
+      gap: 5px;
+    }
+    .map h2 {
+      font-size: 17px;
+    }
+    .map .chips span {
+      font-size: 11px;
+      padding: 1px 6px;
+    }
+    .map .box {
+      font-size: 12px;
+      padding: 6px 8px;
+    }
+    .place {
+      width: 68px;
+    }
+  }
+
+  /* A map: the board as a game starts, its facts beside it. */
+  .map {
+    display: flex;
+    gap: 10px;
+    height: 100%;
+  }
+  .map .board {
+    flex: 1;
+    min-width: 0;
+    position: relative;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--line);
+  }
+  .map .facts {
+    flex: none;
+    width: min(300px, 34%);
+  }
+  .terrains {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3px 10px;
+  }
+  .terrain {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .terrain i {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    background: var(--t);
+    flex: none;
+  }
+  .terrain b {
+    margin-left: auto;
+  }
+  .home {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin-top: 3px;
+  }
+  .place {
+    width: 76px;
+    opacity: 0.7;
+  }
+  .who {
+    font-weight: 700;
+    color: color-mix(in srgb, var(--c) 60%, white);
   }
 
   /* A faction: its two figures in the land by its home base, and its facts beside them. */
