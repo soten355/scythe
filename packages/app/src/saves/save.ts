@@ -31,6 +31,8 @@ export interface SavedGame {
   mapName?: string;
   /** Each seat's bot level, or null for a person (none: everyone is a person, as in older saves). */
   bots?: (Level | null)[];
+  /** The skin it was started in (its ID on the device that started it); it shows in that skin while it's on the device. None: the skin in use. */
+  skin?: string;
   /** Every move, in order; each inner list is applied as one step. */
   steps: Action[][];
   /** Step where undo stops (see Game.svelte). */
@@ -49,10 +51,11 @@ function summarize(state: GameState): SaveSummary {
   };
 }
 
-export function createSave(setup: GameSetup, id: string, now: Date, mapName?: string, bots?: (Level | null)[]): SavedGame {
+export function createSave(setup: GameSetup, id: string, now: Date, mapName?: string, bots?: (Level | null)[], skin?: string): SavedGame {
   const state = newGame(setup);
   return {
     ...(mapName ? { mapName } : {}),
+    ...(skin && skin !== 'original' ? { skin } : {}),
     ...(bots?.some(Boolean) ? { bots } : {}),
     format: FORMAT,
     formatVersion: FORMAT_VERSION,

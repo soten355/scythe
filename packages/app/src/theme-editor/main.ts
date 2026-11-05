@@ -25,12 +25,15 @@ const store = new SaveStore();
 const root = document.querySelector<HTMLDivElement>('#theme-editor')!;
 let theme: Theme = DEFAULT_THEME;
 let status = '';
+/** The skin being edited (the one in use). */
+let skinName = 'Original';
 
 async function keep(next: Theme, note = 'Saved on this device: the game uses it the next time it opens.') {
   theme = next;
   render();
   try {
     await store.putTheme(theme);
+    skinName = (await store.activeSkin()).name;
     show(note);
   } catch {
     show("This couldn't be kept on the device (it may be out of room). Save it to a file to keep it.", true);
@@ -181,7 +184,8 @@ function render() {
   root.innerHTML = `
     <header>
       <a class="back" href="${import.meta.env.BASE_URL}#workshop">← Workshop</a>
-      <label>Theme<input type="text" data-name value="${esc(theme.name)}"></label>
+      <span class="editing">Skin: <b>${esc(skinName)}</b>${skinName === 'Original' ? ' (changes start a skin of your own)' : ''}</span>
+      <label>Theme name<input type="text" data-name value="${esc(theme.name)}"></label>
       <span class="spacer"></span>
       <button data-act="open">Open theme file…</button>
       <button data-act="file">Save theme file</button>
@@ -299,9 +303,10 @@ root.addEventListener('change', async (e) => {
 });
 
 render();
-store.theme().then(
-  (t) => {
-    theme = t;
+store.activeSkin().then(
+  (s) => {
+    theme = s.theme;
+    skinName = s.name;
     render();
   },
   () => show("The theme on this device couldn't be read.", true),

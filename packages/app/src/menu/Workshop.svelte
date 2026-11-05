@@ -26,6 +26,7 @@
       title: 'Look and testing',
       tools: [
         { page: 'themes.html', icon: '🎨', name: 'Theme editor', what: 'Your own pictures and colours' },
+        { page: 'skin-words.html', icon: '✍️', name: 'Names and wording', what: "The skin's names for factions, mats and maps" },
         { page: 'bot-check.html', icon: '⏱️', name: 'Bot speed check', what: 'How fast bots think on this device' },
       ],
     },

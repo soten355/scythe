@@ -3,7 +3,8 @@
   // faction and mat (or shuffle them) and who plays it (you, another person
   // passed the device, or a bot at Easy, Medium or Hard), then start. The player's own maps,
   // factions and mats (made in the editors or brought in from files) are
-  // offered after the built-in ones, and can be added or removed here.
+  // offered after the built-in ones, and can be added or removed here. With
+  // skins of one's own, the skin to play in can be changed here too.
   import { untrack } from 'svelte';
   import FactionEmblem from '../play/FactionEmblem.svelte';
   import FactionPortrait from '../play/FactionPortrait.svelte';
@@ -22,6 +23,9 @@
     onRemove,
     onBack,
     backLabel,
+    skins = [],
+    skin = 'original',
+    onSkin,
   }: {
     /** Everything to pick from: built-in, then the library. */
     catalog: Catalog;
@@ -34,6 +38,10 @@
     onRemove: (kind: LibraryKind, id: string | string[]) => void;
     onBack: () => void;
     backLabel: string;
+    /** Every skin on the device (Original first), and the one in use. */
+    skins?: { id: string; name: string }[];
+    skin?: string;
+    onSkin?: (id: string) => void;
   } = $props();
 
   // Always starts from the default map and the first factions and mats.
@@ -89,6 +97,9 @@
   <header>
     <button class="quiet" onclick={onBack}>‹ {backLabel}</button>
     <h2>New game</h2>
+    {#if skins.length > 1}
+      <label class="skin">Skin <select value={skin} onchange={(e) => onSkin?.(e.currentTarget.value)}>{#each skins as s (s.id)}<option value={s.id}>{s.name}</option>{/each}</select></label>
+    {/if}
     <button class="primary" disabled={issues.length > 0} onclick={start}>Start</button>
   </header>
 
@@ -153,9 +164,6 @@
         {/if}
         {#if !library.objectives.length}
           <p class="hint">Objectives use a made-up sample deck until you add your cards from the objective card editor.</p>
-        {/if}
-        {#if !library.structureBonuses.length}
-          <p class="hint">Structure bonus tiles are made-up samples until you add yours from the structure bonus tile editor.</p>
         {/if}
       </section>
     </div>
@@ -412,5 +420,22 @@
     margin: 0;
     color: #ff9b85;
     text-align: center;
+  }
+  .skin {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    opacity: 0.9;
+    margin-left: auto;
+  }
+  .skin select {
+    font: inherit;
+    color: var(--fg);
+    background: var(--raised);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 3px 6px;
+    max-width: 160px;
   }
 </style>

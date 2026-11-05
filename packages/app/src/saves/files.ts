@@ -3,6 +3,7 @@
 import { contentFileName, contentFileText, type Library } from '../content/library';
 import { fileName, parseSaveFile, saveFileText, type SavedGame } from './save';
 import { themeFileName, themeFileText, type Theme } from '../theme/theme';
+import { skinFileName, skinFileText, type Skin } from '../skins/skin';
 
 async function shareFile(name: string, text: string): Promise<void> {
   await share(new File([text], name, { type: 'application/json' }));
@@ -35,6 +36,9 @@ export const exportSave = (save: SavedGame) => shareFile(fileName(save), saveFil
 export const exportContent = (content: Library, pictures?: Record<string, string>) => shareFile(contentFileName(content), contentFileText(content, pictures));
 
 export const exportTheme = (theme: Theme) => shareFile(themeFileName(theme), themeFileText(theme));
+
+/** A whole skin (its theme and words) to one file. */
+export const exportSkin = (skin: Skin) => shareFile(skinFileName(skin), skinFileText(skin));
 
 /** A picture made in the app (the map guide), to the share sheet or Downloads. */
 export const exportPicture = (name: string, picture: Blob) => share(new File([picture], name, { type: picture.type }));

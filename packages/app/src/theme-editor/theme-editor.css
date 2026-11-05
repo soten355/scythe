@@ -194,3 +194,11 @@ label.check {
   border-color: var(--glow);
   background: color-mix(in srgb, var(--glow) 22%, var(--panel));
 }
+
+.editing {
+  align-self: center;
+  font-size: 0.85rem;
+}
+.editing b {
+  color: var(--accent);
+}

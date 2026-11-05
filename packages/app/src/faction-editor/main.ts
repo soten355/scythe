@@ -162,7 +162,7 @@ function pictures(f: Faction): string {
   }).join('');
   return `<section class="pictures">
       <h3>Pictures</h3>
-      <p class="note">This faction's own look in the game; anything left empty keeps the usual piece in its colour. Pictures are kept on this device with the theme, under the ID <b>${esc(f.id)}</b>, and go to other devices in the theme file (Workshop → Theme editor → Save theme file). Use your own pictures, not scans of the published game.</p>
+      <p class="note">This faction's own look in the game; anything left empty keeps the usual piece in its colour. Pictures are kept on this device in the skin in use, under the ID <b>${esc(f.id)}</b>, and go to other devices in its skin file (Main menu → Skins → Save to a file). With the Original skin in use, the first picture starts a skin of your own. Use your own pictures, not scans of the published game.</p>
       <div class="slots">${rows}</div>
       <p class="note picture-note">${esc(theme ? pictureNote : "The pictures on this device couldn't be read.")}</p>
       <input type="file" accept="image/*" data-picture hidden>

@@ -28,6 +28,14 @@ function play(n: number) {
 }
 
 describe('save records', () => {
+  it('remembers the skin a game was started in (none for Original), through a file too', () => {
+    expect(createSave(setup, 'g1', at).skin).toBeUndefined();
+    expect(createSave(setup, 'g1', at, undefined, undefined, 'original').skin).toBeUndefined();
+    const save = createSave(setup, 'g1', at, undefined, undefined, 'iron-tide');
+    expect(save.skin).toBe('iron-tide');
+    expect(parseSaveFile(saveFileText(save)).skin).toBe('iron-tide');
+  });
+
   it('a new game is its setup, no steps, and the engine version', () => {
     const save = createSave(setup, 'g1', at);
     expect(save).toMatchObject({ id: 'g1', engineVersion: ENGINE_VERSION, steps: [], turnStart: 0, finished: false });

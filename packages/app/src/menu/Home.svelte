@@ -1,7 +1,7 @@
 <script lang="ts">
   // The opening menu: continue the last game, start a new one, pick a saved
-  // game, browse the codex (factions, mats, cards), or open the workshop
-  // (the editors and tools).
+  // game, browse the codex (factions, mats, cards), pick a skin (the game's
+  // whole look and names), or open the workshop (the editors and tools).
   import { ENGINE_VERSION } from '@scythe/engine';
 
   let {
@@ -11,8 +11,10 @@
     onNewGame,
     onSaves,
     onCodex,
+    onSkins,
     onWorkshop,
-  }: { canContinue: boolean; savedCount: number; onContinue: () => void; onNewGame: () => void; onSaves: () => void; onCodex: () => void; onWorkshop: () => void } = $props();
+    skinName = 'Original',
+  }: { canContinue: boolean; savedCount: number; onContinue: () => void; onNewGame: () => void; onSaves: () => void; onCodex: () => void; onSkins: () => void; onWorkshop: () => void; skinName?: string } = $props();
 </script>
 
 <div class="home">
@@ -25,10 +27,13 @@
       <button class="primary" onclick={onNewGame}>New game</button>
     {/if}
     <button onclick={onSaves}>Saved games{savedCount ? ` (${savedCount})` : ''}</button>
-    <button onclick={onCodex}>📖 Codex</button>
+    <div class="pair">
+      <button onclick={onCodex}>📖 Codex</button>
+      <button onclick={onSkins}>🎨 Skins</button>
+    </div>
     <button onclick={onWorkshop}>🛠️ Workshop</button>
   </nav>
-  <p class="meta">engine v{ENGINE_VERSION}</p>
+  <p class="meta">Skin: {skinName} · engine v{ENGINE_VERSION}</p>
 </div>
 
 <style>
@@ -67,5 +72,10 @@
     margin: 0;
     opacity: 0.5;
     font-size: 11px;
+  }
+  .pair {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
   }
 </style>

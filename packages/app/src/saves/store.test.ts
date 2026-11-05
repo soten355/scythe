@@ -6,6 +6,7 @@ import { createSave } from './save';
 import { SaveStore } from './store';
 import { EMPTY_LIBRARY } from '../content/library';
 import { DEFAULT_THEME, setPicture } from '../theme/theme';
+import { ORIGINAL, type Skin } from '../skins/skin';
 
 const setup: GameSetup = {
   seed: 1,
@@ -87,5 +88,60 @@ describe('save store', () => {
     expect(await store.library()).toEqual(EMPTY_LIBRARY);
     expect(await store.theme()).toEqual(DEFAULT_THEME);
   });
-});
 
+describe('skins on the device', () => {
+  const words: Skin['words'] = { factions: { nordic: { name: 'Frostwake' } }, mats: {}, maps: {} };
+
+  it('starts with Original in use, and nothing of its own', async () => {
+    expect(await store.skinIndex()).toEqual({ active: 'original', skins: [] });
+    expect(await store.activeSkin()).toEqual(ORIGINAL);
+  });
+
+  it('a change to the look while Original is in use starts "My skin", put in use', async () => {
+    const theme = setPicture(DEFAULT_THEME, 'ui.menu', 'data:image/png;base64,AA==');
+    await store.putTheme(theme);
+    const index = await store.skinIndex();
+    expect(index.skins).toHaveLength(1);
+    expect(index.skins[0]!.name).toBe('My skin');
+    expect(index.active).toBe(index.skins[0]!.id);
+    expect(await store.theme()).toEqual(theme);
+    // Further changes go into that skin.
+    const next = setPicture(theme, 'hex.farm', 'data:image/png;base64,BB==');
+    await store.putTheme(next);
+    expect((await store.skinIndex()).skins).toHaveLength(1);
+    expect(await store.theme()).toEqual(next);
+  });
+
+  it('keeps several skins, switches between them, and renames and deletes them', async () => {
+    const a: Skin = { id: 'a', name: 'Iron Tide', theme: setPicture(DEFAULT_THEME, 'ui.menu', 'data:image/png;base64,AA=='), words };
+    const b: Skin = { id: 'b', name: 'Ashfall', theme: DEFAULT_THEME, words: ORIGINAL.words };
+    await store.putSkin(a, { use: true });
+    await store.putSkin(b);
+    expect(await store.skinIndex()).toEqual({ active: 'a', skins: [{ id: 'a', name: 'Iron Tide' }, { id: 'b', name: 'Ashfall' }] });
+    expect(await store.activeSkin()).toEqual(a);
+    await store.useSkin('b');
+    expect((await store.activeSkin()).name).toBe('Ashfall');
+    await store.useSkin('original');
+    expect(await store.activeSkin()).toEqual(ORIGINAL);
+    await store.putSkin({ ...a, name: 'Iron Tide II' });
+    expect((await store.skinIndex()).skins[0]).toEqual({ id: 'a', name: 'Iron Tide II' });
+    await store.useSkin('a');
+    await store.deleteSkin('a');
+    expect(await store.skinIndex()).toEqual({ active: 'original', skins: [{ id: 'b', name: 'Ashfall' }] });
+    expect(await store.skin('a')).toEqual(ORIGINAL);
+    await expect(store.useSkin('a')).rejects.toThrow(/no longer/);
+    await expect(store.putSkin(ORIGINAL)).rejects.toThrow(/can't be changed/);
+  });
+
+  it('a theme kept from before skins becomes a skin of its own, in use', async () => {
+    const old = { ...setPicture(DEFAULT_THEME, 'hex.farm', 'data:image/png;base64,AA=='), name: 'Golden' };
+    await (store as unknown as { write: (r: [string, unknown][]) => Promise<void> }).write([['theme', old]]);
+    const index = await store.skinIndex();
+    expect(index.skins.map((s) => s.name)).toEqual(['Golden']);
+    expect(index.active).toBe(index.skins[0]!.id);
+    expect(await store.theme()).toEqual(old);
+    // Only once.
+    expect(await store.skinIndex()).toEqual(index);
+  });
+});
+});

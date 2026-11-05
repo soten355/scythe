@@ -1,6 +1,8 @@
 <script lang="ts">
-  // The whole app: the opening menu, the new game screen, saved games and the
-  // game. A game in progress stays alive behind the menu, so it can be
+  // The whole app: the opening menu, the new game screen, saved games, the
+  // codex, the skins and the game. The skin in use gives every screen its look
+  // and the factions, mats and maps their names; a game shows in the skin it
+  // was started in. A game in progress stays alive behind the menu, so it can be
   // continued; every game is also kept on the device after every move.
   import type { GameSetup } from '@scythe/engine';
   import type { Level } from '@scythe/bots';
@@ -8,13 +10,17 @@
   import Home from './menu/Home.svelte';
   import Workshop from './menu/Workshop.svelte';
   import Codex from './menu/Codex.svelte';
+  import Skins from './menu/Skins.svelte';
   import NewGame from './menu/NewGame.svelte';
   import SavedGames from './menu/SavedGames.svelte';
   import { BUILT_IN } from './content/catalog';
   import { createSave, restore, type SavedGame } from './saves/save';
   import { SaveStore } from './saves/store';
-  import { exportSave, readSaveFile } from './saves/files';
-  import { boardLook, DEFAULT_THEME, uiStyle, type Theme } from './theme/theme';
+  import { exportSave, exportSkin, readSaveFile } from './saves/files';
+  import { boardLook, uiStyle } from './theme/theme';
+  import { applyWords, freeName, newSkin, ORIGINAL, parseSkinFile, type Skin } from './skins/skin';
+  import type { SkinIndex } from './saves/store';
+  import { untrack } from 'svelte';
   import { useCardPictures, useTheme } from './theme/current.svelte';
   import { addToLibrary, catalogWith, EMPTY_LIBRARY, parseContentFile, removeFromLibrary, type Library, type LibraryKind } from './content/library';
 
@@ -23,7 +29,8 @@
   const store = new SaveStore();
 
   // The editors' back links come back to the workshop (#workshop).
-  let screen: 'home' | 'new' | 'saves' | 'workshop' | 'codex' | 'game' = $state(location.hash === '#workshop' ? 'workshop' : 'home');
+  type Screen = 'home' | 'new' | 'saves' | 'workshop' | 'codex' | 'skins' | 'game';
+  let screen = $state<Screen>(location.hash === '#workshop' ? 'workshop' : location.hash === '#skins' ? 'skins' : 'home');
   if (location.hash) history.replaceState(null, '', location.pathname + location.search);
   /** The game open (as it was when opened: the game itself keeps its moves). */
   let current = $state.raw<{ key: number; save: SavedGame } | null>(null);
@@ -33,8 +40,16 @@
   let message = $state('');
   /** The player's own maps, factions and mats, kept on the device. */
   let library: Library = $state.raw(EMPTY_LIBRARY);
-  /** What there is to pick from on the new game screen. */
-  const catalog = $derived(catalogWith(builtIn, library));
+  /** The skin in use, and every skin on the device. */
+  let skin: Skin = $state.raw(ORIGINAL);
+  let skinIndex: SkinIndex = $state.raw({ active: ORIGINAL.id, skins: [] });
+  async function loadSkins() {
+    skinIndex = await store.skinIndex();
+    skin = await store.skin(skinIndex.active);
+  }
+  loadSkins().catch(() => {});
+  /** What there is to pick from on the new game screen, named as the skin names it. */
+  const catalog = $derived(applyWords(catalogWith(builtIn, library), skin.words));
 
   async function refresh() {
     try {
@@ -45,9 +60,24 @@
   }
   void refresh();
   store.library().then((l) => (library = l), () => {});
-  /** The theme in use (made in the theme editor), for the board's look. */
-  let theme: Theme = $state.raw(DEFAULT_THEME);
-  store.theme().then((t) => ((theme = t), useTheme(t)), () => {});
+  /** The skin the open game was started in, when it's another one on this device. */
+  let gameSkin = $state.raw<Skin | null>(null);
+  // Follows the open game and the skin in use (a game keeps its skin when another is put in use).
+  $effect(() => {
+    const save = current?.save;
+    const id = save?.skin;
+    if (!save || !id || id === skin.id || !skinIndex.skins.some((s) => s.id === id)) {
+      gameSkin = null;
+      return;
+    }
+    if (untrack(() => gameSkin?.id) === id) return;
+    store.skin(id).then((found) => {
+      if (current?.save.id === save.id) gameSkin = found;
+    }, () => {});
+  });
+  /** The look on screen: the open game's skin while it's showing, else the skin in use. */
+  const theme = $derived(screen === 'game' && gameSkin ? gameSkin.theme : skin.theme);
+  $effect(() => useTheme(theme));
   store.cardPictures().then(useCardPictures, () => {});
   const look = $derived(boardLook(theme));
   // The look and feel: the theme's colours and fonts, set on the page for every screen to read.
@@ -65,6 +95,7 @@
     if (to === 'home' || to === 'saves') void refresh();
     // The editors may have added to the library since.
     if (to === 'new' || to === 'codex') store.library().then((l) => (library = l), () => {});
+    if (to === 'skins') skinMessage = '';
   }
 
   async function keep(next: Library) {
@@ -99,12 +130,43 @@
     go('game');
   }
 
+  // Skins.
+  let skinMessage = $state('');
+  /** Does something to the skins, then reads them again; says what happened (or went wrong). */
+  async function skinDo(what: () => Promise<unknown>, done = '') {
+    try {
+      const said = await what();
+      await loadSkins();
+      skinMessage = typeof said === 'string' ? said : done;
+    } catch (e) {
+      skinMessage = e instanceof Error ? e.message : String(e);
+    }
+  }
+  const useSkin = (id: string) => skinDo(() => store.useSkin(id));
+  const takenNames = (except?: string) => skinIndex.skins.filter((s) => s.id !== except).map((s) => s.name);
+  const makeSkin = (wanted: string, from: string) =>
+    skinDo(async () => {
+      const name = freeName(wanted, takenNames());
+      await store.putSkin(newSkin(name, await store.skin(from), crypto.randomUUID()), { use: true });
+      return `Made "${name}" and put it in use. Edit it from here or the Workshop.`;
+    });
+  const renameSkin = (id: string, name: string) => skinDo(async () => store.putSkin({ ...(await store.skin(id)), name: freeName(name, takenNames(id)) }));
+  const deleteSkin = (id: string) => skinDo(() => store.deleteSkin(id), 'Deleted.');
+  const exportSkinById = (id: string) => skinDo(async () => void (await exportSkin(await store.skin(id))));
+  const importSkin = (file: File) =>
+    skinDo(async () => {
+      const read = parseSkinFile(await file.text(), crypto.randomUUID());
+      const opened = { ...read, name: freeName(read.name, skinIndex.skins.map((s) => s.name)) };
+      await store.putSkin(opened, { use: true });
+      return `Added "${opened.name}" and put it in use.`;
+    });
+
   function persist(save: SavedGame) {
     store.put(save).catch(() => alert("This game couldn't be saved on the device. Save it to a file from the game menu to keep it."));
   }
 
   function start(setup: GameSetup, mapName: string, bots: (Level | null)[]) {
-    const save = createSave(setup, crypto.randomUUID(), new Date(), mapName, bots);
+    const save = createSave(setup, crypto.randomUUID(), new Date(), mapName, bots, skin.id);
     // Ask the browser not to clear saves when space runs low.
     void navigator.storage?.persist?.();
     persist(save);
@@ -149,13 +211,15 @@
 {/if}
 
 {#if screen === 'home'}
-  <Home canContinue={resumable !== null} savedCount={saves.length} onContinue={() => resumable && play(resumable)} onNewGame={() => go('new')} onSaves={() => go('saves')} onCodex={() => go('codex')} onWorkshop={() => go('workshop')} />
+  <Home canContinue={resumable !== null} savedCount={saves.length} onContinue={() => resumable && play(resumable)} onNewGame={() => go('new')} onSaves={() => go('saves')} onCodex={() => go('codex')} onSkins={() => go('skins')} onWorkshop={() => go('workshop')} skinName={skin.name} />
 {:else if screen === 'codex'}
   <Codex {catalog} {builtIn} board={builtIn.maps[0]!.board} {look} onBack={() => go('home')} />
+{:else if screen === 'skins'}
+  <Skins index={skinIndex} factions={builtIn.factions} message={skinMessage} loadSkin={(id) => store.skin(id)} onUse={useSkin} onNew={makeSkin} onRename={renameSkin} onDelete={deleteSkin} onExport={exportSkinById} onImport={importSkin} onBack={() => go('home')} />
 {:else if screen === 'workshop'}
   <Workshop onBack={() => go('home')} />
 {:else if screen === 'new'}
-  <NewGame {catalog} {library} {message} onStart={start} onImport={importContent} onRemove={removeContent} onBack={() => go(current ? 'game' : 'home')} backLabel={current ? 'Back to the game' : 'Menu'} />
+  <NewGame {catalog} {library} {message} onStart={start} onImport={importContent} onRemove={removeContent} onBack={() => go(current ? 'game' : 'home')} backLabel={current ? 'Back to the game' : 'Menu'} skins={[{ id: ORIGINAL.id, name: ORIGINAL.name }, ...skinIndex.skins]} skin={skin.id} onSkin={useSkin} />
 {:else if screen === 'saves'}
   <SavedGames {saves} {message} onOpen={open} onExport={exportSave} onDelete={remove} onImport={importFile} onBack={() => go('home')} />
 {/if}

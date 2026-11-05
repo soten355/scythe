@@ -1,15 +1,26 @@
-// Saved games, the player's own maps, factions and mats, and the theme in use, on this device,
+// Saved games, the player's own maps, factions and mats, and the skins (each a
+// theme and its own words, one of them in use), on this device,
 // in IndexedDB (kept by installed home-screen apps, unlike some browser
 // storage). One record per game, by id; the library is a single record.
 import { EMPTY_LIBRARY, type Library } from '../content/library';
 import type { SavedGame } from './save';
 import { DEFAULT_THEME, type Theme } from '../theme/theme';
+import { newSkin, ORIGINAL, type Skin } from '../skins/skin';
 
 const DB = 'scythe';
 const STORE = 'games';
 const LIBRARY = 'library';
-/** The theme in use, kept in the library's store under its own key. */
+/** The theme from before skins: it becomes the first skin of one's own (see skinIndex). */
 const THEME = 'theme';
+/** Which skins there are (besides Original) and which is in use; each skin is kept under "skin:<id>". */
+const SKINS = 'skins';
+const SKIN = 'skin:';
+
+/** The skins kept on this device, besides Original, and the one in use. */
+export interface SkinIndex {
+  active: string;
+  skins: { id: string; name: string }[];
+}
 /** Encounter cards' pictures, each kept once in the library's store under "picture:<ref>". */
 const PICTURE = 'picture:';
 
@@ -81,14 +92,80 @@ export class SaveStore {
     await this.run('readwrite', (s) => s.put(plain(library), LIBRARY), LIBRARY);
   }
 
-  /** The theme in use (pictures and colours); the usual look if none is set. */
-  async theme(): Promise<Theme> {
-    const saved = await this.run('readonly', (s) => s.get(THEME) as IDBRequest<Theme | undefined>, LIBRARY);
-    return { ...DEFAULT_THEME, ...saved };
+  /** Writes some records of the library's store in one go. */
+  private async write(records: [string, unknown][], remove: string[] = []): Promise<void> {
+    const db = await this.open();
+    const tx = db.transaction(LIBRARY, 'readwrite');
+    const store = tx.objectStore(LIBRARY);
+    for (const [key, value] of records) store.put(plain(value), key);
+    for (const key of remove) store.delete(key);
+    await new Promise<void>((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = tx.onabort = () => reject(tx.error);
+    });
   }
 
+  /**
+   * The skins on this device and the one in use (Original when there are none).
+   * A theme kept from before skins becomes a skin of its own, in use, the first time.
+   */
+  async skinIndex(): Promise<SkinIndex> {
+    const index = await this.run('readonly', (s) => s.get(SKINS) as IDBRequest<SkinIndex | undefined>, LIBRARY);
+    if (index) return index;
+    const old = await this.run('readonly', (s) => s.get(THEME) as IDBRequest<Theme | undefined>, LIBRARY);
+    if (!old) return { active: ORIGINAL.id, skins: [] };
+    const skin: Skin = { ...newSkin(old.name?.trim() || 'My skin', ORIGINAL, crypto.randomUUID()), theme: { ...DEFAULT_THEME, ...old } };
+    const made: SkinIndex = { active: skin.id, skins: [{ id: skin.id, name: skin.name }] };
+    await this.write([[SKIN + skin.id, skin], [SKINS, made]], [THEME]);
+    return made;
+  }
+
+  /** A skin by its ID (Original for Original, or one that's gone). */
+  async skin(id: string): Promise<Skin> {
+    if (id === ORIGINAL.id) return ORIGINAL;
+    const saved = await this.run('readonly', (s) => s.get(SKIN + id) as IDBRequest<Skin | undefined>, LIBRARY);
+    return saved ? { ...saved, theme: { ...DEFAULT_THEME, ...saved.theme } } : ORIGINAL;
+  }
+
+  /** The skin in use. */
+  async activeSkin(): Promise<Skin> {
+    return this.skin((await this.skinIndex()).active);
+  }
+
+  /** Keeps a skin (new or changed); Original can't be changed. */
+  async putSkin(skin: Skin, { use = false } = {}): Promise<void> {
+    if (skin.id === ORIGINAL.id) throw new Error("The Original skin can't be changed.");
+    const index = await this.skinIndex();
+    const skins = index.skins.some((s) => s.id === skin.id) ? index.skins.map((s) => (s.id === skin.id ? { id: skin.id, name: skin.name } : s)) : [...index.skins, { id: skin.id, name: skin.name }];
+    await this.write([[SKIN + skin.id, skin], [SKINS, { active: use ? skin.id : index.active, skins }]]);
+  }
+
+  /** Puts a skin in use. */
+  async useSkin(id: string): Promise<void> {
+    const index = await this.skinIndex();
+    if (id !== ORIGINAL.id && !index.skins.some((s) => s.id === id)) throw new Error('That skin is no longer on this device.');
+    await this.write([[SKINS, { ...index, active: id }]]);
+  }
+
+  /** Removes a skin; if it was in use, Original is used instead. */
+  async deleteSkin(id: string): Promise<void> {
+    const index = await this.skinIndex();
+    await this.write([[SKINS, { active: index.active === id ? ORIGINAL.id : index.active, skins: index.skins.filter((s) => s.id !== id) }]], [SKIN + id]);
+  }
+
+  /** The theme of the skin in use (the usual look with Original). */
+  async theme(): Promise<Theme> {
+    return (await this.activeSkin()).theme;
+  }
+
+  /**
+   * Changes the theme of the skin in use. Original can't be changed, so a
+   * change made while it's in use starts a skin of one's own ("My skin"), put in use.
+   */
   async putTheme(theme: Theme): Promise<void> {
-    await this.run('readwrite', (s) => s.put(plain(theme), THEME), LIBRARY);
+    const skin = await this.activeSkin();
+    if (skin.id === ORIGINAL.id) await this.putSkin({ ...newSkin('My skin', ORIGINAL, crypto.randomUUID()), theme }, { use: true });
+    else await this.putSkin({ ...skin, theme });
   }
 
   /** Every encounter card picture kept on the device, by reference. */

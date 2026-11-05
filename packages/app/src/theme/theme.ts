@@ -294,6 +294,11 @@ export function parseThemeFile(text: string): Theme {
   }
   if (!data || typeof data !== 'object' || data.format !== FORMAT) throw notTheme;
   if (typeof data.formatVersion === 'number' && data.formatVersion > FORMAT_VERSION) throw new Error('This theme was made by a newer version of the app. Update the app to open it.');
+  return readTheme(data);
+}
+
+/** A theme from plain data (a theme file's, or a skin's), keeping only slots, pictures and colours it knows. */
+export function readTheme(data: Record<string, unknown>): Theme {
   const pictures: Theme['pictures'] = {};
   for (const [slot, url] of Object.entries((data.pictures as Record<string, unknown>) ?? {})) {
     if ((SLOT_IDS.has(slot) || readFactionSlot(slot)) && typeof url === 'string' && PICTURE.test(url)) pictures[slot as SlotId] = url;

@@ -1,0 +1,143 @@
+/* The skin words page: a tab per faction, its name and colour, then its abilities as cards; mats and maps below. */
+h2 {
+  margin: 0;
+  font-size: 1.1rem;
+  align-self: center;
+}
+.skin-name {
+  color: var(--accent);
+}
+.status {
+  font-size: 0.8rem;
+  opacity: 0.8;
+  align-self: center;
+}
+.status.bad {
+  color: #e08a7a;
+  opacity: 1;
+}
+.intro {
+  margin: 0 10px;
+  font-size: 0.85rem;
+  opacity: 0.75;
+}
+.empty {
+  margin: 20px;
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.factions {
+  display: flex;
+  gap: 6px;
+  padding: 0 10px;
+  overflow-x: auto;
+}
+.factions button {
+  border-left: 4px solid var(--c);
+  white-space: nowrap;
+}
+.factions button.on {
+  background: color-mix(in srgb, var(--c) 35%, #3a322a);
+  font-weight: 700;
+}
+.faction,
+.names {
+  margin: 0 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.named {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+}
+.named label,
+.names label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 0.75rem;
+  opacity: 0.9;
+}
+.named input[type='text'] {
+  width: 200px;
+}
+.crest {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+}
+.crest.dot {
+  border-radius: 50%;
+  background: var(--c);
+}
+.was {
+  font-size: 0.75rem;
+  opacity: 0.55;
+  align-self: center;
+}
+.abilities {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+.card {
+  background: var(--panel);
+  border-radius: 10px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.card.wide {
+  grid-column: 1 / -1;
+  border-left: 3px solid var(--c);
+}
+.card h3 {
+  margin: 0;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.65;
+}
+.card input[type='text'],
+.card textarea {
+  width: 100%;
+  box-sizing: border-box;
+}
+textarea {
+  font: inherit;
+  font-size: 0.85rem;
+  color: var(--fg);
+  background: #3a322a;
+  border: 1px solid #fff2;
+  border-radius: 6px;
+  padding: 6px 8px;
+  resize: vertical;
+}
+::placeholder {
+  color: #efe6d455;
+}
+.does {
+  margin: 0;
+  font-size: 0.75rem;
+  opacity: 0.6;
+}
+.names {
+  flex-direction: row;
+  flex-wrap: wrap;
+  padding-bottom: 20px;
+}
+.names .card {
+  flex: 1;
+  min-width: 260px;
+}
+@media (max-width: 700px) {
+  .abilities {
+    grid-template-columns: 1fr;
+  }
+}
