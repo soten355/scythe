@@ -3,7 +3,7 @@ import { baseBoard, baseFactions, baseMats } from '@scythe/content';
 import type { PlayerMat } from '@scythe/engine';
 import { BUILT_IN } from '../content/catalog';
 import { catalogWith, EMPTY_LIBRARY } from '../content/library';
-import { CODEX_TABS, codexList, mapFacts, mapStart, encounterFacts, factionFacts, factoryFacts, matFacts, objectiveFacts, tileFacts } from './codex';
+import { CODEX_TABS, codexList, codexScene, mapFacts, mapStart, encounterFacts, factionFacts, factoryFacts, matFacts, objectiveFacts, tileFacts } from './codex';
 
 const mat: PlayerMat = {
   id: 'm',
@@ -110,5 +110,12 @@ describe('the codex', () => {
   it('still shows a map with no faction to start on it', () => {
     const game = mapStart(baseBoard, [{ ...baseFactions[0]!, homeBase: 'nowhere' }], baseMats);
     expect(game.players).toEqual([]);
+  });
+
+  it("a faction's page stands in its own background, else one of the fight backdrops at random, else the drawn land", () => {
+    expect(codexScene('own.jpg', ['a.jpg', 'b.jpg'], () => 0.9)).toBe('own.jpg');
+    expect(codexScene(undefined, ['a.jpg', 'b.jpg'], () => 0)).toBe('a.jpg');
+    expect(codexScene(undefined, ['a.jpg', 'b.jpg'], () => 0.99)).toBe('b.jpg');
+    expect(codexScene(undefined, [], () => 0.5)).toBeUndefined();
   });
 });

@@ -115,7 +115,9 @@ describe('the board theme', () => {
 
 describe("each faction's own pictures (set in the faction editor)", () => {
   it('has a crest, the character, a mech, a worker and each structure, at sizes in multiples of 16', () => {
-    expect(FACTION_PARTS.map((p) => p.part)).toEqual(['crest', 'portrait', 'character', 'mech', 'characterMap', 'mechMap', 'worker', 'mine', 'mill', 'armory', 'monument']);
+    expect(FACTION_PARTS.map((p) => p.part)).toEqual(['crest', 'portrait', 'character', 'mech', 'characterMap', 'mechMap', 'scene', 'worker', 'mine', 'mill', 'armory', 'monument']);
+    // The Codex background: a JPEG, taller than wide, like the box it fills.
+    expect(pictureSpec('faction.nordic.scene')).toMatchObject({ best: { width: 768, height: 1024 }, type: 'image/jpeg' });
     expect(factionSlot('nordic', 'mech')).toBe('faction.nordic.mech');
     expect(pictureSpec('faction.nordic.crest')).toMatchObject({ best: { width: 256, height: 256 }, type: 'image/png' });
     // Figures are taller than wide, and big enough for the fight screen.

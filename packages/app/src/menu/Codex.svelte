@@ -10,9 +10,9 @@
   import Board from '../play/Board.svelte';
   import type { Prompt } from '../play/prompt';
   import type { BoardLook } from '../theme/theme';
-  import { CODEX_TABS, codexList, mapFacts, mapStart, encounterFacts, factionFacts, factoryFacts, matFacts, objectiveFacts, tileFacts, type CodexKind } from './codex';
+  import { CODEX_TABS, codexList, codexScene, mapFacts, mapStart, encounterFacts, factionFacts, factoryFacts, matFacts, objectiveFacts, tileFacts, type CodexKind } from './codex';
   import { cardLook } from '../content/card-pictures';
-  import { cardPicture } from '../theme/current.svelte';
+  import { backdropPictures, cardPicture, factionPicture } from '../theme/current.svelte';
   import FactionEmblem from '../play/FactionEmblem.svelte';
   import FactionPortrait from '../play/FactionPortrait.svelte';
   import FightBackdrop from '../play/FightBackdrop.svelte';
@@ -64,6 +64,8 @@
   /** Nothing to do on a map in the codex: it's only to look at. */
   const LOOK_ONLY: Prompt = { title: '', buttons: [], highlights: new Set(), tapActions: new Map(), tapSelects: new Map() };
   const faction = $derived(kind === 'factions' ? catalog.factions[at] : undefined);
+  /** The faction page's background: its own, else a fight backdrop at random (picked again for each page). */
+  const scene = $derived(faction && codexScene(factionPicture(faction.id, 'scene'), backdropPictures()));
   const mat = $derived(kind === 'mats' ? [...catalog.mats].sort((a, b) => a.turnOrder - b.turnOrder)[at] : undefined);
   const encounter = $derived(kind === 'encounters' ? catalog.encounters?.[at] : undefined);
   const factory = $derived(kind === 'factory' ? catalog.factory?.[at] : undefined);
@@ -133,7 +135,7 @@
             {@const f = factionFacts(faction, board)}
             <div class="faction" style:--c={faction.color} style:--ink={inkOn(faction.color)}>
               <div class="hero">
-                <FightBackdrop terrain={f.terrain} />
+                <FightBackdrop terrain={f.terrain} picture={scene} />
                 <div class="figures">
                   <div class="mech"><FighterArt kind="mech" color={faction.color} factionId={faction.id} /></div>
                   <div class="character"><FighterArt kind="character" color={faction.color} factionId={faction.id} /></div>

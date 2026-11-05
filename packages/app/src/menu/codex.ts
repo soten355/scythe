@@ -129,3 +129,8 @@ export function objectiveFacts(card: ObjectiveCard) {
 export function tileFacts(tile: StructureBonusTile) {
   return { count: countText(tile.count), pays: tile.pays.map((s) => `${s.atLeast}+ → ${plural(s.coins, 'coin')}`) };
 }
+
+/** What a faction's Codex page stands in: its own background, else one of the fight backdrops at random, else nothing (the drawn land by its home base). */
+export function codexScene(own: string | undefined, backdrops: string[], random: () => number = Math.random): string | undefined {
+  return own ?? (backdrops.length ? backdrops[Math.min(backdrops.length - 1, Math.floor(random() * backdrops.length))] : undefined);
+}

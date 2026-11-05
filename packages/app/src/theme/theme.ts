@@ -21,7 +21,7 @@ const TOKENS: Resource[] = ['oil', 'metal', 'wood', 'food'];
  * character and mech are full figures (fights, the faction's screen, and the
  * map), unless they have their own map pieces (characterMap, mechMap).
  */
-export type FactionPart = 'crest' | 'portrait' | 'character' | 'mech' | 'characterMap' | 'mechMap' | 'worker' | Structure;
+export type FactionPart = 'crest' | 'portrait' | 'character' | 'mech' | 'characterMap' | 'mechMap' | 'scene' | 'worker' | Structure;
 
 export type SlotId = 'background' | `hex.${Terrain}` | `symbol.${Terrain | 'tunnel' | 'encounter'}` | `token.${Resource}` | `backdrop.${Terrain}` | 'ui.menu' | 'ui.panel' | `faction.${string}.${FactionPart}`;
 
@@ -48,6 +48,8 @@ const BEST = {
   portrait: { width: 512, height: 512 },
   /** A standing figure: the character or a mech, on the map and big on the fight screen. */
   figure: { width: 384, height: 512 },
+  /** Behind a faction's figures on its Codex page: taller than wide. */
+  scene: { width: 768, height: 1024 },
 } as const;
 const sizeText = (b: { width: number; height: number }) => `Best at ${b.width} × ${b.height} pixels`;
 
@@ -63,6 +65,7 @@ export const FACTION_PARTS: { part: FactionPart; label: string; hint: string }[]
   { part: 'mech', label: 'Mech', hint: FIGURE },
   { part: 'characterMap', label: 'Character on the map', hint: MAP_PIECE('character') },
   { part: 'mechMap', label: 'Mech on the map', hint: MAP_PIECE('mech') },
+  { part: 'scene', label: 'Codex background', hint: `Behind the character and mech on the faction's page in the Codex, cropped to fit; they stand about 80% of the way down. Empty: one of the fight backdrops (theme editor) at random, else the drawn land by its home base. ${sizeText(BEST.scene)}.` },
   { part: 'worker', label: 'Worker', hint: ON_MAP },
   { part: 'mine', label: 'Mine', hint: ON_MAP },
   { part: 'mill', label: 'Mill', hint: ON_MAP },
@@ -113,6 +116,7 @@ export function pictureSpec(slot: SlotId): { best: { width: number; height: numb
   const part = readFactionSlot(slot)?.part;
   if (part === 'character' || part === 'mech' || part === 'characterMap' || part === 'mechMap') return spec(BEST.figure, 'image/png');
   if (part === 'portrait') return spec(BEST.portrait, 'image/png');
+  if (part === 'scene') return spec(BEST.scene, 'image/jpeg');
   return spec(BEST.small, 'image/png');
 }
 

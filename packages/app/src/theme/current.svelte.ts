@@ -26,5 +26,11 @@ export const factionPicture = (factionId: string, part: FactionPart): string | u
 /** The picture behind the menus or the side panel, if the theme has one. */
 export const uiPicture = (slot: 'ui.menu' | 'ui.panel'): string | undefined => current.theme.pictures[slot];
 
+/** Every fight backdrop picture the theme has. */
+export const backdropPictures = (): string[] =>
+  Object.entries(current.theme.pictures)
+    .filter(([slot, url]) => slot.startsWith('backdrop.') && url)
+    .map(([, url]) => url!);
+
 /** The picture behind fights on this terrain, if the theme has one. */
 export const backdropNow = (terrain: string): string | undefined => backdropPicture(current.theme, terrain);

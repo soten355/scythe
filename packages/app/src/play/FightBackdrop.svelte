@@ -10,9 +10,10 @@
   import { backdropNow } from '../theme/current.svelte';
   import { backdropFor, rand, ridge, treeline } from './scenery';
 
-  let { terrain }: { terrain: string } = $props();
+  /** `picture`: one to show in place of the terrain's (the Codex's faction pages). */
+  let { terrain, picture: chosen }: { terrain: string; picture?: string } = $props();
   const kind = $derived(backdropFor(terrain));
-  const picture = $derived(backdropNow(terrain));
+  const picture = $derived(chosen ?? backdropNow(terrain));
 
   // Scenery that never changes, worked out once.
   const forest = {
