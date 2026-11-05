@@ -1,8 +1,9 @@
 <script lang="ts">
-  // A fight plays out once both sides have locked in. What each side played
-  // is revealed, the two lead fighters charge and collide, a dust cloud
-  // swallows them, and when it clears the winner is standing and the loser
-  // lies wrecked on the ground. Then a big banner names the winner. Tap to
+  // A fight plays out once both sides have locked in. The two sides face off,
+  // the lead fighters charge and collide, a dust cloud swallows them, and when
+  // it clears the winner is standing and the loser lies wrecked on the ground.
+  // Only then is what each side played revealed (owner's request: no numbers
+  // before the dust clears), with a big banner naming the winner. Tap to
   // skip ahead; tap again (or Continue) to go back to the map.
   import { onMount } from 'svelte';
   import { lineup, type Battle } from './fight';
@@ -12,8 +13,8 @@
   let { battle, onDone }: { battle: Battle; onDone: () => void } = $props();
 
   /** The scene's beats, in order, and when each starts (ms). */
-  const BEATS = ['reveal', 'charge', 'impact', 'aftermath', 'clearing', 'verdict'] as const;
-  const AT = [0, 1500, 1950, 2500, 3100, 3900];
+  const BEATS = ['faceoff', 'charge', 'impact', 'aftermath', 'clearing', 'verdict'] as const;
+  const AT = [0, 900, 1350, 1900, 2500, 3500];
   let beat = $state(0);
   const from = (name: (typeof BEATS)[number]) => beat >= BEATS.indexOf(name);
 
@@ -65,10 +66,10 @@
       {/each}
     </div>
 
-    <!-- What they played: power and each card flip in, then the total. -->
+    <!-- What they played, once the dust has cleared: power and each card flip in, then the total. -->
     <div class="tally {side}" class:won={from('verdict') && won} class:lost={from('verdict') && !won} style:--c={s.color}>
       <h2 class="named"><FactionPortrait factionId={s.factionId} color={s.color} size={34} />{s.name}</h2>
-      <div class="sum">
+      {#if from('verdict')}<div class="sum">
         <span class="chip power" style:--d="0ms">⚡ {s.power}</span>
         {#each s.cards as card, i (i)}
           <span class="plus">+</span>
@@ -76,7 +77,7 @@
         {/each}
         <span class="plus">=</span>
         <span class="total" style:--d="{450 + s.cards.length * 200}ms">{s.total}</span>
-      </div>
+      </div>{/if}
     </div>
   {/each}
 

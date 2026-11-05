@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { botName, isBot, needsPass, people } from './seats';
+import { baseBoard, baseFactions, baseMats } from '@scythe/content';
+import { newGame, nextSeat } from '@scythe/engine';
+import { botName, inTurnOrder, isBot, needsPass, people } from './seats';
 
 describe('who plays each seat', () => {
   it('a seat is a bot only if the game says so (older games: everyone is a person)', () => {
@@ -27,5 +29,18 @@ describe('who plays each seat', () => {
 
   it('bots are named by their level', () => {
     expect(botName('hard')).toBe('Hard bot');
+  });
+
+  it('lists the seats in turn order: whoever goes first, then on round the table', () => {
+    const mats = [...baseMats].sort((a, b) => b.turnOrder - a.turnOrder);
+    const game = newGame({ seed: 3, board: baseBoard, turnOrder: 'map', players: baseFactions.slice(0, 4).map((faction, i) => ({ faction, mat: mats[i]! })) });
+    const order = inTurnOrder(game);
+    expect(order).toHaveLength(4);
+    expect(new Set(order).size).toBe(4);
+    // The first player (the lowest mat) leads, and each next seat is who plays after.
+    expect(order[0]).toBe(game.currentPlayer);
+    for (let i = 1; i < 4; i++) expect(order[i]).toBe(nextSeat(game, order[i - 1]!));
+    // It stays the same as play goes round.
+    expect(inTurnOrder({ ...game, currentPlayer: order[2]! })).toEqual(order);
   });
 });

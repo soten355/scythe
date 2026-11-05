@@ -3,11 +3,15 @@
   // mechs, workers, territories controlled (the Factory counts three) and the
   // resources on hexes they control. Everyone else shrinks to
   // their name (just its first letter with four or more players, so all fit on
-  // a phone); everyone's stars always show. Tapping a player opens their
-  // dossier (FactionDossier).
+  // a phone); everyone's stars always show. They're listed in turn order,
+  // whoever went first leading. Tapping a player opens their dossier
+  // (FactionDossier); each is at least 44 points wide and 34 tall, to be easy
+  // to tap on the iPhone, and on a phone the resource line is left out so all
+  // fit without scrolling.
   import { controlledHexes, RESOURCES, territories, type GameState } from '@scythe/engine';
   import { cubicInOut } from 'svelte/easing';
   import { slide } from 'svelte/transition';
+  import { inTurnOrder } from './seats';
 
   let { game, onOpen }: { game: GameState; onOpen?: (seat: number) => void } = $props();
 
@@ -18,7 +22,8 @@
 
   const compact = $derived(game.players.length > 3);
   const rows = $derived(
-    game.players.map((p, seat) => {
+    inTurnOrder(game).map((seat) => {
+      const p = game.players[seat]!;
       const totals = Object.fromEntries(RESOURCES.map((r) => [r, 0])) as Record<string, number>;
       for (const hex of controlledHexes(game, seat)) {
         for (const [r, n] of Object.entries(game.resources[hex] ?? {})) totals[r]! += n;
@@ -56,15 +61,20 @@
   .bar {
     display: flex;
     gap: 6px;
-    padding: 4px 6px;
-    font-size: 12px;
+    padding: 3px 6px;
+    font-size: 13px;
     overflow-x: auto;
   }
   .player {
     display: flex;
     gap: 8px;
     align-items: center;
-    padding: 3px 8px;
+    justify-content: center;
+    flex: none;
+    min-width: 44px;
+    min-height: 34px;
+    padding: 4px 10px;
+    touch-action: manipulation;
     border-radius: 6px;
     border: 2px solid transparent;
     background: var(--panel);
@@ -96,5 +106,15 @@
   }
   .res {
     opacity: 0.75;
+  }
+  /* A phone: drop the resource line, so every player fits without scrolling (their screen shows it). */
+  @media (max-width: 760px) {
+    .details,
+    .player {
+      gap: 6px;
+    }
+    .res {
+      display: none;
+    }
   }
 </style>

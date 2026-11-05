@@ -2,6 +2,7 @@
 // person the device is passed between them, with the board hidden; bots
 // never need it, and a solo player keeps it throughout.
 import type { Level } from '@scythe/bots';
+import { playOrder, type GameState } from '@scythe/engine';
 
 /** Each seat's bot level, or null for a person; none: everyone is a person. */
 export type Bots = (Level | null)[] | undefined;
@@ -17,3 +18,12 @@ export const needsPass = (bots: Bots, players: number, viewer: number | null, to
 
 const LEVEL_NAMES: Record<Level, string> = { easy: 'Easy', medium: 'Medium', hard: 'Hard' };
 export const botName = (level: Level) => `${LEVEL_NAMES[level]} bot`;
+
+/** Every seat in the order they play, starting with whoever went first (the lowest mat), for the top bar. */
+export function inTurnOrder(game: GameState): number[] {
+  const { players } = game.setup;
+  const first = players.reduce((best, p, i) => (p.mat.turnOrder < players[best]!.mat.turnOrder ? i : best), 0);
+  const order = playOrder(game.setup);
+  const at = order.indexOf(first);
+  return [...order.slice(at), ...order.slice(0, at)];
+}
