@@ -4,7 +4,8 @@
   // Use one (menus, the codex and new games follow it), start a new one from
   // it, rename it, save it to a file, delete it, or open a skin file. The
   // editors change the skin in use: its look (theme editor), its factions'
-  // pictures (faction editor) and its names and wording (skin words).
+  // pictures (faction editor) and its names and wording (skin words). Saving
+  // to a file asks whether to put the player's own card decks in too.
   import type { Faction } from '@scythe/engine';
   import { inkOn } from '../play/ink';
   import { ORIGINAL, type Skin } from '../skins/skin';
@@ -14,6 +15,7 @@
   let {
     index,
     factions,
+    cards,
     message,
     loadSkin,
     onUse,
@@ -27,13 +29,15 @@
     index: SkinIndex;
     /** The built-in factions, to show each skin's crests and names. */
     factions: Faction[];
+    /** How many of their own cards the player has in each deck (none: still the made-up samples). */
+    cards: { encounters: number; factory: number; objectives: number };
     message: string;
     loadSkin: (id: string) => Promise<Skin>;
     onUse: (id: string) => void;
     onNew: (name: string, from: string) => void;
     onRename: (id: string, name: string) => void;
     onDelete: (id: string) => void;
-    onExport: (id: string) => void;
+    onExport: (id: string, withCards: boolean) => void;
     onImport: (file: File) => void;
     onBack: () => void;
   } = $props();
@@ -69,6 +73,24 @@
   }
 
   let fileInput: HTMLInputElement;
+
+  /** The skin being saved to a file (the choice of cards is asked first). */
+  let saving = $state<{ id: string; name: string } | null>(null);
+  let withCards = $state(true);
+  const hasCards = $derived(cards.encounters + cards.factory + cards.objectives > 0);
+  const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+  const cardList = $derived(
+    [
+      { n: cards.encounters, what: 'encounter card' },
+      { n: cards.factory, what: 'Factory card' },
+      { n: cards.objectives, what: 'objective card' },
+    ].map(({ n, what }) => (n ? plural(n, what) : `no ${what}s of your own (the made-up samples stay out)`)),
+  );
+  function save() {
+    if (!saving) return;
+    onExport(saving.id, hasCards && withCards);
+    saving = null;
+  }
 </script>
 
 <div class="screen">
@@ -104,7 +126,7 @@
           <button onclick={() => startNew(s.id)}>New skin from this</button>
           {#if !original}
             <button onclick={() => rename(s.id, s.name)}>Rename</button>
-            <button onclick={() => onExport(s.id)}>Save to a file</button>
+            <button onclick={() => ((saving = { id: s.id, name: s.name }), (withCards = true))}>Save to a file</button>
             <button class="danger" onclick={() => remove(s.id, s.name)}>Delete</button>
           {/if}
         </div>
@@ -120,6 +142,31 @@
     {/each}
   </div>
 </div>
+
+{#if saving}
+  <!-- Saving a skin to a file: put the player's own cards in too, or not. -->
+  <div class="backdrop" role="presentation" onclick={() => (saving = null)}></div>
+  <div class="dialog" role="dialog" aria-modal="true" aria-label="Save the skin to a file">
+    <h3>Save "{saving.name}" to a file</h3>
+    <p>The file holds the whole skin: its pictures, colours, fonts, names and wording.</p>
+    {#if hasCards}
+      <label class="check">
+        <input type="checkbox" bind:checked={withCards} />
+        <span>
+          <b>Include your cards</b>
+          <small>{cardList.join(' · ')}</small>
+          <small>Whoever opens the file is asked whether to use them for new games.</small>
+        </span>
+      </label>
+    {:else}
+      <p class="dim">Your encounter, Factory and objective decks are still the made-up samples, so there are no cards of your own to include. Add your decks from their editors in the Workshop first.</p>
+    {/if}
+    <div class="buttons">
+      <button onclick={() => (saving = null)}>Cancel</button>
+      <button class="primary" onclick={save}>Save to a file</button>
+    </div>
+  </div>
+{/if}
 
 <style>
   .screen {
@@ -275,5 +322,69 @@
     .list {
       grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
     }
+  }
+  .backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgb(0 0 0 / 0.55);
+    z-index: 10;
+  }
+  .dialog {
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: min(460px, 92vw);
+    max-height: 90vh;
+    overflow-y: auto;
+    z-index: 11;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    font-size: 14px;
+  }
+  .dialog h3 {
+    white-space: normal;
+    flex: none;
+  }
+  .dialog p {
+    margin: 0;
+  }
+  .dim {
+    opacity: 0.7;
+    font-size: 13px;
+  }
+  .check {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    padding: 8px 10px;
+    background: var(--raised);
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .check input {
+    width: 20px;
+    height: 20px;
+    margin-top: 1px;
+    accent-color: var(--accent);
+  }
+  .check span {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .check small {
+    opacity: 0.75;
+    font-size: 12px;
+  }
+  .buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
   }
 </style>

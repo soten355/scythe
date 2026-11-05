@@ -7,8 +7,12 @@
 //
 // "Original" is the built-in look (the drawn pieces and emoji) and can't be
 // changed; a device can keep any number of skins of its own beside it. Skins
-// go between devices as one file (.scythe-skin.json).
-import type { Ability } from '@scythe/engine';
+// go between devices as one file (.scythe-skin.json), which can also carry
+// the player's own encounter, Factory and objective cards (with the encounter
+// cards' pictures), to use on the device it's opened on.
+import type { Ability, EncounterCard, FactoryCard, ObjectiveCard } from '@scythe/engine';
+import { contentFileText, parseContentFile, type Library } from '../content/library';
+import { picturesFor } from '../content/card-pictures';
 import type { Catalog } from '../menu/setup';
 import { DEFAULT_THEME, readTheme, type Theme } from '../theme/theme';
 
@@ -96,7 +100,41 @@ const COLOR = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
 const NAME_MAX = 60;
 const TEXT_MAX = 600;
 
-export const skinFileText = (skin: Skin) => JSON.stringify({ format: FORMAT, formatVersion: FORMAT_VERSION, name: skin.name, theme: skin.theme, words: skin.words });
+/** Card decks that can travel with a skin: the player's own, with the encounter cards' pictures. */
+export interface SkinCards {
+  encounters: EncounterCard[];
+  factory: FactoryCard[];
+  objectives: ObjectiveCard[];
+  pictures: Record<string, string>;
+}
+
+/** The player's own decks to put in a skin file (the made-up samples never go), with only the pictures they use; none if there are none. */
+export function cardsToShare(library: Library, kept: Record<string, string>): SkinCards | undefined {
+  const { encounters, factory, objectives } = library;
+  if (!encounters.length && !factory.length && !objectives.length) return undefined;
+  return { encounters, factory, objectives, pictures: picturesFor(encounters, kept) };
+}
+
+/** The library with a skin's decks in place of the ones new games use now; a deck the skin lacks stays as it is. */
+export function useSkinCards(library: Library, cards: SkinCards): Library {
+  return {
+    ...library,
+    ...(cards.encounters.length && { encounters: cards.encounters }),
+    ...(cards.factory.length && { factory: cards.factory }),
+    ...(cards.objectives.length && { objectives: cards.objectives }),
+  };
+}
+
+export const skinFileText = (skin: Skin, cards?: SkinCards) =>
+  JSON.stringify({
+    format: FORMAT,
+    formatVersion: FORMAT_VERSION,
+    name: skin.name,
+    theme: skin.theme,
+    words: skin.words,
+    // The cards as a content file's (so they're checked the same way when read).
+    ...(cards && { cards: JSON.parse(contentFileText({ maps: [], factions: [], mats: [], structureBonuses: [], encounters: cards.encounters, factory: cards.factory, objectives: cards.objectives }, cards.pictures)) }),
+  });
 
 /** "scythe-skin-iron-tide.scythe-skin.json" */
 export const skinFileName = (skin: Skin) => `scythe-skin-${skin.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'skin'}.scythe-skin.json`;
@@ -149,4 +187,18 @@ export function parseSkinFile(fileText: string, id: string): Skin {
     theme: readTheme(isRecord(data.theme) ? data.theme : {}),
     words: readWords(data.words),
   };
+}
+
+/** The cards a skin file carries, if any, checked like a content file's. Throws, in plain words, if one can't be used. */
+export function parseSkinCards(fileText: string): SkinCards | undefined {
+  let data: unknown;
+  try {
+    data = JSON.parse(fileText);
+  } catch {
+    return undefined;
+  }
+  if (!isRecord(data) || !isRecord(data.cards)) return undefined;
+  const content = parseContentFile(JSON.stringify(data.cards));
+  const cards = { encounters: content.encounters, factory: content.factory, objectives: content.objectives, pictures: content.pictures ?? {} };
+  return cards.encounters.length || cards.factory.length || cards.objectives.length ? cards : undefined;
 }

@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { baseFactions, baseMats } from '@scythe/content';
 import { BUILT_IN } from '../content/catalog';
 import { DEFAULT_THEME, setPicture } from '../theme/theme';
-import { applyWords, freeName, newSkin, ORIGINAL, parseSkinFile, skinFileName, skinFileText, type Skin } from './skin';
+import { applyWords, cardsToShare, freeName, newSkin, ORIGINAL, parseSkinCards, parseSkinFile, skinFileName, skinFileText, useSkinCards, type Skin } from './skin';
+import { EMPTY_LIBRARY } from '../content/library';
 
 const nordic = baseFactions[0]!;
 const words: Skin['words'] = {
@@ -90,5 +91,39 @@ describe('skins', () => {
     expect(() => parseSkinFile('{"format":"scythe-theme"}', 'a')).toThrow("This file isn't a Scythe skin.");
     expect(() => parseSkinFile('not json', 'a')).toThrow("This file isn't a Scythe skin.");
     expect(() => parseSkinFile('{"format":"scythe-skin","formatVersion":99}', 'a')).toThrow(/newer version/);
+  });
+
+  describe('with its cards', () => {
+    const encounter = { ...BUILT_IN.encounters![0]!, id: 'my-e1', name: 'My card', picture: 'pic-abc' };
+    const factory = { ...BUILT_IN.factory![0]!, id: 'my-f1', name: 'My Factory card' };
+    const objective = { ...BUILT_IN.objectives![0]!, id: 'my-o1', name: 'My objective' };
+    const library = { ...EMPTY_LIBRARY, encounters: [encounter], factory: [factory], objectives: [objective] };
+    const kept = { 'pic-abc': 'data:image/jpeg;base64,AAAA', 'pic-unused': 'data:image/jpeg;base64,BBBB' };
+    const skin: Skin = { id: 'x1', name: 'Iron Tide', theme: DEFAULT_THEME, words };
+
+    it("shares the player's own decks, with only the pictures they use (never the made-up samples)", () => {
+      expect(cardsToShare(library, kept)).toEqual({ encounters: [encounter], factory: [factory], objectives: [objective], pictures: { 'pic-abc': kept['pic-abc'] } });
+      expect(cardsToShare(EMPTY_LIBRARY, kept)).toBeUndefined();
+    });
+
+    it('carries them in the file, and reads them back', () => {
+      const text = skinFileText(skin, cardsToShare(library, kept));
+      expect(parseSkinFile(text, 'y')).toEqual({ ...skin, id: 'y' });
+      expect(parseSkinCards(text)).toEqual(cardsToShare(library, kept));
+      expect(parseSkinCards(skinFileText(skin))).toBeUndefined();
+    });
+
+    it('turns down cards that are not complete', () => {
+      const text = skinFileText(skin, { encounters: [{ ...encounter, options: [] } as never], factory: [], objectives: [], pictures: {} });
+      expect(() => parseSkinCards(text)).toThrow(/My card can't be used/);
+    });
+
+    it('its decks take the place of the ones new games use; decks it lacks stay', () => {
+      const mine = { ...EMPTY_LIBRARY, encounters: [{ ...encounter, id: 'old' }], factory: [{ ...factory, id: 'old-f' }] };
+      const next = useSkinCards(mine, { encounters: [encounter], factory: [], objectives: [objective], pictures: {} });
+      expect(next.encounters).toEqual([encounter]);
+      expect(next.factory).toEqual(mine.factory);
+      expect(next.objectives).toEqual([objective]);
+    });
   });
 });

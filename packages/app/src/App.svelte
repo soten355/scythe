@@ -18,7 +18,7 @@
   import { SaveStore } from './saves/store';
   import { exportSave, exportSkin, readSaveFile } from './saves/files';
   import { boardLook, uiStyle } from './theme/theme';
-  import { applyWords, freeName, newSkin, ORIGINAL, parseSkinFile, type Skin } from './skins/skin';
+  import { applyWords, cardsToShare, freeName, newSkin, ORIGINAL, parseSkinCards, parseSkinFile, useSkinCards, type Skin, type SkinCards } from './skins/skin';
   import type { SkinIndex } from './saves/store';
   import { untrack } from 'svelte';
   import { useCardPictures, useTheme } from './theme/current.svelte';
@@ -95,7 +95,10 @@
     if (to === 'home' || to === 'saves') void refresh();
     // The editors may have added to the library since.
     if (to === 'new' || to === 'codex') store.library().then((l) => (library = l), () => {});
-    if (to === 'skins') skinMessage = '';
+    if (to === 'skins') {
+      skinMessage = '';
+      store.library().then((l) => (library = l), () => {});
+    }
   }
 
   async function keep(next: Library) {
@@ -132,6 +135,9 @@
 
   // Skins.
   let skinMessage = $state('');
+  const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+  /** How many of their own cards the player has in each deck (the made-up samples don't count). */
+  const ownCards = $derived({ encounters: library.encounters.length, factory: library.factory.length, objectives: library.objectives.length });
   /** Does something to the skins, then reads them again; says what happened (or went wrong). */
   async function skinDo(what: () => Promise<unknown>, done = '') {
     try {
@@ -152,13 +158,32 @@
     });
   const renameSkin = (id: string, name: string) => skinDo(async () => store.putSkin({ ...(await store.skin(id)), name: freeName(name, takenNames(id)) }));
   const deleteSkin = (id: string) => skinDo(() => store.deleteSkin(id), 'Deleted.');
-  const exportSkinById = (id: string) => skinDo(async () => void (await exportSkin(await store.skin(id))));
+  /** Saves a skin to a file, with the player's own card decks if asked. */
+  const exportSkinById = (id: string, withCards: boolean) =>
+    skinDo(async () => void (await exportSkin(await store.skin(id), withCards ? cardsToShare(library, await store.cardPictures()) : undefined)));
   const importSkin = (file: File) =>
     skinDo(async () => {
-      const read = parseSkinFile(await file.text(), crypto.randomUUID());
+      const text = await file.text();
+      const read = parseSkinFile(text, crypto.randomUUID());
       const opened = { ...read, name: freeName(read.name, skinIndex.skins.map((s) => s.name)) };
+      // Its cards, if it brings any, are checked before anything is kept.
+      let cards: SkinCards | undefined;
+      let cardTrouble = '';
+      try {
+        cards = parseSkinCards(text);
+      } catch (e) {
+        cardTrouble = e instanceof Error ? e.message : String(e);
+      }
       await store.putSkin(opened, { use: true });
-      return `Added "${opened.name}" and put it in use.`;
+      const added = `Added "${opened.name}" and put it in use.`;
+      if (cardTrouble) return `${added} Its cards weren't used: ${cardTrouble}`;
+      if (!cards) return added;
+      const what = [plural(cards.encounters.length, 'encounter card'), plural(cards.factory.length, 'Factory card'), plural(cards.objectives.length, 'objective card')].filter((t) => !t.startsWith('0 ')).join(', ');
+      if (!confirm(`"${opened.name}" comes with its own cards: ${what}. Use them for new games? They take the place of the cards new games use now (games already started keep theirs).`)) return `${added} Its cards were left out.`;
+      await store.putCardPictures(cards.pictures);
+      useCardPictures(await store.cardPictures());
+      await keep(useSkinCards(library, cards));
+      return `${added} New games use its cards: ${what}.`;
     });
 
   function persist(save: SavedGame) {
@@ -215,7 +240,7 @@
 {:else if screen === 'codex'}
   <Codex {catalog} {builtIn} board={builtIn.maps[0]!.board} {look} onBack={() => go('home')} />
 {:else if screen === 'skins'}
-  <Skins index={skinIndex} factions={builtIn.factions} message={skinMessage} loadSkin={(id) => store.skin(id)} onUse={useSkin} onNew={makeSkin} onRename={renameSkin} onDelete={deleteSkin} onExport={exportSkinById} onImport={importSkin} onBack={() => go('home')} />
+  <Skins index={skinIndex} factions={builtIn.factions} cards={ownCards} message={skinMessage} loadSkin={(id) => store.skin(id)} onUse={useSkin} onNew={makeSkin} onRename={renameSkin} onDelete={deleteSkin} onExport={exportSkinById} onImport={importSkin} onBack={() => go('home')} />
 {:else if screen === 'workshop'}
   <Workshop onBack={() => go('home')} />
 {:else if screen === 'new'}
