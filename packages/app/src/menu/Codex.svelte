@@ -614,7 +614,10 @@
     gap: 8px;
   }
   .card-picture {
-    height: clamp(90px, 34vh, 260px);
+    aspect-ratio: 3 / 2;
+    height: clamp(120px, 50vh, 460px);
+    max-width: 100%;
+    margin: 0 auto;
     border-radius: 8px;
     background: center / cover no-repeat;
     display: flex;

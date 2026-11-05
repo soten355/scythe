@@ -70,7 +70,7 @@
 }
 .card-thumb {
   width: 200px;
-  aspect-ratio: 800 / 448;
+  aspect-ratio: 3 / 2;
   flex: none;
   display: grid;
   place-items: center;

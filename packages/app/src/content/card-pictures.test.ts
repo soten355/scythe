@@ -20,7 +20,7 @@ describe('encounter card pictures', () => {
   });
 
   it('are shrunk to a wide JPEG of about 100 KB', () => {
-    expect(CARD_PICTURE).toEqual({ best: { width: 800, height: 448 }, max: 800, type: 'image/jpeg' });
+    expect(CARD_PICTURE).toEqual({ best: { width: 768, height: 512 }, max: 768, type: 'image/jpeg' });
   });
 
   it('show what the card asks for: by default the story, and the picture too when it has one', () => {

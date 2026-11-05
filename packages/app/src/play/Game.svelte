@@ -1245,10 +1245,13 @@
     opacity: 0.85;
   }
   /* A wide band: short enough to leave room for the options on a phone held sideways. */
+  /* The picture whole, at 3:2, as tall as the screen allows. */
   .encounter .card-picture {
     position: relative;
-    height: clamp(80px, 30vh, 220px);
-    margin-bottom: 8px;
+    aspect-ratio: 3 / 2;
+    height: clamp(120px, 44vh, 400px);
+    max-width: 100%;
+    margin: 0 auto 8px;
     border-radius: 8px;
     background: center / cover no-repeat;
     display: flex;

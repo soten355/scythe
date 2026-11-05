@@ -5,8 +5,8 @@
 // the card's story instead.
 import type { EncounterCard } from '@scythe/engine';
 
-/** Shrunk to this as it comes in: wide, JPEG, about 100 KB. */
-export const CARD_PICTURE = { best: { width: 800, height: 448 }, max: 800, type: 'image/jpeg' } as const;
+/** Shrunk to this as it comes in: 3:2 (the owner's choice), JPEG, about 100 KB. Other shapes are shown cropped to 3:2. */
+export const CARD_PICTURE = { best: { width: 768, height: 512 }, max: 768, type: 'image/jpeg' } as const;
 
 /** A short, stable reference for a picture: the same picture always gets the same one. */
 export function pictureRef(url: string): string {
