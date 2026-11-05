@@ -163,9 +163,19 @@ export class SaveStore {
    * change made while it's in use starts a skin of one's own ("My skin"), put in use.
    */
   async putTheme(theme: Theme): Promise<void> {
+    await this.changeSkin((skin) => ({ ...skin, theme }));
+  }
+
+  /**
+   * Changes the skin in use (read fresh, so changes made elsewhere meanwhile
+   * aren't lost) and returns it. With Original in use, the change starts a
+   * skin of one's own ("My skin"), put in use.
+   */
+  async changeSkin(change: (skin: Skin) => Skin): Promise<Skin> {
     const skin = await this.activeSkin();
-    if (skin.id === ORIGINAL.id) await this.putSkin({ ...newSkin('My skin', ORIGINAL, crypto.randomUUID()), theme }, { use: true });
-    else await this.putSkin({ ...skin, theme });
+    const next = change(skin.id === ORIGINAL.id ? newSkin('My skin', ORIGINAL, crypto.randomUUID()) : skin);
+    await this.putSkin(next, { use: true });
+    return next;
   }
 
   /** Every encounter card picture kept on the device, by reference. */

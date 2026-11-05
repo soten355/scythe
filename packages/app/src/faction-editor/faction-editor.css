@@ -118,3 +118,28 @@ input[type='color'] {
 .what small {
   opacity: 0.65;
 }
+
+/* A built-in faction: its words go to the skin in use; its rules are shown as they are. */
+.built-in {
+  margin: 0 10px;
+  padding: 8px 10px;
+  border-left: 3px solid var(--accent);
+  background: #fff1;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.built-in p {
+  margin: 0;
+}
+.word-note {
+  color: var(--accent);
+}
+input:disabled,
+select:disabled,
+textarea:disabled,
+button:disabled {
+  opacity: 0.5;
+}

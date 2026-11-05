@@ -1,7 +1,10 @@
 // Faction editor: enter or design factions (the faction mat), then export
 // them as data for packages/content; and give each faction its own pictures
-// (crest, character, mech, worker, structures), kept in the theme on this
-// device under the faction's ID. Plain DOM, no framework.
+// (crest, character, mech, worker, structures), kept in the skin in use on
+// this device under the faction's ID. The five built-in factions can't change
+// their rules here: their name, colour and wording go straight into the skin
+// in use (so the codex, new games and menus show them), and the rest is shown
+// as it is. Plain DOM, no framework.
 import { baseBoard, baseFactions } from '@scythe/content';
 import { MAX_POWER, RECRUIT_BONUSES, validateFaction, type Faction, type RecruitBonus } from '@scythe/engine';
 import '../shared/forms.css';
@@ -11,7 +14,9 @@ import { exportContent } from '../saves/files';
 import { SaveStore } from '../saves/store';
 import { clearPicture, copyFactionPictures, FACTION_PARTS, factionSlot, setPicture, type SlotId, type Theme } from '../theme/theme';
 import { pictureFor, sizeKb } from '../theme/pictures';
-import { formatFactions, homeBaseClashes, newFaction } from './model';
+import { formatFactions, homeBaseClashes, newFaction, wordsFromCopy } from './model';
+import { applyWords, type Skin, type SkinWords } from '../skins/skin';
+import { setAbilityWord, setFactionWord } from '../skins/words';
 
 const STORAGE_KEY = 'scythe-faction-editor';
 const HOME_BASES = Object.keys(baseBoard.homeBasePositions);
@@ -44,21 +49,41 @@ const faction = () => state.factions[state.selected]!;
 // ---- pictures (kept in the theme, on this device) ------------------------------
 
 const store = new SaveStore();
-/** The theme on the device; null until read (or if it can't be). */
+/** The skin in use and its theme; null until read (or if they can't be). */
+let skin: Skin | null = null;
 let theme: Theme | null = null;
 let pictureNote = '';
+/** What happened to the last change of a built-in faction's words. */
+let wordNote = '';
 
 /** Changes the theme as it is on the device now (the theme editor may have changed it since this page opened). */
 async function changeTheme(change: (t: Theme) => Theme, note: string) {
   try {
-    theme = change(await store.theme());
-    await store.putTheme(theme);
+    skin = await store.changeSkin((s) => ({ ...s, theme: change(s.theme) }));
+    theme = skin.theme;
     pictureNote = note;
   } catch {
     pictureNote = "That couldn't be kept on this device (it may be out of room).";
   }
   render();
 }
+
+/** Changes the words of the skin in use (a built-in faction's name, colour or wording). */
+async function changeWords(change: (w: SkinWords) => SkinWords) {
+  try {
+    skin = await store.changeSkin((s) => ({ ...s, words: change(s.words) }));
+    theme = skin.theme;
+    wordNote = `Kept in the skin "${skin.name}": the Codex, new games and the menus show it.`;
+  } catch {
+    wordNote = "That couldn't be kept on this device.";
+  }
+  render();
+}
+
+/** The built-in faction with this one's ID, if it is one. */
+const builtInOf = (f: Faction) => baseFactions.find((b) => b.id === f.id);
+/** A built-in faction as the skin in use tells it. */
+const skinned = (b: Faction) => (skin ? applyWords({ maps: [], factions: [b], mats: [] }, skin.words).factions[0]! : b);
 
 const update = (next: Faction) => {
   state = { ...state, factions: state.factions.map((f, i) => (i === state.selected ? next : f)) };
@@ -69,8 +94,16 @@ const update = (next: Faction) => {
 
 const root = document.querySelector<HTMLDivElement>('#faction-editor')!;
 
+/** Whether the faction open is built in (its rules can't change here). */
+let locked = false;
+const lock = () => (locked ? 'disabled' : '');
 const num = (path: string, value: number, max?: number) =>
-  `<input type="number" inputmode="numeric" min="0" ${max ? `max="${max}"` : ''} step="1" data-path="${path}" value="${Number.isFinite(value) ? value : ''}">`;
+  `<input type="number" inputmode="numeric" min="0" ${max ? `max="${max}"` : ''} step="1" data-path="${path}" value="${Number.isFinite(value) ? value : ''}" ${lock()}>`;
+/** A built-in faction's word, kept in the skin: `which` is its name, its colour, or an ability's name or wording. */
+const word = (which: string, value: string, placeholder: string, isArea = false) =>
+  isArea
+    ? `<textarea data-skin="${which}" rows="3" placeholder="${esc(placeholder)}">${esc(value)}</textarea>`
+    : `<input type="text" data-skin="${which}" value="${esc(value)}" placeholder="${esc(placeholder)}">`;
 const text = (path: string, value: string, placeholder = '') =>
   `<input type="text" data-path="${path}" data-text value="${esc(value)}" placeholder="${placeholder}">`;
 const area = (path: string, value: string) =>
@@ -84,15 +117,23 @@ function homeOptions(current: string) {
   }).join('');
 }
 
+/** An ability's name and wording: the editor's own, or (built in) the skin's. */
+function abilityFields(which: 'ability' | number, a: Faction['ability'], original: Faction['ability'] | undefined, path: string) {
+  if (!original) return `${text(`${path}.name`, a.name, 'Name')}${area(`${path}.description`, a.description)}`;
+  return `${word(`${which}.name`, a.name, original.name)}${word(`${which}.description`, a.description, original.description, true)}`;
+}
+
 function render() {
-  const f = faction();
+  const base = builtInOf(faction());
+  locked = !!base;
+  // A built-in faction shows as the skin tells it, with its own rules.
+  const f = base ? skinned(base) : faction();
   const mechs = f.mechAbilities
     .map(
       (m, i) => `
       <div class="card">
         <h3>Mech ability ${i + 1}</h3>
-        ${text(`mechAbilities.${i}.name`, m.name, 'Name')}
-        ${area(`mechAbilities.${i}.description`, m.description)}
+        ${abilityFields(i, m, base?.mechAbilities[i], `mechAbilities.${i}`)}
       </div>`,
     )
     .join('');
@@ -101,7 +142,7 @@ function render() {
       (r, i) => `
       <label>Space ${i + 1}
         <span class="pair">
-          <select data-path="recruitBonuses.${i}.bonus" data-text>
+          <select data-path="recruitBonuses.${i}.bonus" data-text ${lock()}>
             ${RECRUIT_BONUSES.map((b) => `<option value="${b}" ${b === r.bonus ? 'selected' : ''}>${BONUS_LABEL[b]}</option>`).join('')}
           </select>
           ${num(`recruitBonuses.${i}.amount`, r.amount)}
@@ -113,20 +154,34 @@ function render() {
   root.innerHTML = `
     <header>
       <a class="back" href="${import.meta.env.BASE_URL}#workshop">← Workshop</a>
-      <select data-act="pick">${state.factions.map((x, i) => `<option value="${i}" ${i === state.selected ? 'selected' : ''}>${esc(x.name || x.id)}</option>`).join('')}</select>
+      <select data-act="pick">${state.factions
+        .map((x, i) => {
+          const b = builtInOf(x);
+          return `<option value="${i}" ${i === state.selected ? 'selected' : ''}>${esc((b ? skinned(b).name : x.name) || x.id)}${b ? ' (built in)' : ''}</option>`;
+        })
+        .join('')}</select>
       <button data-act="new">New faction</button>
       <button data-act="duplicate">Duplicate</button>
       <button data-act="delete">Delete</button>
       <span class="spacer"></span>
-      <button data-act="add" title="Pick this faction on the new game screen">Add to game</button>
-      <button data-act="file">Save to a file</button>
+      <button data-act="add" title="${locked ? 'Built in: already in the game' : 'Pick this faction on the new game screen'}" ${lock()}>Add to game</button>
+      <button data-act="file" ${lock()}>Save to a file</button>
       <button data-act="export" class="primary">Export…</button>
     </header>
+    ${
+      base
+        ? `<div class="built-in">
+        <p><b>${esc(f.name)} is built in.</b> Its name, colour and ability names and wording go straight into the skin in use, <b>${esc(skin?.name ?? '…')}</b>, so the Codex, new games and the menus show them (leave a box empty for the original). Its rules can't change: to make a different faction from it, use Duplicate.</p>
+        ${wordNote ? `<span class="word-note">${esc(wordNote)}</span>` : ''}
+      </div>`
+        : ''
+    }
     <div class="details">
-      <label>Name${text('name', f.name)}</label>
-      <label>ID${text('id', f.id)}</label>
-      <label>Color<input type="color" data-path="color" data-text value="${esc(f.color)}"></label>
-      <label>Home base<select data-path="homeBase" data-text>${homeOptions(f.homeBase)}</select></label>
+      <label>Name${base ? word('name', f.name, base.name) : text('name', f.name)}</label>
+      <label>ID${base ? `<input type="text" value="${esc(f.id)}" disabled>` : text('id', f.id)}</label>
+      <label>Color${base ? `<input type="color" data-skin="color" value="${esc(f.color)}">` : `<input type="color" data-path="color" data-text value="${esc(f.color)}">`}</label>
+      ${base ? `<button data-act="usual-color" ${f.color === base.color ? 'disabled' : ''}>Usual colour</button>` : ''}
+      <label>Home base<select data-path="homeBase" data-text ${lock()}>${homeOptions(f.homeBase)}</select></label>
       <label>Starting power${num('power', f.power, MAX_POWER)}</label>
       <label>Starting combat cards${num('combatCards', f.combatCards)}</label>
       <label>Stars${num('stars', f.stars)}</label>
@@ -134,8 +189,7 @@ function render() {
     <div class="faction-grid">
       <div class="card ability">
         <h3>Faction ability</h3>
-        ${text('ability.name', f.ability.name, 'Name')}
-        ${area('ability.description', f.ability.description)}
+        ${abilityFields('ability', f.ability, base?.ability, 'ability')}
       </div>
       <div class="card">
         <h3>Recruit one-time bonuses</h3>
@@ -171,6 +225,11 @@ function pictures(f: Faction): string {
 
 function renderStatus() {
   const el = root.querySelector<HTMLElement>('.status')!;
+  if (locked) {
+    el.className = 'status';
+    el.textContent = '✓ Built in: always in the game.';
+    return;
+  }
   const problems = validateFaction(faction());
   const clashes = homeBaseClashes(state.factions);
   const notes = clashes.length ? ` Note: ${clashes.join('; ')} (fine if they never play together).` : '';
@@ -228,6 +287,13 @@ root.addEventListener('change', async (e) => {
     render();
   } else if (el.dataset.path === 'name') {
     render(); // refresh the faction picker's label
+  } else if (el.dataset.skin && (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement)) {
+    // A built-in faction's word, into the skin in use.
+    const id = faction().id;
+    const v = el.value;
+    const [which, key] = el.dataset.skin.split('.') as [string, 'name' | 'description' | undefined];
+    if (!key) await changeWords((w) => setFactionWord(w, id, which as 'name' | 'color', v));
+    else await changeWords((w) => setAbilityWord(w, id, which === 'ability' ? 'ability' : Number(which), key, v));
   }
 });
 
@@ -239,8 +305,16 @@ root.addEventListener('click', async (e) => {
       state = { factions: [...state.factions, newFaction(`faction-${state.factions.length + 1}`, free)], selected: state.factions.length };
       break;
     }
+    case 'usual-color': {
+      const id = faction().id;
+      await changeWords((w) => setFactionWord(w, id, 'color', ''));
+      return;
+    }
     case 'duplicate': {
-      const copy = { ...JSON.parse(JSON.stringify(faction())), id: `${faction().id}-copy`, name: `${faction().name} (copy)` };
+      // A built-in faction is copied as the skin tells it: a new faction of one's own, free to change.
+      const b = builtInOf(faction());
+      const shown = b ? skinned(b) : faction();
+      const copy = { ...JSON.parse(JSON.stringify(shown)), id: `${shown.id}-copy`, name: `${shown.name} (copy)` };
       const from = faction().id;
       state = { factions: [...state.factions, copy], selected: state.factions.length };
       save();
@@ -288,9 +362,29 @@ root.addEventListener('click', async (e) => {
 });
 
 render();
-store.theme().then(
-  (t) => {
-    theme = t;
+store.activeSkin().then(
+  async (s) => {
+    skin = s;
+    theme = s.theme;
+    // Names and wording once changed in this editor's copies of built-in factions move into the skin.
+    const moved = state.factions.filter((f) => {
+      const b = builtInOf(f);
+      return b && wordsFromCopy(b, f, s.words) !== s.words;
+    });
+    if (moved.length) {
+      try {
+        skin = await store.changeSkin((x) => ({ ...x, words: moved.reduce((w, f) => wordsFromCopy(builtInOf(f)!, f, w), x.words) }));
+        theme = skin.theme;
+        wordNote = `Your earlier changes to ${moved.map((f) => builtInOf(f)!.name).join(', ')} are now in the skin "${skin.name}", so the Codex and new games show them.`;
+      } catch {
+        wordNote = "Your earlier changes couldn't be moved into the skin.";
+      }
+    }
+    // The editor's copies of built-in factions are the built-in ones now: their words live in the skin.
+    if (!moved.length || skin !== s) {
+      state = { ...state, factions: state.factions.map((f) => builtInOf(f) ?? f) };
+      save();
+    }
     render();
   },
   () => render(),

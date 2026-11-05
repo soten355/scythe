@@ -112,6 +112,15 @@ describe('skins on the device', () => {
     expect(await store.theme()).toEqual(next);
   });
 
+  it("changes the words of the skin in use, starting \"My skin\" if Original is in use", async () => {
+    const first = await store.changeSkin((s) => ({ ...s, words }));
+    expect(first.name).toBe('My skin');
+    expect((await store.activeSkin()).words).toEqual(words);
+    const again = await store.changeSkin((s) => ({ ...s, words: ORIGINAL.words }));
+    expect(again.id).toBe(first.id);
+    expect((await store.skinIndex()).skins).toHaveLength(1);
+  });
+
   it('keeps several skins, switches between them, and renames and deletes them', async () => {
     const a: Skin = { id: 'a', name: 'Iron Tide', theme: setPicture(DEFAULT_THEME, 'ui.menu', 'data:image/png;base64,AA=='), words };
     const b: Skin = { id: 'b', name: 'Ashfall', theme: DEFAULT_THEME, words: ORIGINAL.words };
