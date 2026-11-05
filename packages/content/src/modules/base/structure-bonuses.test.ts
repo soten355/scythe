@@ -55,5 +55,9 @@ describe("the owner's structure bonus tiles", () => {
     // A2 farm, A3 village, A4 forest, A5 tundra.
     expect(count({ mill: 'A2', armory: 'A3', mine: 'A4', monument: 'A5' }, onFarmsAndTundra)).toBe(2);
     expect(count({ mill: 'A3', armory: 'A4' }, onFarmsAndTundra)).toBe(0);
+    // Mixed in any way: two farms and two tundras make 4.
+    const farms = Object.values(baseBoard.hexes).filter((h) => h.terrain === 'farm').slice(0, 2).map((h) => h.id);
+    const tundras = Object.values(baseBoard.hexes).filter((h) => h.terrain === 'tundra').slice(0, 2).map((h) => h.id);
+    expect(count({ mill: farms[0], armory: farms[1], mine: tundras[0], monument: tundras[1] }, onFarmsAndTundra)).toBe(4);
   });
 });

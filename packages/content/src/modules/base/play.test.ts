@@ -108,6 +108,9 @@ describe('the structure bonus tiles', () => {
   it('are the six base tiles, tile 2 counting structures on tunnels', () => {
     expect(baseStructureBonuses.map((t) => t.id)).toEqual(['tile-1', 'tile-2', 'tile-3', 'tile-4', 'tile-5', 'tile-6']);
     expect(baseStructureBonuses[1]!.count).toEqual({ kind: 'on', tunnel: true });
+    const four = [{ atLeast: 1, coins: 2 }, { atLeast: 2, coins: 4 }, { atLeast: 3, coins: 6 }, { atLeast: 4, coins: 9 }];
+    expect(baseStructureBonuses[4]!.pays).toEqual(four);
+    expect(baseStructureBonuses[5]!.pays).toEqual(four);
   });
 
   it('has a unique ID for every tile, and every tile is complete', () => {
