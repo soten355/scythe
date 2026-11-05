@@ -1,4 +1,4 @@
-import { baseBoard, baseFactions, baseMats, sampleEncounters, sampleFactoryCards, sampleObjectives, sampleStructureBonuses } from '@scythe/content';
+import { baseBoard, baseFactions, baseMats, sampleEncounters, sampleFactoryCards, sampleObjectives, baseStructureBonuses } from '@scythe/content';
 import { activeSeat, applyAction, isGameOver, legalActions, neighbors, newGame, nextInt, score, seedRng, standings, type GameState, type HexId, type PlayerState } from '@scythe/engine';
 import { describe, expect, it } from 'vitest';
 import { planTurns } from './planner';
@@ -12,7 +12,7 @@ const game = (seed = 1, players = 2) =>
     encounters: sampleEncounters,
     factory: sampleFactoryCards,
     objectives: sampleObjectives,
-    structureBonuses: sampleStructureBonuses,
+    structureBonuses: baseStructureBonuses,
   });
 
 const withPlayer = (state: GameState, seat: number, patch: Partial<PlayerState>): GameState => ({

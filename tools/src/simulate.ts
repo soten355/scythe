@@ -6,7 +6,7 @@
 //
 // --bots is how many seats are bots (the first ones; the rest play at random).
 // Factions and mats rotate between games, so each seat gets a mix.
-import { baseBoard, baseFactions, baseMats, sampleEncounters, sampleFactoryCards, sampleObjectives, sampleStructureBonuses } from '@scythe/content';
+import { baseBoard, baseFactions, baseMats, sampleEncounters, sampleFactoryCards, sampleObjectives, baseStructureBonuses } from '@scythe/content';
 import { ENGINE_VERSION, standings, type GameSetup, type Seat } from '@scythe/engine';
 import { planningBot, playMatch, randomSeat } from '@scythe/bots';
 
@@ -27,7 +27,7 @@ const setup = (game: number): GameSetup => ({
   encounters: sampleEncounters,
   factory: sampleFactoryCards,
   objectives: sampleObjectives,
-  structureBonuses: sampleStructureBonuses,
+  structureBonuses: baseStructureBonuses,
 });
 
 /** Times each decision, to report how long a bot thinks. */

@@ -1,4 +1,4 @@
-import { baseBoard, baseFactions, baseMats, sampleEncounters, sampleFactoryCards, sampleObjectives, sampleStructureBonuses } from '@scythe/content';
+import { baseBoard, baseFactions, baseMats, sampleEncounters, sampleFactoryCards, sampleObjectives, baseStructureBonuses } from '@scythe/content';
 import { newGame, playerView, legalActions, type GameSetup } from '@scythe/engine';
 import { describe, expect, it } from 'vitest';
 import { planningBot } from './bot';
@@ -12,7 +12,7 @@ const setup: GameSetup = {
   encounters: sampleEncounters,
   factory: sampleFactoryCards,
   objectives: sampleObjectives,
-  structureBonuses: sampleStructureBonuses,
+  structureBonuses: baseStructureBonuses,
 };
 
 /** A client wired to a host as a worker would be: every message copied, as posting a message copies it. */

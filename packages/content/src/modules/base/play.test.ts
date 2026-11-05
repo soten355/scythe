@@ -6,7 +6,7 @@ import { baseMats } from './mats';
 import { sampleEncounters } from './encounters';
 import { sampleFactoryCards } from './factory';
 import { sampleObjectives } from './objectives';
-import { sampleStructureBonuses } from './structure-bonuses';
+import { baseStructureBonuses } from './structure-bonuses';
 
 describe('a game with the base content', () => {
   const setup = (seed: number) => ({
@@ -49,7 +49,7 @@ describe('a game with the base content', () => {
         encounters: sampleEncounters,
         factory: sampleFactoryCards,
         objectives: sampleObjectives,
-        structureBonuses: sampleStructureBonuses,
+        structureBonuses: baseStructureBonuses,
         players: baseFactions.map((faction, i) => ({ faction, mat: baseMats[i]! })),
       });
       expect(state.encounterTokens).toHaveLength(11);
@@ -104,9 +104,14 @@ describe('the sample objective deck', () => {
   });
 });
 
-describe('the sample structure bonus tiles', () => {
+describe('the structure bonus tiles', () => {
+  it('are the six base tiles, tile 2 counting structures on tunnels', () => {
+    expect(baseStructureBonuses.map((t) => t.id)).toEqual(['tile-1', 'tile-2', 'tile-3', 'tile-4', 'tile-5', 'tile-6']);
+    expect(baseStructureBonuses[1]!.count).toEqual({ kind: 'on', tunnel: true });
+  });
+
   it('has a unique ID for every tile, and every tile is complete', () => {
-    expect(new Set(sampleStructureBonuses.map((t) => t.id)).size).toBe(sampleStructureBonuses.length);
-    for (const t of sampleStructureBonuses) expect(validateStructureBonus(t), t.id).toEqual([]);
+    expect(new Set(baseStructureBonuses.map((t) => t.id)).size).toBe(baseStructureBonuses.length);
+    for (const t of baseStructureBonuses) expect(validateStructureBonus(t), t.id).toEqual([]);
   });
 });

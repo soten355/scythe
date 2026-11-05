@@ -74,7 +74,6 @@
     encounters: 'Made-up sample cards until you add your own from the encounter card editor.',
     factory: 'Made-up sample cards until you add your own from the Factory card editor.',
     objectives: 'Made-up sample cards until you add your own from the objective card editor.',
-    structureBonuses: 'Made-up sample tiles until you add your own from the structure bonus tile editor.',
   };
 </script>
 

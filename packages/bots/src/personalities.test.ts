@@ -1,4 +1,4 @@
-import { baseBoard, baseFactions, baseMats, sampleEncounters, sampleFactoryCards, sampleObjectives, sampleStructureBonuses } from '@scythe/content';
+import { baseBoard, baseFactions, baseMats, sampleEncounters, sampleFactoryCards, sampleObjectives, baseStructureBonuses } from '@scythe/content';
 import { activeSeat, applyAction, legalActions, newGame, playerView, type Action, type GameState } from '@scythe/engine';
 import { describe, expect, it } from 'vitest';
 import { planningBot } from './bot';
@@ -13,7 +13,7 @@ const game = (seed: number) =>
     encounters: sampleEncounters,
     factory: sampleFactoryCards,
     objectives: sampleObjectives,
-    structureBonuses: sampleStructureBonuses,
+    structureBonuses: baseStructureBonuses,
   });
 
 /** Every action in the first `rounds` rounds, with every seat a bot of the given kind. */

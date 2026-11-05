@@ -3,6 +3,7 @@
 // game or save them to a file. Plain DOM, no framework; shares its look with
 // the card editors.
 import { STRUCTURE_FEATURES, type StructureCount, type Terrain } from '@scythe/engine';
+import { baseStructureBonuses } from '@scythe/content';
 import '../shared/forms.css';
 import '../faction-editor/faction-editor.css';
 import '../encounter-editor/encounter-editor.css';
@@ -37,7 +38,8 @@ function load(): EditorState {
   } catch {
     // Fall through to a fresh start if the saved copy is unreadable.
   }
-  return { tiles: [newTile('tile-1')], selected: 0 };
+  // A fresh start: the built-in tiles, to edit.
+  return { tiles: baseStructureBonuses.map(editable), selected: 0 };
 }
 
 let state = load();
@@ -90,7 +92,7 @@ function render() {
       <button data-act="duplicate">Duplicate</button>
       <button data-act="delete">Delete</button>
       <span class="spacer"></span>
-      <button data-act="add" title="New games draw from these tiles in place of the sample ones">Add tiles to game</button>
+      <button data-act="add" title="New games draw from these tiles in place of the built-in ones">Add tiles to game</button>
       <button data-act="file">Save tiles to a file</button>
       <button data-act="export" class="primary">Export…</button>
     </header>

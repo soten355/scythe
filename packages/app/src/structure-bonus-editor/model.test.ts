@@ -1,4 +1,4 @@
-import { sampleStructureBonuses } from '@scythe/content';
+import { baseStructureBonuses } from '@scythe/content';
 import { validateStructureBonus } from '@scythe/engine';
 import { describe, expect, it } from 'vitest';
 import { setPath } from '../shared/editor-utils';
@@ -43,11 +43,11 @@ describe('the structure bonus tile editor', () => {
     tile = setPath(tile, 'count.tunnel', true);
     tile = setPath(tile, 'pays.0.coins', 3);
     expect(cleanTile(tile)).toEqual({ id: 't', name: 'Roots', count: { kind: 'on', tunnel: true }, pays: [{ atLeast: 1, coins: 3 }] });
-    for (const t of sampleStructureBonuses) expect(cleanTile(editable(t))).toEqual(t);
+    for (const t of baseStructureBonuses) expect(cleanTile(editable(t))).toEqual(t);
   });
 
   it('lists the problems by tile, including a repeated ID', () => {
-    const fine = sampleStructureBonuses[0]!;
+    const fine = baseStructureBonuses[0]!;
     expect(tileProblems([fine])).toEqual([]);
     expect(tileProblems([fine, { ...fine, name: 'Copy' }])).toEqual([`Copy: another tile has the ID ${fine.id}`]);
   });

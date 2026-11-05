@@ -31,6 +31,8 @@ describe('the codex', () => {
     expect(factions.items.map((i) => i.name)).toEqual(baseFactions.map((f) => f.name));
     expect(factions.sample).toBe(false);
     expect(codexList(catalog, BUILT_IN, 'encounters').sample).toBe(true);
+    // The built-in structure bonus tiles are the real ones.
+    expect(codexList(catalog, BUILT_IN, 'structureBonuses').sample).toBe(false);
     // Your own deck, once added, replaces the sample.
     const mine = { ...BUILT_IN.encounters![0]!, id: 'mine-1', name: 'Mine' };
     const withMine = catalogWith(BUILT_IN, { ...EMPTY_LIBRARY, encounters: [mine] });

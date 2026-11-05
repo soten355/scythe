@@ -1,4 +1,4 @@
-import { baseBoard, baseFactions, baseMats, sampleEncounters, sampleFactoryCards, sampleObjectives, sampleStructureBonuses } from '@scythe/content';
+import { baseBoard, baseFactions, baseMats, sampleEncounters, sampleFactoryCards, sampleObjectives, baseStructureBonuses } from '@scythe/content';
 import { applyAction, legalActions, newGame, playerView, standings, type GameSetup, type GameState } from '@scythe/engine';
 import { describe, expect, it } from 'vitest';
 import { LEVELS, planningBot, type Level } from './bot';
@@ -11,7 +11,7 @@ const setup = (seed: number, players: number): GameSetup => ({
   encounters: sampleEncounters,
   factory: sampleFactoryCards,
   objectives: sampleObjectives,
-  structureBonuses: sampleStructureBonuses,
+  structureBonuses: baseStructureBonuses,
 });
 
 describe('planning bot', () => {

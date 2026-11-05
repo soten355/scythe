@@ -1,6 +1,6 @@
 // The built-in maps, factions and mats: what the new game screen offers
 // before the player's own.
-import { baseBoard, baseFactions, baseMats, sampleEncounters, sampleFactoryCards, sampleObjectives, sampleStructureBonuses } from '@scythe/content';
+import { baseBoard, baseFactions, baseMats, sampleEncounters, sampleFactoryCards, sampleObjectives, baseStructureBonuses } from '@scythe/content';
 import type { Catalog } from '../menu/setup';
 
 export const BUILT_IN: Catalog = {
@@ -14,5 +14,5 @@ export const BUILT_IN: Catalog = {
   // Until the real deck is entered with the objective card editor.
   objectives: sampleObjectives,
   // Until the real tiles are entered with the structure bonus tile editor.
-  structureBonuses: sampleStructureBonuses,
+  structureBonuses: baseStructureBonuses,
 };

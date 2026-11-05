@@ -24,7 +24,8 @@ export const CODEX_TABS: { kind: CodexKind; label: string; icon: string }[] = [
 /** What a tab lists, in order, and whether it's the made-up sample deck (no deck of your own added yet). */
 export function codexList(catalog: Catalog, builtIn: Catalog, kind: CodexKind): { items: { id: string; name: string }[]; sample: boolean } {
   const all = (kind === 'mats' ? [...catalog.mats].sort((a, b) => a.turnOrder - b.turnOrder) : (catalog[kind] ?? [])) as { id: string; name: string }[];
-  const deck = kind !== 'maps' && kind !== 'factions' && kind !== 'mats';
+  // The structure bonus tiles are the real ones; the decks are still made up.
+  const deck = kind === 'encounters' || kind === 'factory' || kind === 'objectives';
   return { items: all.map(({ id, name }) => ({ id, name })), sample: deck && all.length > 0 && all === builtIn[kind] };
 }
 

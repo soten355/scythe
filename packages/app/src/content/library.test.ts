@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { baseBoard, baseFactions, baseMats, sampleEncounters, sampleFactoryCards, sampleObjectives, sampleStructureBonuses } from '@scythe/content';
+import { baseBoard, baseFactions, baseMats, sampleEncounters, sampleFactoryCards, sampleObjectives, baseStructureBonuses } from '@scythe/content';
 import type { EncounterCard, FactoryCard, GameSetup, ObjectiveCard, StructureBonusTile } from '@scythe/engine';
 import type { Catalog } from '../menu/setup';
 import { createSave, saveFileText } from '../saves/save';
@@ -230,12 +230,12 @@ describe('objective cards', () => {
 });
 
 describe('structure bonus tiles', () => {
-  const withTiles: Catalog = { ...builtIn, structureBonuses: sampleStructureBonuses };
-  const mine: StructureBonusTile = { ...sampleStructureBonuses[0]!, id: 'tile-1', name: 'Deep roots' };
+  const withTiles: Catalog = { ...builtIn, structureBonuses: baseStructureBonuses };
+  const mine: StructureBonusTile = { ...baseStructureBonuses[0]!, id: 'my-tile-1', name: 'Deep roots' };
   const set = { ...EMPTY_LIBRARY, structureBonuses: [mine] };
 
   it('new games draw from the built-in tiles until you add yours, then only yours', () => {
-    expect(catalogWith(withTiles, EMPTY_LIBRARY).structureBonuses).toBe(sampleStructureBonuses);
+    expect(catalogWith(withTiles, EMPTY_LIBRARY).structureBonuses).toBe(baseStructureBonuses);
     expect(catalogWith(withTiles, addToLibrary(EMPTY_LIBRARY, withTiles, set).library).structureBonuses).toEqual([mine]);
   });
 
