@@ -18,10 +18,10 @@ export function countText(count: StructureCount): string {
       return `${FEATURES[count.feature]} next to your structures`;
     case 'on': {
       const where = [...(count.tunnel ? ['tunnels'] : []), ...(count.terrains ?? []).map((t) => PLACES[t])];
-      return `Your structures on ${where.join(' or ')}`;
+      return `Your structures on ${where.join(' or ')}${count.tunnel ? " (a Mine doesn't make a tunnel)" : ''}`;
     }
     case 'inRow':
-      return 'Your structures in one straight row';
+      return "Your longest straight row of structures (rivers don't break it)";
   }
 }
 

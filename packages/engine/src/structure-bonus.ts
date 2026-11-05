@@ -15,9 +15,9 @@ export type StructureFeature = 'tunnel' | 'lake' | 'encounter';
 export type StructureCount =
   /** Hexes of this kind next to any of your structures, each hex once. */
   | { kind: 'adjacent'; feature: StructureFeature }
-  /** Your structures on a tunnel, or on one of these terrains. */
+  /** Your structures on a tunnel (printed on the map: a Mine doesn't make one), or on one of these terrains. */
   | { kind: 'on'; tunnel?: boolean; terrains?: Terrain[] }
-  /** Your structures in the longest straight row of hexes side by side. */
+  /** Your structures in the longest straight row of hexes side by side, along any of the three lines; rivers don't break it. */
   | { kind: 'inRow' };
 
 export interface StructureBonusTile {

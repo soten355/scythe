@@ -17,7 +17,7 @@ const STORAGE_KEY = 'scythe-structure-bonus-editor';
 const KINDS: [StructureCount['kind'], string][] = [
   ['adjacent', 'Spots next to your structures'],
   ['on', 'Your structures on…'],
-  ['inRow', 'Your structures in one straight row'],
+  ['inRow', 'Your longest straight row of structures'],
 ];
 const FEATURE_NAMES: Record<string, string> = { tunnel: 'Tunnels', lake: 'Lakes', encounter: 'Encounter spots' };
 const TERRAINS: Terrain[] = ['farm', 'forest', 'mountain', 'tundra', 'village', 'lake', 'factory'];
