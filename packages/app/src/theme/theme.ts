@@ -16,8 +16,12 @@ import { inkOn } from '../play/ink';
 export const TERRAINS: Terrain[] = ['farm', 'forest', 'mountain', 'tundra', 'village', 'lake', 'factory'];
 const TOKENS: Resource[] = ['oil', 'metal', 'wood', 'food'];
 
-/** A faction's own pictures: its crest, its units and its structures. */
-export type FactionPart = 'crest' | 'portrait' | 'character' | 'mech' | 'worker' | Structure;
+/**
+ * A faction's own pictures: its crest, its units and its structures. The
+ * character and mech are full figures (fights, the faction's screen, and the
+ * map), unless they have their own map pieces (characterMap, mechMap).
+ */
+export type FactionPart = 'crest' | 'portrait' | 'character' | 'mech' | 'characterMap' | 'mechMap' | 'worker' | Structure;
 
 export type SlotId = 'background' | `hex.${Terrain}` | `symbol.${Terrain | 'tunnel' | 'encounter'}` | `token.${Resource}` | `backdrop.${Terrain}` | 'ui.menu' | 'ui.panel' | `faction.${string}.${FactionPart}`;
 
@@ -48,7 +52,8 @@ const BEST = {
 const sizeText = (b: { width: number; height: number }) => `Best at ${b.width} × ${b.height} pixels`;
 
 const ON_MAP = `On the map, on a see-through background. ${sizeText(BEST.small)}.`;
-const FIGURE = `Standing, facing right, on a see-through background: small on the map, big in fights and on the faction's screen. ${sizeText(BEST.figure)}.`;
+const FIGURE = `Standing, facing right, on a see-through background: big in fights and on the faction's screen, and small on the map unless it has its own map piece below. ${sizeText(BEST.figure)}.`;
+const MAP_PIECE = (what: string) => `Its piece on the map, in place of the ${what} figure above (empty: the figure, shrunk): e.g. a token, or a simpler, bolder drawing that reads when small. It stands on a base in the faction's colour; on a see-through background. ${sizeText(BEST.figure)}.`;
 
 /** A faction's picture slots, in the order the faction editor lists them. */
 export const FACTION_PARTS: { part: FactionPart; label: string; hint: string }[] = [
@@ -56,6 +61,8 @@ export const FACTION_PARTS: { part: FactionPart; label: string; hint: string }[]
   { part: 'portrait', label: 'Portrait', hint: `The character's face, shown in a circle ringed in the faction's colour: on the new game screen, the faction's own screen, fights and the final scores. Keep the face in the middle; the corners are cut off. ${sizeText(BEST.portrait)}.` },
   { part: 'character', label: 'Character', hint: FIGURE },
   { part: 'mech', label: 'Mech', hint: FIGURE },
+  { part: 'characterMap', label: 'Character on the map', hint: MAP_PIECE('character') },
+  { part: 'mechMap', label: 'Mech on the map', hint: MAP_PIECE('mech') },
   { part: 'worker', label: 'Worker', hint: ON_MAP },
   { part: 'mine', label: 'Mine', hint: ON_MAP },
   { part: 'mill', label: 'Mill', hint: ON_MAP },
@@ -68,7 +75,7 @@ export const factionSlot = (factionId: string, part: FactionPart): SlotId => `fa
 
 /** "faction.<id>.<part>" → its faction and part (the ID may itself hold dots), or null. */
 function readFactionSlot(slot: string): { id: string; part: FactionPart } | null {
-  const m = /^faction\.(.+)\.([a-z]+)$/.exec(slot);
+  const m = /^faction\.(.+)\.([a-zA-Z]+)$/.exec(slot);
   return m && FACTION_PART_NAMES.has(m[2]!) ? { id: m[1]!, part: m[2] as FactionPart } : null;
 }
 
@@ -104,7 +111,7 @@ export function pictureSpec(slot: SlotId): { best: { width: number; height: numb
   if (slot === 'ui.panel') return spec(BEST.panel, 'image/jpeg');
   if (slot.startsWith('hex.')) return spec(BEST.hex, 'image/png');
   const part = readFactionSlot(slot)?.part;
-  if (part === 'character' || part === 'mech') return spec(BEST.figure, 'image/png');
+  if (part === 'character' || part === 'mech' || part === 'characterMap' || part === 'mechMap') return spec(BEST.figure, 'image/png');
   if (part === 'portrait') return spec(BEST.portrait, 'image/png');
   return spec(BEST.small, 'image/png');
 }
@@ -267,7 +274,8 @@ export function boardLook(theme: Theme): BoardLook {
     tunnel: asIcon('symbol.tunnel', TUNNEL_ICON),
     encounter: asIcon('symbol.encounter', ENCOUNTER_ICON),
     token: (r) => picture(`token.${r}`),
-    piece: (id, part) => picture(factionSlot(id, part)),
+    // On the map the character and mech use their own map pieces, if they have them.
+    piece: (id, part) => (part === 'character' || part === 'mech' ? picture(factionSlot(id, `${part}Map`)) : undefined) ?? picture(factionSlot(id, part)),
   };
 }
 

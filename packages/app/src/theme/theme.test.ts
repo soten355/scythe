@@ -115,7 +115,7 @@ describe('the board theme', () => {
 
 describe("each faction's own pictures (set in the faction editor)", () => {
   it('has a crest, the character, a mech, a worker and each structure, at sizes in multiples of 16', () => {
-    expect(FACTION_PARTS.map((p) => p.part)).toEqual(['crest', 'portrait', 'character', 'mech', 'worker', 'mine', 'mill', 'armory', 'monument']);
+    expect(FACTION_PARTS.map((p) => p.part)).toEqual(['crest', 'portrait', 'character', 'mech', 'characterMap', 'mechMap', 'worker', 'mine', 'mill', 'armory', 'monument']);
     expect(factionSlot('nordic', 'mech')).toBe('faction.nordic.mech');
     expect(pictureSpec('faction.nordic.crest')).toMatchObject({ best: { width: 256, height: 256 }, type: 'image/png' });
     // Figures are taller than wide, and big enough for the fight screen.
@@ -138,6 +138,23 @@ describe("each faction's own pictures (set in the faction editor)", () => {
     expect(look.piece('rusviet', 'mech')).toBe(PNG);
     expect(look.piece('rusviet', 'worker')).toBeUndefined();
     expect(look.piece('nordic', 'mech')).toBeUndefined();
+  });
+
+  it('the character and mech can have their own map pieces; without one the map shows the figure', () => {
+    let theme = setPicture(DEFAULT_THEME, factionSlot('rusviet', 'character'), PNG);
+    theme = setPicture(theme, factionSlot('rusviet', 'mech'), PNG);
+    expect(boardLook(theme).piece('rusviet', 'character')).toBe(PNG);
+    theme = setPicture(theme, factionSlot('rusviet', 'characterMap'), JPEG);
+    theme = setPicture(theme, factionSlot('rusviet', 'mechMap'), JPEG);
+    expect(boardLook(theme).piece('rusviet', 'character')).toBe(JPEG);
+    expect(boardLook(theme).piece('rusviet', 'mech')).toBe(JPEG);
+    // A map piece alone (no figure) shows on the map too.
+    const only = boardLook(setPicture(DEFAULT_THEME, factionSlot('nordic', 'mechMap'), JPEG));
+    expect(only.piece('nordic', 'mech')).toBe(JPEG);
+    // They're listed right after the figures, and travel in theme files.
+    const parts = FACTION_PARTS.map((p) => p.part);
+    expect(parts.slice(parts.indexOf('character'), parts.indexOf('character') + 4)).toEqual(['character', 'mech', 'characterMap', 'mechMap']);
+    expect(parseThemeFile(themeFileText(theme)).pictures[factionSlot('rusviet', 'mechMap')]).toBe(JPEG);
   });
 
   it('move with a faction whose ID changes, or are copied for a duplicate', () => {
