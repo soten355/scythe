@@ -24,6 +24,33 @@ export function newFaction(id: string, homeBase: string): Faction {
   };
 }
 
+const sameName = (a: Faction, b: Faction) => a.name.trim().toLowerCase() === b.name.trim().toLowerCase();
+const sameStart = (a: Faction, b: Faction) => a.homeBase === b.homeBase && a.power === b.power && a.combatCards === b.combatCards && a.stars === b.stars;
+
+/**
+ * The editor's saved list with every built-in faction in it, first and in their
+ * usual order, then the player's own. The list is kept on the device and can be
+ * older than the built-in factions, so it may lack one, or hold an old copy of
+ * one under another ID (the same name and start): that copy takes the built-in
+ * ID, and `strays` says so, for its pictures to follow. Any other faction stays
+ * as the player's own.
+ */
+export function withBuiltIns(saved: Faction[], builtIns: Faction[]): { factions: Faction[]; strays: { from: string; to: string }[] } {
+  const isBuiltIn = (f: Faction) => builtIns.some((b) => b.id === f.id);
+  const strays: { from: string; to: string }[] = [];
+  const taken = new Set<Faction>();
+  const first = builtIns.map((b) => {
+    const own = saved.find((f) => f.id === b.id);
+    if (own) return own;
+    const copy = saved.find((f) => !isBuiltIn(f) && !taken.has(f) && sameName(f, b) && sameStart(f, b));
+    if (!copy) return b;
+    taken.add(copy);
+    strays.push({ from: copy.id, to: b.id });
+    return { ...copy, id: b.id, name: b.name };
+  });
+  return { factions: [...first, ...saved.filter((f) => !isBuiltIn(f) && !taken.has(f))], strays };
+}
+
 /** Home bases claimed by more than one faction (factions in one game need different ones). */
 export function homeBaseClashes(factions: Faction[]): string[] {
   const counts = new Map<string, number>();

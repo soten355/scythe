@@ -14,9 +14,9 @@ import { exportContent } from '../saves/files';
 import { SaveStore } from '../saves/store';
 import { clearPicture, copyFactionPictures, FACTION_PARTS, factionSlot, setPicture, type SlotId, type Theme } from '../theme/theme';
 import { pictureFor, sizeKb } from '../theme/pictures';
-import { formatFactions, homeBaseClashes, newFaction, wordsFromCopy } from './model';
-import { applyWords, type Skin, type SkinWords } from '../skins/skin';
-import { setAbilityWord, setFactionWord } from '../skins/words';
+import { formatFactions, homeBaseClashes, newFaction, withBuiltIns, wordsFromCopy } from './model';
+import { applyWords, LORE_CARDS, LORE_MAX, NAME_MAX, type FactionLore, type Skin, type SkinWords } from '../skins/skin';
+import { copyLore, setAbilityWord, setFactionWord, setLoreWord } from '../skins/words';
 
 const STORAGE_KEY = 'scythe-faction-editor';
 const HOME_BASES = Object.keys(baseBoard.homeBasePositions);
@@ -32,10 +32,21 @@ interface EditorState {
   selected: number;
 }
 
+/** Old copies of built-in factions found under other IDs: their pictures move over once the skin is read. */
+let strays: { from: string; to: string }[] = [];
+
 function load(): EditorState {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) return JSON.parse(saved) as EditorState;
+    if (saved) {
+      const parsed = JSON.parse(saved) as EditorState;
+      const fixed = withBuiltIns(parsed.factions, baseFactions);
+      strays = fixed.strays;
+      // The same faction stays open, wherever the list now has it.
+      const open = parsed.factions[parsed.selected]?.id;
+      const id = strays.find((s) => s.from === open)?.to ?? open;
+      return { factions: fixed.factions, selected: Math.max(0, fixed.factions.findIndex((f) => f.id === id)) };
+    }
   } catch {
     // Fall through to a fresh start if the saved copy is unreadable.
   }
@@ -55,6 +66,8 @@ let theme: Theme | null = null;
 let pictureNote = '';
 /** What happened to the last change of a built-in faction's words. */
 let wordNote = '';
+/** What happened to the last change of a faction's story. */
+let loreNote = '';
 
 /** Changes the theme as it is on the device now (the theme editor may have changed it since this page opened). */
 async function changeTheme(change: (t: Theme) => Theme, note: string) {
@@ -78,6 +91,23 @@ async function changeWords(change: (w: SkinWords) => SkinWords) {
     wordNote = "That couldn't be kept on this device.";
   }
   render();
+}
+
+/**
+ * Keeps a part of a faction's story in the skin in use. The page is drawn again
+ * only if that started a new skin, so going from box to box keeps your place.
+ */
+async function changeLore(id: string, key: keyof FactionLore, value: string) {
+  const before = skin?.id;
+  try {
+    skin = await store.changeSkin((s) => ({ ...s, words: setLoreWord(s.words, id, key, value) }));
+    theme = skin.theme;
+    loreNote = `Kept in the skin "${skin.name}": the Codex shows it.`;
+  } catch {
+    loreNote = "That couldn't be kept on this device.";
+  }
+  if (skin?.id !== before) render();
+  else root.querySelector('.story-note')!.textContent = loreNote;
 }
 
 /** The built-in faction with this one's ID, if it is one. */
@@ -162,7 +192,7 @@ function render() {
         .join('')}</select>
       <button data-act="new">New faction</button>
       <button data-act="duplicate">Duplicate</button>
-      <button data-act="delete">Delete</button>
+      <button data-act="delete" ${lock()}>Delete</button>
       <span class="spacer"></span>
       <button data-act="add" title="${locked ? 'Built in: already in the game' : 'Pick this faction on the new game screen'}" ${lock()}>Add to game</button>
       <button data-act="file" ${lock()}>Save to a file</button>
@@ -198,9 +228,35 @@ function render() {
     </div>
     <div class="faction-grid">${mechs}</div>
     <p class="note">Write ability descriptions in your own words rather than copying the printed text.</p>
+    ${story(f)}
     ${pictures(f)}
     <div class="status"></div>`;
   renderStatus();
+}
+
+/** The faction's story for the Codex: any faction's, kept in the skin in use under its ID. */
+function story(f: Faction): string {
+  const lore = skin?.words.factions[f.id]?.lore;
+  const off = skin ? '' : 'disabled';
+  const cards = LORE_CARDS.map(
+    (card) => `
+    <div class="card">
+      <h3>${esc(card.title)}</h3>
+      ${card.fields
+        .map(({ key, label, long }) =>
+          long
+            ? `<label>${esc(label)}<textarea data-lore="${key}" rows="4" maxlength="${LORE_MAX}" ${off}>${esc(lore?.[key] ?? '')}</textarea></label>`
+            : `<label>${esc(label)}<input type="text" data-lore="${key}" maxlength="${NAME_MAX}" value="${esc(lore?.[key] ?? '')}" ${off}></label>`,
+        )
+        .join('')}
+    </div>`,
+  ).join('');
+  return `<section class="story">
+      <h3>Story</h3>
+      <p class="note">Shown on this faction's Codex page, only for reading: it changes nothing in the game. Kept in the skin in use, so each skin can tell its own. With the Original skin in use, the first thing you write starts a skin of your own.</p>
+      <div class="story-cards">${cards}</div>
+      <p class="note story-note">${esc(loreNote)}</p>
+    </section>`;
 }
 
 function pictures(f: Faction): string {
@@ -276,6 +332,8 @@ root.addEventListener('change', async (e) => {
     const from = idBefore;
     idBefore = faction().id;
     const to = faction().id.trim();
+    // Its story follows the new ID, as its pictures do.
+    if (from && to && from !== to && skin?.words.factions[from]?.lore) await changeWords((w) => copyLore(w, from, to, { move: true }));
     if (from && to && from !== to && FACTION_PARTS.some((p) => theme?.pictures[factionSlot(from, p.part)])) {
       await changeTheme((t) => copyFactionPictures(t, from, to, { move: true }), `Its pictures moved to the new ID, ${to}.`);
     } else {
@@ -287,6 +345,8 @@ root.addEventListener('change', async (e) => {
     render();
   } else if (el.dataset.path === 'name') {
     render(); // refresh the faction picker's label
+  } else if (el.dataset.lore && (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement)) {
+    await changeLore(faction().id, el.dataset.lore as keyof FactionLore, el.value);
   } else if (el.dataset.skin && (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement)) {
     // A built-in faction's word, into the skin in use.
     const id = faction().id;
@@ -318,6 +378,7 @@ root.addEventListener('click', async (e) => {
       const from = faction().id;
       state = { factions: [...state.factions, copy], selected: state.factions.length };
       save();
+      if (skin?.words.factions[from]?.lore) await changeWords((w) => copyLore(w, from, copy.id));
       if (FACTION_PARTS.some((p) => theme?.pictures[factionSlot(from, p.part)])) {
         await changeTheme((t) => copyFactionPictures(t, from, copy.id), 'Its pictures were copied too.');
         return;
@@ -366,6 +427,21 @@ store.activeSkin().then(
   async (s) => {
     skin = s;
     theme = s.theme;
+    // Pictures saved under an old copy's ID move to the built-in faction (any it already has stay).
+    const pictured = strays.filter(({ from }) => FACTION_PARTS.some((p) => s.theme.pictures[factionSlot(from, p.part)]));
+    if (pictured.length) {
+      try {
+        s = await store.changeSkin((x) => ({ ...x, theme: pictured.reduce((t, { from, to }) => copyFactionPictures(t, from, to, { keep: true }), x.theme) }));
+        skin = s;
+        theme = s.theme;
+        pictureNote = `Pictures saved under an old ID now belong to ${pictured.map(({ to }) => skinned(baseFactions.find((b) => b.id === to)!).name).join(', ')}.`;
+      } catch {
+        // The list isn't saved, so this is tried again next time.
+        pictureNote = "Some pictures saved under an old ID couldn't be moved (the device may be out of room).";
+        render();
+        return;
+      }
+    }
     // Names and wording once changed in this editor's copies of built-in factions move into the skin.
     const moved = state.factions.filter((f) => {
       const b = builtInOf(f);

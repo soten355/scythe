@@ -2,7 +2,48 @@ import { validateFaction } from '@scythe/engine';
 import { describe, expect, it } from 'vitest';
 import { baseFactions } from '@scythe/content';
 import { NO_WORDS } from '../skins/skin';
-import { formatFactions, homeBaseClashes, newFaction, wordsFromCopy } from './model';
+import { formatFactions, homeBaseClashes, newFaction, withBuiltIns, wordsFromCopy } from './model';
+
+describe("the editor's saved list and the built-in factions", () => {
+  const saxony = baseFactions.find((f) => f.id === 'saxony')!;
+
+  it('leaves a list that already has them all as it is, with its own factions after', () => {
+    const mine = newFaction('mine', 'w');
+    const { factions, strays } = withBuiltIns([mine, ...baseFactions], baseFactions);
+    expect(factions.map((f) => f.id)).toEqual([...baseFactions.map((f) => f.id), 'mine']);
+    expect(strays).toEqual([]);
+  });
+
+  it('adds a built-in faction missing from the list', () => {
+    const { factions, strays } = withBuiltIns(baseFactions.filter((f) => f !== saxony), baseFactions);
+    expect(factions.map((f) => f.id)).toEqual(baseFactions.map((f) => f.id));
+    expect(strays).toEqual([]);
+  });
+
+  it('gives an old copy under another ID the built-in ID, and says so, so its pictures can follow', () => {
+    const copy = { ...saxony, id: 'saxon', name: ' saxony ' };
+    const { factions, strays } = withBuiltIns([...baseFactions.filter((f) => f !== saxony), copy], baseFactions);
+    expect(factions.map((f) => f.id)).toEqual(baseFactions.map((f) => f.id));
+    expect(factions.find((f) => f.id === 'saxony')!.name).toBe('Saxony');
+    expect(strays).toEqual([{ from: 'saxon', to: 'saxony' }]);
+  });
+
+  it("keeps the player's own factions: a duplicate, another name, or the same name with other numbers", () => {
+    const duplicate = { ...saxony, id: 'saxony-copy', name: 'Saxony (copy)' };
+    const renamed = { ...saxony, id: 'mine', name: 'Blackmoor' };
+    const stronger = { ...saxony, id: 'strong', name: 'Saxony', power: saxony.power + 3 };
+    const { factions, strays } = withBuiltIns([...baseFactions.filter((f) => f !== saxony), duplicate, renamed, stronger], baseFactions);
+    expect(factions.map((f) => f.id)).toEqual([...baseFactions.map((f) => f.id), 'saxony-copy', 'mine', 'strong']);
+    expect(strays).toEqual([]);
+  });
+
+  it('leaves a same-named copy alone when the built-in is already there', () => {
+    const copy = { ...saxony, id: 'saxon' };
+    const { factions, strays } = withBuiltIns([...baseFactions, copy], baseFactions);
+    expect(factions.map((f) => f.id)).toEqual([...baseFactions.map((f) => f.id), 'saxon']);
+    expect(strays).toEqual([]);
+  });
+});
 
 describe('faction editor model', () => {
   it('starts a new faction that is already valid', () => {

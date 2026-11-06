@@ -240,14 +240,14 @@ export function hexArtIndex(seed: number, hexId: string, count: number): number 
   return ((h ^ (h >>> 15)) >>> 0) % count;
 }
 
-/** A faction's pictures copied to another ID (a duplicate), or moved there (its ID changed). */
-export function copyFactionPictures(theme: Theme, from: string, to: string, { move = false } = {}): Theme {
+/** A faction's pictures copied to another ID (a duplicate), or moved there (its ID changed). With `keep`, a picture already at the new ID stays. */
+export function copyFactionPictures(theme: Theme, from: string, to: string, { move = false, keep = false } = {}): Theme {
   if (from === to) return theme;
   const pictures = { ...theme.pictures };
   for (const { part } of FACTION_PARTS) {
     const url = pictures[factionSlot(from, part)];
     if (!url) continue;
-    pictures[factionSlot(to, part)] = url;
+    if (!keep || !pictures[factionSlot(to, part)]) pictures[factionSlot(to, part)] = url;
     if (move) delete pictures[factionSlot(from, part)];
   }
   return { ...theme, pictures };

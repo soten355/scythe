@@ -229,6 +229,11 @@ describe("each faction's own pictures (set in the faction editor)", () => {
     const copied = copyFactionPictures(theme, 'old', 'copy');
     expect(copied.pictures[factionSlot('copy', 'crest')]).toBe(PNG);
     expect(copied.pictures[factionSlot('old', 'crest')]).toBe(PNG);
+    // Told to keep what's there, it only fills the gaps.
+    const has = setPicture(theme, factionSlot('new', 'crest'), JPEG);
+    const filled = copyFactionPictures(has, 'old', 'new', { keep: true });
+    expect(filled.pictures[factionSlot('new', 'crest')]).toBe(JPEG);
+    expect(filled.pictures[factionSlot('new', 'mine')]).toBe(JPEG);
     const moved = copyFactionPictures(theme, 'old', 'new', { move: true });
     expect(moved.pictures[factionSlot('new', 'mine')]).toBe(JPEG);
     expect(moved.pictures[factionSlot('old', 'mine')]).toBeUndefined();
