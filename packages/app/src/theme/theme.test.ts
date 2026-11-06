@@ -1,11 +1,75 @@
 import { describe, expect, it } from 'vitest';
-import { backdropPicture, DEFAULT_UI_COLORS, FONTS, uiStyle, UI_COLORS, boardLook, clearPicture, copyFactionPictures, DEFAULT_THEME, FACTION_PARTS, factionSlot, parseThemeFile, pictureSpec, setColor, setPicture, SLOTS, themeFileText, type Theme } from './theme';
+import { addHexPicture, backdropPicture, hexArtIndex, hexPictures, readTheme, removeHexPicture, DEFAULT_UI_COLORS, FONTS, uiStyle, UI_COLORS, boardLook, clearPicture, copyFactionPictures, DEFAULT_THEME, FACTION_PARTS, factionSlot, parseThemeFile, pictureSpec, setColor, setPicture, SLOTS, themeFileText, type Theme } from './theme';
+import { baseBoard } from '@scythe/content';
 import { ENCOUNTER_ICON, TERRAIN_ICONS, TUNNEL_ICON } from '../play/icons';
 
 const PNG = 'data:image/png;base64,iVBORw0KGgo=';
 const JPEG = 'data:image/jpeg;base64,/9j/4AAQ';
 
 describe('the board theme', () => {
+  describe('several pictures for one terrain', () => {
+    const A = 'data:image/png;base64,AAAA';
+    const B = 'data:image/png;base64,BBBB';
+    const C = 'data:image/png;base64,CCCC';
+    const three = () => addHexPicture(addHexPicture(addHexPicture(DEFAULT_THEME, 'farm', A), 'farm', B), 'farm', C);
+
+    it('adds them in order, the first in the usual slot, so older themes and files keep working', () => {
+      const theme = three();
+      expect(hexPictures(theme, 'farm')).toEqual([A, B, C]);
+      expect(theme.pictures['hex.farm']).toBe(A);
+      expect(hexPictures(theme, 'forest')).toEqual([]);
+      // A theme from before this, with one picture, still has it.
+      expect(hexPictures(setPicture(DEFAULT_THEME, 'hex.lake', A), 'lake')).toEqual([A]);
+    });
+
+    it('removes any one of them, the next taking over when the first goes, and leaves nothing behind when the last goes', () => {
+      expect(hexPictures(removeHexPicture(three(), 'farm', 1), 'farm')).toEqual([A, C]);
+      const noFirst = removeHexPicture(three(), 'farm', 0);
+      expect(hexPictures(noFirst, 'farm')).toEqual([B, C]);
+      expect(noFirst.pictures['hex.farm']).toBe(B);
+      const none = removeHexPicture(addHexPicture(DEFAULT_THEME, 'farm', A), 'farm', 0);
+      expect(none.pictures).toEqual({});
+      expect(none.moreHexArt).toEqual({});
+    });
+
+    it('clearing the terrain clears them all', () => {
+      expect(hexPictures(clearPicture(three(), 'hex.farm'), 'farm')).toEqual([]);
+    });
+
+    it('offers them all to the board, unless a painted map replaces hex art, and hides the symbol as with one', () => {
+      const look = boardLook(three());
+      expect(look.arts('farm')).toEqual([A, B, C]);
+      expect(look.art('farm')).toBe(A);
+      expect(look.arts('forest')).toEqual([]);
+      expect(look.symbol('farm')).toBeUndefined();
+      expect(boardLook(setPicture(three(), 'background', JPEG)).arts('farm')).toEqual([]);
+    });
+
+    it('go with the theme in its file, keeping only real pictures for real terrains', () => {
+      expect(hexPictures(parseThemeFile(themeFileText(three())), 'farm')).toEqual([A, B, C]);
+      const read = readTheme({ moreHexArt: { farm: [B, 'javascript:alert(1)', 7], moon: [B], forest: 'nope' } });
+      expect(read.moreHexArt).toEqual({ farm: [B] });
+      expect(readTheme({}).moreHexArt).toEqual({});
+    });
+
+    it('a hex keeps its pick in a game, picks differ from game to game, and every picture gets used about as often', () => {
+      expect(hexArtIndex(12, 'A1', 3)).toBe(hexArtIndex(12, 'A1', 3));
+      expect(hexArtIndex(12, 'A1', 1)).toBe(0);
+      const ids = Object.keys(baseBoard.hexes);
+      const picks = (seed: number) => ids.map((id) => hexArtIndex(seed, id, 3));
+      expect(picks(1)).not.toEqual(picks(2));
+      const counts = [0, 0, 0];
+      for (let seed = 0; seed < 100; seed++) for (const n of picks(seed)) counts[n]!++;
+      const share = 100 * ids.length;
+      for (const n of counts) {
+        expect(n / share).toBeGreaterThan(0.28);
+        expect(n / share).toBeLessThan(0.38);
+      }
+      // Hexes in one game don't all land on the same picture.
+      expect(new Set(picks(1)).size).toBe(3);
+    });
+  });
+
   it('has a slot for the map background, each terrain (art and symbol), the markers and the resource tokens', () => {
     const ids = SLOTS.map((s) => s.id);
     expect(ids).toContain('background');

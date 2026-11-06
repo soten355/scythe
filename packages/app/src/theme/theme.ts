@@ -85,7 +85,7 @@ function readFactionSlot(slot: string): { id: string; part: FactionPart } | null
 /** Every slot, in the order the editor lists them. */
 export const SLOTS: Slot[] = [
   { id: 'background', group: 'Map', label: 'Map picture', hint: `The whole map in one painting, made from the map guide so it lines up with the hexes; it zooms and pans with them. ${sizeText(BEST.background)}.` },
-  ...TERRAINS.map((t): Slot => ({ id: `hex.${t}`, group: 'Hex art', label: TERRAIN_NAMES[t], hint: `Fills each hex, cropped to the hex shape; see-through parts show the map picture, or else the hex's colour. ${sizeText(BEST.hex)}.` })),
+  ...TERRAINS.map((t): Slot => ({ id: `hex.${t}`, group: 'Hex art', label: TERRAIN_NAMES[t], hint: `Fills each hex, cropped to the hex shape; see-through parts show the map picture, or else the hex's colour. Add several and each hex picks one at random, a new mix each game. ${sizeText(BEST.hex)}.` })),
   ...TERRAINS.map((t): Slot => ({ id: `symbol.${t}`, group: 'Hex symbols', label: TERRAIN_NAMES[t], hint: `In the middle of the hex, on a see-through background. ${sizeText(BEST.small)}.` })),
   { id: 'symbol.tunnel', group: 'Markers', label: 'Tunnel', hint: `At the top of tunnel hexes, on a see-through background. ${sizeText(BEST.small)}.` },
   { id: 'symbol.encounter', group: 'Markers', label: 'Encounter', hint: `At the bottom of hexes with an encounter, on a see-through background. ${sizeText(BEST.small)}.` },
@@ -168,6 +168,8 @@ export interface Theme {
   name: string;
   /** Data URLs, by slot. */
   pictures: Partial<Record<SlotId, string>>;
+  /** A terrain's other hex pictures, after the one in its hex slot; each hex shows one of them (see hexArtIndex). */
+  moreHexArt: Partial<Record<Terrain, string[]>>;
   /** Hex colours (where there's no hex art, and while it loads). */
   colors: Partial<Record<Terrain, string>>;
   /** Draw the terrain symbols over hex art (or the map picture) too (off: the art says what the hex is). */
@@ -184,7 +186,7 @@ export interface Theme {
   headingFont: FontId;
 }
 
-export const DEFAULT_THEME: Theme = { name: 'My theme', pictures: {}, colors: {}, symbolsOverArt: false, paintedMap: true, hexEdges: true, uiColors: {}, bodyFont: 'system', headingFont: 'georgia' };
+export const DEFAULT_THEME: Theme = { name: 'My theme', pictures: {}, moreHexArt: {}, colors: {}, symbolsOverArt: false, paintedMap: true, hexEdges: true, uiColors: {}, bodyFont: 'system', headingFont: 'georgia' };
 
 export const DEFAULT_COLORS: Record<Terrain, string> = {
   farm: '#d9c46a',
@@ -199,9 +201,43 @@ export const DEFAULT_COLORS: Record<Terrain, string> = {
 export const setPicture = (theme: Theme, slot: SlotId, url: string): Theme => ({ ...theme, pictures: { ...theme.pictures, [slot]: url } });
 
 export function clearPicture(theme: Theme, slot: SlotId): Theme {
+  if (slot.startsWith('hex.')) return withHexPictures(theme, slot.slice(4) as Terrain, []);
   const pictures = { ...theme.pictures };
   delete pictures[slot];
   return { ...theme, pictures };
+}
+
+/** All of a terrain's hex pictures. */
+export const hexPictures = (theme: Theme, terrain: Terrain): string[] => {
+  const first = theme.pictures[`hex.${terrain}`];
+  return [...(first ? [first] : []), ...(theme.moreHexArt?.[terrain] ?? [])];
+};
+
+function withHexPictures(theme: Theme, terrain: Terrain, [first, ...rest]: string[]): Theme {
+  const pictures = { ...theme.pictures };
+  const moreHexArt = { ...theme.moreHexArt };
+  if (first) pictures[`hex.${terrain}`] = first;
+  else delete pictures[`hex.${terrain}`];
+  if (rest.length) moreHexArt[terrain] = rest;
+  else delete moreHexArt[terrain];
+  return { ...theme, pictures, moreHexArt };
+}
+
+export const addHexPicture = (theme: Theme, terrain: Terrain, url: string): Theme => withHexPictures(theme, terrain, [...hexPictures(theme, terrain), url]);
+
+export const removeHexPicture = (theme: Theme, terrain: Terrain, index: number): Theme => withHexPictures(theme, terrain, hexPictures(theme, terrain).filter((_, i) => i !== index));
+
+/**
+ * Which of a terrain's pictures a hex shows: at random, but worked out from the
+ * game's seed and the hex, so it differs from game to game and a hex keeps its
+ * picture through a game (redraws, undo, reloading a save).
+ */
+export function hexArtIndex(seed: number, hexId: string, count: number): number {
+  if (count <= 1) return 0;
+  let h = 0x811c9dc5;
+  for (const ch of `${seed}|${hexId}`) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
+  h = Math.imul(h ^ (h >>> 13), 0x5bd1e995);
+  return ((h ^ (h >>> 15)) >>> 0) % count;
 }
 
 /** A faction's pictures copied to another ID (a duplicate), or moved there (its ID changed). */
@@ -247,6 +283,8 @@ export interface BoardLook {
   edges: boolean;
   fill: (terrain: Terrain) => string;
   art: (terrain: Terrain) => string | undefined;
+  /** All of a terrain's hex pictures: each hex shows one (see hexArtIndex). */
+  arts: (terrain: Terrain) => string[];
   symbol: (terrain: Terrain) => Icon | undefined;
   tunnel: Icon;
   encounter: Icon;
@@ -268,11 +306,12 @@ export function boardLook(theme: Theme): BoardLook {
     edges: theme.hexEdges,
     fill: (t) => theme.colors[t] ?? DEFAULT_COLORS[t],
     // A painted map replaces the hex art.
-    art: (t) => (painted ? undefined : picture(`hex.${t}`)),
+    art: (t) => (painted ? undefined : hexPictures(theme, t)[0]),
+    arts: (t) => (painted ? [] : hexPictures(theme, t)),
     symbol: (t) => {
       const own = picture(`symbol.${t}`);
       if (own) return { image: own };
-      if ((painted || picture(`hex.${t}`)) && !theme.symbolsOverArt) return undefined;
+      if ((painted || hexPictures(theme, t).length) && !theme.symbolsOverArt) return undefined;
       return TERRAIN_ICONS[t];
     },
     tunnel: asIcon('symbol.tunnel', TUNNEL_ICON),
@@ -315,6 +354,12 @@ export function readTheme(data: Record<string, unknown>): Theme {
   for (const [slot, url] of Object.entries((data.pictures as Record<string, unknown>) ?? {})) {
     if ((SLOT_IDS.has(slot) || readFactionSlot(slot)) && typeof url === 'string' && PICTURE.test(url)) pictures[slot as SlotId] = url;
   }
+  const moreHexArt: Theme['moreHexArt'] = {};
+  for (const [terrain, urls] of Object.entries((data.moreHexArt as Record<string, unknown>) ?? {})) {
+    if (!(TERRAINS as string[]).includes(terrain) || !Array.isArray(urls)) continue;
+    const good = urls.filter((url): url is string => typeof url === 'string' && PICTURE.test(url));
+    if (good.length) moreHexArt[terrain as Terrain] = good;
+  }
   const colors: Theme['colors'] = {};
   for (const [terrain, color] of Object.entries((data.colors as Record<string, unknown>) ?? {})) {
     if ((TERRAINS as string[]).includes(terrain) && typeof color === 'string' && COLOR.test(color)) colors[terrain as Terrain] = color;
@@ -327,6 +372,7 @@ export function readTheme(data: Record<string, unknown>): Theme {
   return {
     name: typeof data.name === 'string' && data.name.trim() ? data.name.trim().slice(0, 60) : DEFAULT_THEME.name,
     pictures,
+    moreHexArt,
     colors,
     symbolsOverArt: data.symbolsOverArt === true,
     paintedMap: data.paintedMap !== false,

@@ -18,7 +18,7 @@ import { mapPictureFrame } from '../play/map-picture';
 import { mapGuide } from '../theme/map-guide';
 import { center, corners, points, SIZE, type Point } from '../play/geometry';
 import type { Icon } from '../play/icons';
-import { boardLook, clearPicture, DEFAULT_COLORS, DEFAULT_THEME, DEFAULT_UI_COLORS, FONTS, parseThemeFile, setColor, setPicture, SLOTS, TERRAINS, UI_COLORS, uiStyle, type FontId, type SlotId, type Theme, type UiColor } from '../theme/theme';
+import { addHexPicture, boardLook, clearPicture, hexPictures, removeHexPicture, DEFAULT_COLORS, DEFAULT_THEME, DEFAULT_UI_COLORS, FONTS, parseThemeFile, setColor, setPicture, SLOTS, TERRAINS, UI_COLORS, uiStyle, type FontId, type SlotId, type Theme, type UiColor } from '../theme/theme';
 import { pictureFor, sizeKb } from '../theme/pictures';
 
 const store = new SaveStore();
@@ -117,13 +117,29 @@ function preview(): string {
 
 // ---- the page ------------------------------------------------------------------
 
+/** A hex art row: all the terrain's pictures, any of which can be removed, and a button to add more. */
+function hexSlotRow(id: SlotId, terrain: Terrain, label: string, hint: string): string {
+  const urls = hexPictures(theme, terrain);
+  const many = urls.length > 1;
+  const kb = urls.reduce((n, url) => n + sizeKb(url), 0);
+  const thumbs = urls.length
+    ? urls.map((url, i) => `<div class="hex-pic"><div class="thumb hex"><img src="${esc(url)}" alt=""></div>${many ? `<button class="remove" data-act="remove-hex" data-slot="${id}" data-index="${i}" aria-label="Remove this picture" title="Remove this picture">×</button>` : ''}</div>`).join('')
+    : '<div class="thumb hex"><span>—</span></div>';
+  return `<div class="slot ${many ? 'many-pics' : ''}">
+    <div class="hex-pics">${thumbs}</div>
+    <div class="what"><b>${esc(label)}</b><small>${esc(hint)}${urls.length ? ` · ${many ? `${urls.length} pictures, ` : ''}${kb} KB` : ''}</small></div>
+    <label class="color" title="Colour where there's no picture">Colour<input type="color" data-color="${terrain}" value="${theme.colors[terrain] ?? DEFAULT_COLORS[terrain]}"></label>
+    <button data-act="choose" data-slot="${id}">${urls.length ? 'Add…' : 'Choose…'}</button>
+    ${urls.length ? `<button data-act="clear" data-slot="${id}">${many ? 'Clear all' : 'Clear'}</button>` : ''}
+  </div>`;
+}
+
 function slotRow(id: SlotId, label: string, hint: string): string {
+  if (id.startsWith('hex.')) return hexSlotRow(id, id.slice(4) as Terrain, label, hint);
   const url = theme.pictures[id];
-  const terrain = id.startsWith('hex.') ? (id.slice(4) as Terrain) : null;
   return `<div class="slot">
-    <div class="thumb ${id.startsWith('hex.') ? 'hex' : ''}">${url ? `<img src="${esc(url)}" alt="">` : '<span>—</span>'}</div>
+    <div class="thumb">${url ? `<img src="${esc(url)}" alt="">` : '<span>—</span>'}</div>
     <div class="what"><b>${esc(label)}</b><small>${esc(hint)}${url ? ` · ${sizeKb(url)} KB` : ''}</small></div>
-    ${terrain ? `<label class="color" title="Colour where there's no picture">Colour<input type="color" data-color="${terrain}" value="${theme.colors[terrain] ?? DEFAULT_COLORS[terrain]}"></label>` : ''}
     <button data-act="choose" data-slot="${id}">${url ? 'Change…' : 'Choose…'}</button>
     ${url ? `<button data-act="clear" data-slot="${id}">Clear</button>` : ''}
   </div>`;
@@ -180,7 +196,7 @@ function uiPreview(): string {
 
 function render() {
   const groups = [...new Set(SLOTS.map((s) => s.group))];
-  const total = Object.values(theme.pictures).reduce((n, url) => n + sizeKb(url ?? ''), 0);
+  const total = [...Object.values(theme.pictures), ...Object.values(theme.moreHexArt).flat()].reduce((n, url) => n + sizeKb(url ?? ''), 0);
   root.innerHTML = `
     <header>
       <a class="back" href="${import.meta.env.BASE_URL}#workshop">← Workshop</a>
@@ -227,12 +243,21 @@ root.addEventListener('click', async (e) => {
   if (!btn) return;
   const slot = btn.dataset.slot as SlotId | undefined;
   switch (btn.dataset.act) {
-    case 'choose':
+    case 'choose': {
       choosing = slot!;
-      root.querySelector<HTMLInputElement>('[data-picture]')!.click();
+      const input = root.querySelector<HTMLInputElement>('[data-picture]')!;
+      // Hex art can take several at once.
+      input.multiple = slot!.startsWith('hex.');
+      input.click();
       break;
-    case 'clear':
-      await keep(clearPicture(theme, slot!));
+    }
+    case 'clear': {
+      const count = slot!.startsWith('hex.') ? hexPictures(theme, slot!.slice(4) as Terrain).length : 1;
+      if (count < 2 || (await ask(`Remove all ${count} pictures for this terrain? (Save the theme to a file first to keep them.)`))) await keep(clearPicture(theme, slot!));
+      break;
+    }
+    case 'remove-hex':
+      await keep(removeHexPicture(theme, slot!.slice(4) as Terrain, Number(btn.dataset.index)));
       break;
     case 'file':
       await exportTheme(theme);
@@ -263,11 +288,27 @@ root.addEventListener('click', async (e) => {
 root.addEventListener('change', async (e) => {
   const el = e.target as HTMLInputElement;
   if (el.dataset.picture !== undefined) {
-    const file = el.files?.[0];
+    const files = [...(el.files ?? [])];
+    const file = files[0];
     el.value = '';
     if (!file || !choosing) return;
     const slot = choosing;
-    show('Shrinking the picture…');
+    show(files.length > 1 ? `Shrinking ${files.length} pictures…` : 'Shrinking the picture…');
+    if (slot.startsWith('hex.')) {
+      const terrain = slot.slice(4) as Terrain;
+      let next = theme;
+      let unreadable = 0;
+      for (const f of files) {
+        try {
+          next = addHexPicture(next, terrain, await pictureFor(slot, f));
+        } catch {
+          unreadable++;
+        }
+      }
+      if (next !== theme) await keep(next);
+      if (unreadable) show(`${unreadable} of ${files.length} couldn't be read as a picture. Try a PNG or JPEG.`, true);
+      return;
+    }
     try {
       await keep(setPicture(theme, slot, await pictureFor(slot, file)));
     } catch (err) {

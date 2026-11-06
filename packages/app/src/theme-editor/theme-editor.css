@@ -55,6 +55,33 @@
 .thumb span {
   opacity: 0.4;
 }
+/* A terrain's hex pictures: with several, they take their own line above the words and buttons. */
+.slot.many-pics {
+  flex-wrap: wrap;
+}
+.slot.many-pics .hex-pics {
+  width: 100%;
+}
+.hex-pics {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.hex-pic {
+  position: relative;
+}
+.hex-pic .remove {
+  position: absolute;
+  top: -4px;
+  right: -6px;
+  width: 22px;
+  height: 22px;
+  min-height: 0;
+  padding: 0;
+  border-radius: 50%;
+  line-height: 1;
+}
 .what {
   flex: 1;
   min-width: 0;

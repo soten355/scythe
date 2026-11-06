@@ -12,7 +12,7 @@
   // A unit that just moved (travel) glides hex by hex along its path, taking
   // moveMs per hex; its piece at the destination is hidden until it lands,
   // then whatever it carried hops off onto the hex.
-  import { isHomeBase, type GameState, type HexId, type Location, type Resource, type Structure } from '@scythe/engine';
+  import { isHomeBase, type GameState, type HexId, type Location, type Resource, type Structure, type Terrain } from '@scythe/engine';
   import { tick, untrack } from 'svelte';
   import type { Travel } from './travel';
   import { between, fitView, panBy, worldOf, zoomAt, type Limits, type View } from './camera';
@@ -20,7 +20,7 @@
   import HexIcon from './HexIcon.svelte';
   import { MAP_PICTURE, mapPictureFrame } from './map-picture';
   import { LABEL_Y, MECH, MEEPLE } from './shapes';
-  import { boardLook, DEFAULT_THEME, TERRAINS, type BoardLook } from '../theme/theme';
+  import { boardLook, DEFAULT_THEME, hexArtIndex, TERRAINS, type BoardLook } from '../theme/theme';
   import { isLight } from './ink';
   import type { Prompt, Selection } from './prompt';
 
@@ -60,7 +60,12 @@
   };
 
   /** Terrains with hex art: each hex is filled with its picture, cropped to the hex. */
-  const arts = $derived(TERRAINS.flatMap((t) => (look.art(t) ? [{ terrain: t, url: look.art(t)! }] : [])));
+  const arts = $derived(TERRAINS.flatMap((t) => look.arts(t).map((url, i) => ({ id: `art-${t}-${i}`, terrain: t, url }))));
+  /** A hex's fill: one of its terrain's pictures, picked for this game, or else its colour. */
+  function hexFill(id: HexId, terrain: Terrain) {
+    const count = look.arts(terrain).length;
+    return count ? `url(#art-${terrain}-${hexArtIndex(game.setup.seed, id, count)})` : look.fill(terrain);
+  }
   const RESOURCE_COLOR: Record<Resource, string> = { oil: '#1b1b1b', metal: '#9aa3ad', wood: '#7a4a24', food: '#f0d54a' };
   const STRUCTURE_LETTER: Record<Structure, string> = { mine: 'Mi', mill: 'Ml', armory: 'Ar', monument: 'Mo' };
   /** The faction picture for each kind of unit. */
@@ -541,8 +546,8 @@
   {/if}
   {#if arts.length}
     <defs>
-      {#each arts as a (a.terrain)}
-        <pattern id="art-{a.terrain}" width="1" height="1" patternContentUnits="objectBoundingBox">
+      {#each arts as a (a.id)}
+        <pattern id={a.id} width="1" height="1" patternContentUnits="objectBoundingBox">
           <!-- See-through parts of the art show the map picture behind, or else the terrain's colour. -->
           {#if !look.background}<rect width="1" height="1" fill={look.fill(a.terrain)} />{/if}
           <image href={a.url} width="1" height="1" preserveAspectRatio="xMidYMid slice" />
@@ -556,7 +561,7 @@
     {@const tappable = lit || prompt.tapSelects.has(h.id)}
     <polygon
       points={points(corners(c))}
-      fill={look.art(h.terrain) ? `url(#art-${h.terrain})` : look.fill(h.terrain)}
+      fill={hexFill(h.id, h.terrain)}
       fill-opacity={look.painted ? 0 : undefined}
       class="hex"
       class:painted={look.painted}
