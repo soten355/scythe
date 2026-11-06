@@ -150,9 +150,9 @@
     overflow: visible;
     filter: drop-shadow(0 0 18px color-mix(in srgb, var(--c) 45%, transparent));
   }
-  /* A soft shadow cast down and away, as if lit from the upper left. */
+  /* A soft shadow cast down and away, as if lit from the upper left, with a faint dark edge so the figure stands off any background. */
   .fighter.soft {
-    filter: drop-shadow(6px 10px 12px rgb(0 0 0 / 0.45));
+    filter: drop-shadow(0 0 3px rgb(0 0 0 / 0.55)) drop-shadow(12px 18px 22px rgb(0 0 0 / 0.6));
   }
   .flip {
     transform: scaleX(-1);

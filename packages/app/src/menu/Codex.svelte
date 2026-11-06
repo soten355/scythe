@@ -142,19 +142,19 @@
                 </div>
               </div>
               <div class="facts">
-                <!-- Who they are: their portrait, large, with the crest as a badge (or just the crest), beside their name, start and ability. -->
+                <!-- Who they are: their portrait, large, beside their crest, name, start and ability. -->
                 <div class="intro" class:with-portrait={portrait}>
                   {#if portrait}
-                    <div class="portrait">
-                      <img src={portrait} alt="" />
-                      <div class="badge"><FactionEmblem {faction} /></div>
-                    </div>
-                  {:else}
-                    <div class="crest"><FactionEmblem {faction} /></div>
+                    <div class="portrait"><img src={portrait} alt="" /></div>
                   {/if}
                   <div class="intro-text">
-                    <h2>{faction.name}</h2>
-                    <p class="chips">{#each f.start as s (s)}<span>{s}</span>{/each}</p>
+                    <div class="title">
+                      <div class="crest big"><FactionEmblem {faction} /></div>
+                      <div>
+                        <h2>{faction.name}</h2>
+                        <p class="chips">{#each f.start as s (s)}<span>{s}</span>{/each}</p>
+                      </div>
+                    </div>
                     <div class="box ability">
                       <h3>Faction ability</h3>
                       <p><b>{f.ability.name}</b> {f.ability.description}</p>
@@ -596,13 +596,16 @@
     background: color-mix(in srgb, var(--c) 35%, var(--bg));
     box-shadow: 0 6px 16px rgb(0 0 0 / 0.45);
   }
-  .portrait .badge {
-    position: absolute;
-    right: -6%;
-    bottom: -4%;
-    width: 38%;
-    aspect-ratio: 1;
-    filter: drop-shadow(0 2px 4px rgb(0 0 0 / 0.5));
+  /* The crest, large, beside the name. */
+  .title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .crest.big {
+    width: clamp(56px, 13vh, 96px);
+    height: clamp(56px, 13vh, 96px);
+    filter: drop-shadow(0 3px 6px rgb(0 0 0 / 0.5));
   }
 
   /* A mat: its four sections side by side, as on the table. */
