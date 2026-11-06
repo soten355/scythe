@@ -12,6 +12,7 @@
     factionId,
     facing = 'right',
     broken = false,
+    shadow = 'glow',
   }: {
     kind: 'character' | 'mech';
     color: string;
@@ -20,6 +21,8 @@
     facing?: 'left' | 'right';
     /** Beaten in a fight: still, scorched, cracked, smouldering. */
     broken?: boolean;
+    /** A glow in the faction's colour (fights), or a soft shadow (the Codex). */
+    shadow?: 'glow' | 'soft';
   } = $props();
   const picture = $derived(factionId ? factionPicture(factionId, kind) : undefined);
   // Gradient ids must be unique on the page.
@@ -27,9 +30,9 @@
 </script>
 
 {#if picture}
-  <img src={picture} alt="" class="fighter picture {kind}" class:flip={facing === 'left'} class:broken style:--c={color} aria-hidden="true" />
+  <img src={picture} alt="" class="fighter picture {kind}" class:soft={shadow === 'soft'} class:flip={facing === 'left'} class:broken style:--c={color} aria-hidden="true" />
 {:else}
-<svg viewBox="0 0 200 260" class="fighter {kind}" class:flip={facing === 'left'} class:broken style:--c={color} aria-hidden="true">
+<svg viewBox="0 0 200 260" class="fighter {kind}" class:soft={shadow === 'soft'} class:flip={facing === 'left'} class:broken style:--c={color} aria-hidden="true">
   <defs>
     <linearGradient id="{id}-paint" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="color-mix(in srgb, {color} 80%, white)" />
@@ -146,6 +149,10 @@
     height: 100%;
     overflow: visible;
     filter: drop-shadow(0 0 18px color-mix(in srgb, var(--c) 45%, transparent));
+  }
+  /* A soft shadow cast down and away, as if lit from the upper left. */
+  .fighter.soft {
+    filter: drop-shadow(6px 10px 12px rgb(0 0 0 / 0.45));
   }
   .flip {
     transform: scaleX(-1);

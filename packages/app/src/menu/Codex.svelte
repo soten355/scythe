@@ -14,7 +14,6 @@
   import { cardLook } from '../content/card-pictures';
   import { backdropPictures, cardPicture, factionPicture } from '../theme/current.svelte';
   import FactionEmblem from '../play/FactionEmblem.svelte';
-  import FactionPortrait from '../play/FactionPortrait.svelte';
   import FightBackdrop from '../play/FightBackdrop.svelte';
   import FighterArt from '../play/FighterArt.svelte';
   import { inkOn } from '../play/ink';
@@ -133,26 +132,34 @@
             </div>
           {:else if faction}
             {@const f = factionFacts(faction, board)}
+            {@const portrait = factionPicture(faction.id, 'portrait')}
             <div class="faction" style:--c={faction.color} style:--ink={inkOn(faction.color)}>
               <div class="hero">
                 <FightBackdrop terrain={f.terrain} picture={scene} />
                 <div class="figures">
-                  <div class="mech"><FighterArt kind="mech" color={faction.color} factionId={faction.id} /></div>
-                  <div class="character"><FighterArt kind="character" color={faction.color} factionId={faction.id} /></div>
+                  <div class="mech"><FighterArt kind="mech" color={faction.color} factionId={faction.id} shadow="soft" /></div>
+                  <div class="character"><FighterArt kind="character" color={faction.color} factionId={faction.id} shadow="soft" /></div>
                 </div>
               </div>
               <div class="facts">
-                <div class="named">
-                  <div class="crest"><FactionEmblem {faction} /></div>
-                  <FactionPortrait factionId={faction.id} color={faction.color} size={56} />
-                  <div>
+                <!-- Who they are: their portrait, large, with the crest as a badge (or just the crest), beside their name, start and ability. -->
+                <div class="intro" class:with-portrait={portrait}>
+                  {#if portrait}
+                    <div class="portrait">
+                      <img src={portrait} alt="" />
+                      <div class="badge"><FactionEmblem {faction} /></div>
+                    </div>
+                  {:else}
+                    <div class="crest"><FactionEmblem {faction} /></div>
+                  {/if}
+                  <div class="intro-text">
                     <h2>{faction.name}</h2>
                     <p class="chips">{#each f.start as s (s)}<span>{s}</span>{/each}</p>
+                    <div class="box ability">
+                      <h3>Faction ability</h3>
+                      <p><b>{f.ability.name}</b> {f.ability.description}</p>
+                    </div>
                   </div>
-                </div>
-                <div class="box ability">
-                  <h3>Faction ability</h3>
-                  <p><b>{f.ability.name}</b> {f.ability.description}</p>
                 </div>
                 <div class="box">
                   <h3>Mech abilities</h3>
@@ -559,6 +566,43 @@
     width: 56px;
     height: 56px;
     flex: none;
+  }
+  .intro {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+  }
+  .intro-text {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  /* The portrait: big and round in a ring of the faction's colour, its crest pinned to the lower right. */
+  .portrait {
+    position: relative;
+    flex: none;
+    width: clamp(96px, 22vh, 170px);
+    aspect-ratio: 1;
+  }
+  .portrait img {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 4px solid var(--c);
+    box-sizing: border-box;
+    background: color-mix(in srgb, var(--c) 35%, var(--bg));
+    box-shadow: 0 6px 16px rgb(0 0 0 / 0.45);
+  }
+  .portrait .badge {
+    position: absolute;
+    right: -6%;
+    bottom: -4%;
+    width: 38%;
+    aspect-ratio: 1;
+    filter: drop-shadow(0 2px 4px rgb(0 0 0 / 0.5));
   }
 
   /* A mat: its four sections side by side, as on the table. */
