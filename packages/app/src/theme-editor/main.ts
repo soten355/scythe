@@ -16,7 +16,7 @@ import { exportPicture, exportTheme } from '../saves/files';
 import { BUILT_IN } from '../content/catalog';
 import { mapPictureFrame } from '../play/map-picture';
 import { mapGuide } from '../theme/map-guide';
-import { center, corners, points, SIZE, type Point } from '../play/geometry';
+import { center, corners, HEX_HEIGHT, HEX_VIEWBOX, HEX_WIDTH, points, SIZE, type Point } from '../play/geometry';
 import type { Icon } from '../play/icons';
 import { addHexPicture, boardLook, clearPicture, hexPictures, removeHexPicture, DEFAULT_COLORS, DEFAULT_THEME, DEFAULT_UI_COLORS, FONTS, parseThemeFile, setColor, setPicture, SLOTS, TERRAINS, UI_COLORS, uiStyle, type FontId, type SlotId, type Theme, type UiColor } from '../theme/theme';
 import { pictureFor, sizeKb } from '../theme/pictures';
@@ -87,7 +87,7 @@ function preview(): string {
     [w / 2, SIZE * 1.5], [1.5 * w, SIZE * 1.5], [2.5 * w, SIZE * 1.5],
   ];
   const defs = TERRAINS.filter((t) => look.art(t))
-    .map((t) => `<pattern id="p-${t}" width="1" height="1" patternContentUnits="objectBoundingBox"><image href="${esc(look.art(t)!)}" width="1" height="1" preserveAspectRatio="xMidYMid slice"/></pattern>`)
+    .map((t) => `<pattern id="p-${t}" width="1" height="1" viewBox="${HEX_VIEWBOX}" preserveAspectRatio="xMidYMid slice"><image href="${esc(look.art(t)!)}" width="${HEX_WIDTH}" height="${HEX_HEIGHT}" preserveAspectRatio="xMidYMid slice"/></pattern>`)
     .join('');
   const hexes = TERRAINS.map((t, i) => {
     const c = spots[i]!;

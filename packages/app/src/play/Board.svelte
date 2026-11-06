@@ -16,7 +16,7 @@
   import { tick, untrack } from 'svelte';
   import type { Travel } from './travel';
   import { between, fitView, panBy, worldOf, zoomAt, type Limits, type View } from './camera';
-  import { boardArea, center, corners, points, sharedEdge, SIZE, spotsArea, type Point } from './geometry';
+  import { boardArea, center, corners, HEX_HEIGHT, HEX_VIEWBOX, HEX_WIDTH, points, sharedEdge, SIZE, spotsArea, type Point } from './geometry';
   import HexIcon from './HexIcon.svelte';
   import { MAP_PICTURE, mapPictureFrame } from './map-picture';
   import { LABEL_Y, MECH, MEEPLE } from './shapes';
@@ -547,10 +547,11 @@
   {#if arts.length}
     <defs>
       {#each arts as a (a.id)}
-        <pattern id={a.id} width="1" height="1" patternContentUnits="objectBoundingBox">
+        <!-- The box is the hex's shape, so the picture is only ever cropped to fit, never stretched. -->
+        <pattern id={a.id} width="1" height="1" viewBox={HEX_VIEWBOX} preserveAspectRatio="xMidYMid slice">
           <!-- See-through parts of the art show the map picture behind, or else the terrain's colour. -->
-          {#if !look.background}<rect width="1" height="1" fill={look.fill(a.terrain)} />{/if}
-          <image href={a.url} width="1" height="1" preserveAspectRatio="xMidYMid slice" />
+          {#if !look.background}<rect width={HEX_WIDTH} height={HEX_HEIGHT} fill={look.fill(a.terrain)} />{/if}
+          <image href={a.url} width={HEX_WIDTH} height={HEX_HEIGHT} preserveAspectRatio="xMidYMid slice" />
         </pattern>
       {/each}
     </defs>

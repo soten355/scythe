@@ -4,6 +4,11 @@ import type { Board, HexId, Location } from '@scythe/engine';
 
 export const SIZE = 30;
 
+/** A hex's own size. Hex art is fitted in a box this shape, so it's cropped to fit and never stretched. */
+export const HEX_WIDTH = SIZE * Math.sqrt(3);
+export const HEX_HEIGHT = SIZE * 2;
+export const HEX_VIEWBOX = `0 0 ${HEX_WIDTH} ${HEX_HEIGHT}`;
+
 export type Point = [number, number];
 
 export const center = ({ q, r }: { q: number; r: number }): Point => [SIZE * Math.sqrt(3) * (q + r / 2), SIZE * 1.5 * r];
