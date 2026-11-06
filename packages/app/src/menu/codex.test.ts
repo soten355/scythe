@@ -107,6 +107,36 @@ describe('the codex', () => {
     expect(game.encounterTokens.length).toBe(Object.values(baseBoard.hexes).filter((h) => h.encounter).length);
   });
 
+  it("shows what each faction's mechs and structures look like: a mech beside its workers, and all four structures nearby", () => {
+    const game = mapStart(baseBoard, baseFactions, baseMats, BUILT_IN.encounters);
+    const hexes = baseBoard.hexes;
+    for (const p of game.players) {
+      expect(p.mechs).toEqual([p.workers[0]]);
+      expect(Object.keys(p.structures).sort()).toEqual(['armory', 'mill', 'mine', 'monument']);
+    }
+    const built = game.players.flatMap((p) => Object.values(p.structures));
+    // One to a hex, only where the rules let you build, and clear of the workers.
+    expect(new Set(built).size).toBe(built.length);
+    for (const hex of built) expect(['lake', 'factory']).not.toContain(hexes[hex]!.terrain);
+    const workers = game.players.flatMap((p) => p.workers);
+    expect(built.filter((hex) => workers.includes(hex))).toEqual([]);
+  });
+
+  it('puts structures as near home as it can', () => {
+    const game = mapStart(baseBoard, baseFactions.slice(0, 2), baseMats, BUILT_IN.encounters);
+    // The first goes next to a hex by its home base.
+    const first = game.players[0]!.structures.mine!;
+    const home = baseBoard.homeBases[baseFactions[0]!.homeBase]!;
+    expect(home.some((h) => baseBoard.adjacent[h]!.includes(first))).toBe(true);
+  });
+
+  it('places fewer structures when a map has no room, rather than breaking', () => {
+    const hexes = Object.fromEntries(Object.entries(baseBoard.hexes).map(([id, h]) => [id, { ...h, terrain: 'lake' as const }]));
+    const game = mapStart({ ...baseBoard, hexes }, baseFactions.slice(0, 1), baseMats);
+    expect(game.players[0]!.structures).toEqual({});
+    expect(game.players[0]!.mechs).toHaveLength(1);
+  });
+
   it('still shows a map with no faction to start on it', () => {
     const game = mapStart(baseBoard, [{ ...baseFactions[0]!, homeBase: 'nowhere' }], baseMats);
     expect(game.players).toEqual([]);

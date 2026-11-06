@@ -127,7 +127,7 @@
                     </p>
                   {/each}
                 </div>
-                <p class="dim">As a game starts: each faction's character at home and its workers beside it. Pinch or scroll to zoom, drag to look around.</p>
+                <p class="dim">Each faction's character at home and its workers beside it, as a game starts, plus a mech and its four structures to show how they look. Pinch or scroll to zoom, drag to look around.</p>
               </div>
             </div>
           {:else if faction}

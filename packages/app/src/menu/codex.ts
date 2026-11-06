@@ -2,8 +2,8 @@
 // Factory and objective decks and the structure bonus tiles), browsed one at
 // a time from the main menu. This file turns each into what the codex shows,
 // in the words the game uses; Codex.svelte draws it.
-import { newGame, type GameState } from '@scythe/engine';
-import type { Board, EncounterCard, Faction, FactoryCard, ObjectiveCard, PlayerMat, RecruitBonus, StructureBonusTile, Terrain, Upgradeable } from '@scythe/engine';
+import { newGame, STRUCTURES, type GameState } from '@scythe/engine';
+import type { Board, EncounterCard, Faction, FactoryCard, HexId, ObjectiveCard, PlayerMat, RecruitBonus, Structure, StructureBonusTile, Terrain, Upgradeable } from '@scythe/engine';
 import type { Catalog } from './setup';
 import { costText, gainText, moveText } from '../play/prompt';
 import { objectiveText } from '../play/objective-text';
@@ -69,18 +69,49 @@ export function mapFacts(board: Board, factions: Faction[]) {
 /**
  * The map as a game on it starts: every faction with a home base on it (the
  * first for each home base) with its character at home and its workers out,
- * and the encounter tokens down. With no faction to start there, just the map.
+ * and the encounter tokens down. Each also shows a mech and its four structures
+ * (see withSamplePieces). With no faction to start there, just the map.
  */
 export function mapStart(board: Board, factions: Faction[], mats: PlayerMat[], encounters?: EncounterCard[]): GameState {
   const seated = factions.filter((f, i) => board.homeBases[f.homeBase] && factions.findIndex((g) => g.homeBase === f.homeBase) === i);
   const sorted = [...mats].sort((a, b) => a.turnOrder - b.turnOrder);
   const players = seated.slice(0, sorted.length).map((faction, i) => ({ faction, mat: sorted[i]! }));
-  if (players.length) return newGame({ seed: 1, board, players, ...(encounters?.length && { encounters }) });
+  if (players.length) return withSamplePieces(newGame({ seed: 1, board, players, ...(encounters?.length && { encounters }) }));
   // No one to start: a game needs a player, so set one aside afterwards.
   const stand = factions[0] && sorted[0] && Object.keys(board.homeBases)[0];
   if (!stand) throw new Error('a map to show needs a faction, a mat and a home base');
   const game = newGame({ seed: 1, board, players: [{ faction: { ...factions[0]!, homeBase: stand }, mat: sorted[0]! }], ...(encounters?.length && { encounters }) });
   return { ...game, players: [] };
+}
+
+/** The hexes of a map, nearest a home base first. */
+function nearestHexes(board: Board, homeBase: string): HexId[] {
+  const seen = new Set<HexId>(board.homeBases[homeBase] ?? []);
+  for (const hex of seen) for (const next of board.adjacent[hex] ?? []) seen.add(next);
+  return [...seen];
+}
+
+/**
+ * Only for looking at (not a position a game could reach this early): so the
+ * map shows what every faction's pieces look like, each has a mech beside its
+ * workers and its four structures close to home. Structures take turns picking
+ * the nearest hex the rules let them build on, clear of the workers. A map with
+ * no room left just shows fewer.
+ */
+function withSamplePieces(game: GameState): GameState {
+  const { board } = game.setup;
+  const taken = new Set<string>(game.players.flatMap((p) => p.workers));
+  const order = game.setup.players.map((p) => nearestHexes(board, p.faction.homeBase).filter((h) => board.hexes[h] && board.hexes[h].terrain !== 'lake' && board.hexes[h].terrain !== 'factory'));
+  const structures = game.players.map((): Partial<Record<Structure, HexId>> => ({}));
+  for (const structure of STRUCTURES) {
+    order.forEach((hexes, seat) => {
+      const hex = hexes.find((h) => !taken.has(h));
+      if (!hex) return;
+      taken.add(hex);
+      structures[seat]![structure] = hex;
+    });
+  }
+  return { ...game, players: game.players.map((p, seat) => ({ ...p, mechs: p.workers.slice(0, 1), structures: structures[seat]! })) };
 }
 
 const NAMES = { move: 'Move', trade: 'Trade', produce: 'Produce', bolster: 'Bolster', upgrade: 'Upgrade', deploy: 'Deploy', build: 'Build', enlist: 'Enlist' } as const;
