@@ -17,8 +17,9 @@
   import FightBackdrop from '../play/FightBackdrop.svelte';
   import FighterArt from '../play/FighterArt.svelte';
   import { inkOn } from '../play/ink';
+  import type { SkinWords } from '../skins/skin';
 
-  let { catalog, builtIn, board, look, onBack }: { catalog: Catalog; builtIn: Catalog; board: BoardData; look: BoardLook; onBack: () => void } = $props();
+  let { catalog, builtIn, board, look, words, onBack }: { catalog: Catalog; builtIn: Catalog; board: BoardData; look: BoardLook; words: SkinWords; onBack: () => void } = $props();
 
   let kind = $state<CodexKind>('maps');
   let index = $state(0);
@@ -133,6 +134,7 @@
           {:else if faction}
             {@const f = factionFacts(faction, board)}
             {@const portrait = factionPicture(faction.id, 'portrait')}
+            {@const lore = words.factions[faction.id]?.lore}
             <div class="faction" style:--c={faction.color} style:--ink={inkOn(faction.color)}>
               <div class="hero">
                 <FightBackdrop terrain={f.terrain} picture={scene} />
@@ -161,6 +163,24 @@
                     </div>
                   </div>
                 </div>
+                <!-- Their story, from the skin in use: only what's been written. -->
+                {#if lore?.characterName || lore?.characterBio}
+                  <div class="box lore">
+                    <h3>The character</h3>
+                    {#if lore.characterName}<p class="who-name">{lore.characterName}</p>{/if}
+                    {#if lore.characterBio}<p>{lore.characterBio}</p>{/if}
+                  </div>
+                {/if}
+                {#if lore?.capital || lore?.history || lore?.goals}
+                  <div class="box lore">
+                    {#if lore.capital}<h3>Capital city</h3><p>{lore.capital}</p>{/if}
+                    {#if lore.history}<h3>History</h3><p>{lore.history}</p>{/if}
+                    {#if lore.goals}<h3>Goals</h3><p>{lore.goals}</p>{/if}
+                  </div>
+                {/if}
+                {#if !lore}
+                  <p class="dim">No story written yet. Add the character's name and bio and the faction's capital city, history and goals in Workshop → Faction editor.</p>
+                {/if}
                 <div class="box">
                   <h3>Mech abilities</h3>
                   <div class="grid2">
@@ -415,6 +435,17 @@
   }
   .box.ability {
     border-left: 3px solid var(--c);
+  }
+  /* Written text: line breaks stay as typed. */
+  .lore p {
+    white-space: pre-line;
+  }
+  .lore h3:not(:first-child) {
+    margin-top: 8px;
+  }
+  .who-name {
+    font-size: 15px;
+    font-weight: 700;
   }
   .grid2 {
     display: grid;

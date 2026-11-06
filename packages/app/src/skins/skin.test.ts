@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { baseFactions, baseMats } from '@scythe/content';
 import { BUILT_IN } from '../content/catalog';
 import { DEFAULT_THEME, setPicture } from '../theme/theme';
-import { applyWords, cardsToShare, freeName, newSkin, ORIGINAL, parseSkinCards, parseSkinFile, skinFileName, skinFileText, useSkinCards, type Skin } from './skin';
+import { applyWords, cardsToShare, freeName, LORE_MAX, newSkin, ORIGINAL, parseSkinCards, parseSkinFile, skinFileName, skinFileText, useSkinCards, type Skin } from './skin';
 import { EMPTY_LIBRARY } from '../content/library';
 
 const nordic = baseFactions[0]!;
@@ -85,6 +85,26 @@ describe('skins', () => {
     const skin = parseSkinFile(text, 'z');
     expect(skin.theme.pictures).toEqual({});
     expect(skin.words).toEqual({ factions: { nordic: { ability: { name: 'Fine' }, mechAbilities: [{ name: 'A' }, {}] } }, mats: { m: { name: 'M' } }, maps: {} });
+  });
+
+  it("keeps a faction's story in the file: only its own parts, as plain text, within their lengths, with line breaks", () => {
+    const lore = { characterName: 'Ingrid', characterBio: 'First.\nSecond.', capital: 'Harrowhold', history: 'Long ago.', goals: 'Hold the north.' };
+    const skin: Skin = { id: 'x', name: 'Lore', theme: DEFAULT_THEME, words: { factions: { nordic: { lore } }, mats: {}, maps: {} } };
+    expect(parseSkinFile(skinFileText(skin), 'y').words.factions.nordic).toEqual({ lore });
+
+    const odd = JSON.stringify({
+      format: 'scythe-skin',
+      words: { factions: { a: { lore: { characterName: 'N'.repeat(100), history: 'H'.repeat(5000), capital: 7, power: 99 } }, b: { name: 'B', lore: { capital: '  ' } }, c: { name: 'C', lore: 'junk' } } },
+    });
+    const { a, b, c } = parseSkinFile(odd, 'z').words.factions;
+    expect(a!.lore).toEqual({ characterName: 'N'.repeat(60), history: 'H'.repeat(LORE_MAX) });
+    expect(b).toEqual({ name: 'B' });
+    expect(c).toEqual({ name: 'C' });
+  });
+
+  it('a story changes nothing in the catalog the game uses', () => {
+    const lore = { factions: { nordic: { lore: { capital: 'Harrowhold' } } }, mats: {}, maps: {} };
+    expect(applyWords(BUILT_IN, lore).factions).toEqual(BUILT_IN.factions);
   });
 
   it("says plainly when a file isn't a skin", () => {

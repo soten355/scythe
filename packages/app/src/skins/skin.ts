@@ -22,12 +22,41 @@ export interface AbilityWords {
   description?: string;
 }
 
+/** A faction's story, only for reading in the Codex: who its character is, and its capital city, history and goals. */
+export interface FactionLore {
+  characterName?: string;
+  characterBio?: string;
+  capital?: string;
+  history?: string;
+  goals?: string;
+}
+
+/** The parts of a faction's story, as the editors ask for them. */
+export const LORE_CARDS: { title: string; fields: { key: keyof FactionLore; label: string; long: boolean }[] }[] = [
+  {
+    title: 'The character',
+    fields: [
+      { key: 'characterName', label: 'Name', long: false },
+      { key: 'characterBio', label: 'Bio', long: true },
+    ],
+  },
+  {
+    title: 'The faction',
+    fields: [
+      { key: 'capital', label: 'Capital city', long: false },
+      { key: 'history', label: 'History', long: true },
+      { key: 'goals', label: 'Goals', long: true },
+    ],
+  },
+];
+
 export interface FactionWords {
   name?: string;
   color?: string;
   ability?: AbilityWords;
   /** The four mech abilities, in order. */
   mechAbilities?: AbilityWords[];
+  lore?: FactionLore;
 }
 
 export interface SkinWords {
@@ -97,8 +126,10 @@ const FORMAT = 'scythe-skin';
 const FORMAT_VERSION = 1;
 const COLOR = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
 /** Longest name or wording kept from a file. */
-const NAME_MAX = 60;
+export const NAME_MAX = 60;
 const TEXT_MAX = 600;
+/** Longest bio, history or goals (the editors stop there too). */
+export const LORE_MAX = 3000;
 
 /** Card decks that can travel with a skin: the player's own, with the encounter cards' pictures. */
 export interface SkinCards {
@@ -149,6 +180,16 @@ function readAbility(v: unknown): AbilityWords {
   return { ...(name && { name }), ...(description && { description }) };
 }
 
+function readLore(v: unknown): FactionLore | undefined {
+  if (!isRecord(v)) return undefined;
+  const lore: FactionLore = {};
+  for (const { key, long } of LORE_CARDS.flatMap((c) => c.fields)) {
+    const said = text(v[key], long ? LORE_MAX : NAME_MAX);
+    if (said) lore[key] = said;
+  }
+  return Object.keys(lore).length ? lore : undefined;
+}
+
 /** Words from plain data, keeping only names, colours and wording, as plain text. */
 export function readWords(data: unknown): SkinWords {
   const words: SkinWords = { factions: {}, mats: {}, maps: {} };
@@ -159,7 +200,8 @@ export function readWords(data: unknown): SkinWords {
     const color = typeof v.color === 'string' && COLOR.test(v.color) ? v.color : undefined;
     const ability = isRecord(v.ability) ? readAbility(v.ability) : undefined;
     const mechAbilities = Array.isArray(v.mechAbilities) ? v.mechAbilities.slice(0, 4).map(readAbility) : undefined;
-    words.factions[id] = { ...(name && { name }), ...(color && { color }), ...(ability && { ability }), ...(mechAbilities && { mechAbilities }) };
+    const lore = readLore(v.lore);
+    words.factions[id] = { ...(name && { name }), ...(color && { color }), ...(ability && { ability }), ...(mechAbilities && { mechAbilities }), ...(lore && { lore }) };
   }
   for (const kind of ['mats', 'maps'] as const) {
     for (const [id, v] of Object.entries(isRecord(data[kind]) ? data[kind] : {})) {

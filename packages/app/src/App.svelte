@@ -238,7 +238,7 @@
 {#if screen === 'home'}
   <Home canContinue={resumable !== null} savedCount={saves.length} onContinue={() => resumable && play(resumable)} onNewGame={() => go('new')} onSaves={() => go('saves')} onCodex={() => go('codex')} onSkins={() => go('skins')} onWorkshop={() => go('workshop')} skinName={skin.name} />
 {:else if screen === 'codex'}
-  <Codex {catalog} {builtIn} board={builtIn.maps[0]!.board} {look} onBack={() => go('home')} />
+  <Codex {catalog} {builtIn} board={builtIn.maps[0]!.board} {look} words={skin.words} onBack={() => go('home')} />
 {:else if screen === 'skins'}
   <Skins index={skinIndex} factions={builtIn.factions} cards={ownCards} message={skinMessage} loadSkin={(id) => store.skin(id)} onUse={useSkin} onNew={makeSkin} onRename={renameSkin} onDelete={deleteSkin} onExport={exportSkinById} onImport={importSkin} onBack={() => go('home')} />
 {:else if screen === 'workshop'}

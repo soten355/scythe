@@ -12,8 +12,8 @@ import { SaveStore } from '../saves/store';
 import { BUILT_IN } from '../content/catalog';
 import { catalogWith } from '../content/library';
 import type { Catalog } from '../menu/setup';
-import { newSkin, ORIGINAL, type Skin, type SkinWords } from '../skins/skin';
-import { setAbilityWord, setFactionWord, setNameWord } from '../skins/words';
+import { LORE_CARDS, LORE_MAX, NAME_MAX, newSkin, ORIGINAL, type FactionLore, type Skin, type SkinWords } from '../skins/skin';
+import { setAbilityWord, setFactionWord, setLoreWord, setNameWord } from '../skins/words';
 import { factionSlot } from '../theme/theme';
 
 const store = new SaveStore();
@@ -68,6 +68,18 @@ function abilityCard(f: Faction, which: 'ability' | number) {
     </div>`;
 }
 
+/** The faction's story, for the Codex: its character, then the faction itself. */
+function loreCards(f: Faction) {
+  const lore = skin.words.factions[f.id]?.lore;
+  return LORE_CARDS.map(
+    (card) => `
+    <div class="card">
+      <h3>${esc(card.title)}</h3>
+      ${card.fields.map(({ key, label, long }) => `<label>${esc(label)}${field(`data-lore="${key}" maxlength="${long ? LORE_MAX : NAME_MAX}"`, lore?.[key], '', long)}</label>`).join('')}
+    </div>`,
+  ).join('');
+}
+
 function render() {
   if (skin.id === ORIGINAL.id) {
     root.innerHTML = `
@@ -106,6 +118,7 @@ function render() {
         <button data-act="usual-color" ${w.color ? '' : 'disabled'}>Usual colour</button>
         <span class="was">Originally ${esc(f.name)}</span>
       </div>
+      <div class="abilities">${loreCards(f)}</div>
       <div class="abilities">
         ${abilityCard(f, 'ability')}
         ${[0, 1, 2, 3].map((i) => abilityCard(f, i)).join('')}
@@ -150,6 +163,7 @@ root.addEventListener('change', async (e) => {
   const f = catalog.factions[selected]!;
   const v = el.value;
   if (el.dataset.faction) await keep((w) => setFactionWord(w, f.id, el.dataset.faction as 'name' | 'color', v));
+  else if (el.dataset.lore) await keep((w) => setLoreWord(w, f.id, el.dataset.lore as keyof FactionLore, v));
   else if (el.dataset.ability) {
     const which = el.dataset.ability === 'ability' ? 'ability' : Number(el.dataset.ability);
     await keep((w) => setAbilityWord(w, f.id, which, el.dataset.key as 'name' | 'description', v));

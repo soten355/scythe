@@ -63,6 +63,39 @@ input[type='color'] {
   opacity: 0.7;
 }
 
+/* The faction's story, for the Codex. */
+.story {
+  margin: 4px 10px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.story > h3 {
+  margin: 4px 0 0;
+  font-size: 0.95rem;
+}
+.story .note {
+  margin: 0;
+}
+.story-note {
+  color: var(--accent);
+}
+.story-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 8px;
+}
+.story-cards label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.story-cards input,
+.story-cards textarea {
+  width: 100%;
+  box-sizing: border-box;
+}
+
 /* Pictures: one row per slot, like the theme editor's. */
 .pictures {
   margin: 4px 10px 0;
