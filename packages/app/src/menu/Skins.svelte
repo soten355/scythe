@@ -229,6 +229,7 @@
     align-content: start;
   }
   .skin {
+    min-width: 0;
     background: var(--panel);
     border: 2px solid transparent;
     border-radius: 12px;
@@ -388,10 +389,19 @@
     gap: 8px;
   }
 
-  /* A phone held upright: one skin to a row. */
+  /* A phone held upright: one skin to a row, as wide as the screen, with faction names on two lines if need be. */
   @media (max-width: 600px) {
     .list {
-      grid-template-columns: 1fr;
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .crests {
+      gap: 2px;
+    }
+    .crest small {
+      font-size: 10px;
+      white-space: normal;
+      text-align: center;
+      overflow-wrap: anywhere;
     }
   }
 </style>

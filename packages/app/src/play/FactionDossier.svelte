@@ -72,7 +72,7 @@
       <div class="heading">
         <div class="crest"><FactionEmblem {faction} /></div>
         <FactionPortrait factionId={faction.id} color={d.color} size={72} />
-        <div>
+        <div class="title">
           <h2>{d.name}</h2>
           <p class="sub">{d.mat} mat (#{d.matNumber}) · {playedBy(seat)}</p>
           {#if leaning(seat)}<p class="leaning">{leaning(seat)}</p>{/if}
@@ -233,7 +233,9 @@
     align-items: center;
     overflow-x: auto;
   }
+  /* Tabs keep their width and the row scrolls sideways. */
   .tab {
+    flex: none;
     padding: 4px 12px;
     border-radius: 99px;
     border: 2px solid var(--t);
@@ -268,6 +270,10 @@
     gap: 10px;
     align-items: center;
     text-shadow: 0 2px 6px rgb(0 0 0 / 0.8);
+  }
+  .title {
+    min-width: 0;
+    overflow-wrap: break-word;
   }
   .crest {
     width: 64px;
@@ -550,6 +556,24 @@
   }
   .objective.ready b {
     color: #ffd75e;
+  }
+  /* A phone held sideways: a smaller crest and portrait, so a long name fits beside them. */
+  @container screen (max-height: 500px) {
+    .heading {
+      gap: 6px;
+    }
+    .crest {
+      width: 44px;
+      height: 44px;
+    }
+    .heading :global(.portrait) {
+      width: 48px;
+      height: 48px;
+    }
+    h2 {
+      font-size: 20px;
+      line-height: 1.1;
+    }
   }
   @media (prefers-reduced-motion: reduce) {
     .character,

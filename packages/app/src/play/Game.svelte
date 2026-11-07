@@ -635,7 +635,7 @@
     {:else}
       <!-- The encounter card: its story, then one button per option (greyed out when it can't be paid for). -->
       <div class="ask" role="dialog" aria-modal="true" style:--c={color(game.currentPlayer)}>
-        <div class="box encounter">
+        <div class="box encounter" class:with-picture={shown.picture}>
           <p class="heading"><b>⭐ {e.name}</b><span class="where">Encounter on {e.hex}</span></p>
           {#if shown.picture}
             <!-- The card's picture, with its story over the bottom when it shows both. -->
@@ -1235,6 +1235,7 @@
     margin: 0 0 6px;
   }
   .box.encounter {
+    box-sizing: border-box;
     width: min(640px, 94cqw);
     max-height: 92cqh;
     overflow-y: auto;
@@ -1254,7 +1255,6 @@
     font-style: italic;
     opacity: 0.85;
   }
-  /* A wide band: short enough to leave room for the options on a phone held sideways. */
   /* The picture whole, at 3:2, as tall as the screen allows. */
   .encounter .card-picture {
     position: relative;
@@ -1316,6 +1316,67 @@
   .encounter .row {
     display: flex;
     justify-content: space-between;
+  }
+  /* A phone held sideways: the card stays inside the safe margins. */
+  @container screen (max-height: 500px) {
+    .ask:has(.encounter) {
+      box-sizing: border-box;
+      padding: calc(var(--safe-top) + 4px) calc(var(--safe-right) + 4px) calc(var(--safe-bottom) + 4px) calc(var(--safe-left) + 4px);
+    }
+    .box.encounter {
+      width: min(760px, 100%);
+      max-height: 100%;
+      padding: 10px 12px;
+    }
+    .box.encounter .heading {
+      margin-bottom: 6px;
+    }
+    /* With a picture: the picture whole on the left, the options in a column on the right, all in view at once. */
+    .encounter.with-picture {
+      display: grid;
+      grid-template-columns: 46% minmax(0, 1fr);
+      grid-template-rows: auto auto 1fr;
+      grid-template-areas:
+        'heading note'
+        'picture options'
+        'row options';
+      column-gap: 12px;
+    }
+    .encounter.with-picture .heading {
+      grid-area: heading;
+      flex-wrap: wrap;
+      gap: 0 10px;
+    }
+    .encounter.with-picture .card-picture {
+      grid-area: picture;
+      width: 100%;
+      height: auto;
+      margin: 0 0 6px;
+    }
+    .encounter.with-picture .note {
+      grid-area: note;
+      margin-bottom: 6px;
+    }
+    .encounter.with-picture .options {
+      grid-area: options;
+      grid-template-columns: minmax(0, 1fr);
+      align-content: start;
+      gap: 6px;
+      margin: 0;
+    }
+    .encounter.with-picture .options button {
+      flex-flow: row wrap;
+      gap: 2px 12px;
+      padding: 7px 10px;
+    }
+    .encounter.with-picture .text,
+    .encounter.with-picture .why {
+      flex-basis: 100%;
+    }
+    .encounter.with-picture .row {
+      grid-area: row;
+      align-self: end;
+    }
   }
   .back-to-card {
     position: fixed;
