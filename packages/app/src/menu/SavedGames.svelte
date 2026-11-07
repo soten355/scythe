@@ -180,4 +180,15 @@
     border-color: transparent;
     color: var(--accent);
   }
+
+  /* A phone held upright: a game's buttons on their own line, under its name. */
+  @media (max-width: 600px) {
+    li {
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+    .what {
+      flex-basis: calc(100% - 70px);
+    }
+  }
 </style>

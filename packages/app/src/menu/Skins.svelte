@@ -387,4 +387,11 @@
     justify-content: flex-end;
     gap: 8px;
   }
+
+  /* A phone held upright: one skin to a row. */
+  @media (max-width: 600px) {
+    .list {
+      grid-template-columns: 1fr;
+    }
+  }
 </style>

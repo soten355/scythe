@@ -250,7 +250,7 @@
 {/if}
 
 {#if current}
-  <div class:hidden={screen !== 'game'}>
+  <div class="game-frame" class:hidden={screen !== 'game'}>
     {#key current.key}
       <Game save={current.save} onSave={persist} onNewGame={() => go('new')} onMenu={() => go('home')} {look} />
     {/key}
@@ -260,6 +260,31 @@
 <style>
   .hidden {
     display: none;
+  }
+  /* The game: always laid out sideways. Its sizes and phone rules measure this frame. */
+  .game-frame {
+    container: screen / size;
+    position: fixed;
+    inset: 0;
+  }
+  /*
+   * iPhones won't let a web app lock its rotation, so on a phone held upright the
+   * frame is drawn a quarter turn round, sideways however the phone is held. Its
+   * left edge lies along the phone's top, so the safe margins go round with it.
+   * Keep the rule's condition in step with play/frame.ts.
+   */
+  @media (orientation: portrait) and (pointer: coarse) and (max-width: 600px) {
+    .game-frame {
+      inset: 0 auto auto 0;
+      width: 100dvh;
+      height: 100vw;
+      transform-origin: top left;
+      transform: translateX(100vw) rotate(90deg);
+      --safe-top: calc(env(safe-area-inset-right) + 18px);
+      --safe-right: env(safe-area-inset-bottom);
+      --safe-bottom: env(safe-area-inset-left);
+      --safe-left: env(safe-area-inset-top);
+    }
   }
   .menu-picture {
     position: fixed;

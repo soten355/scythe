@@ -284,6 +284,7 @@
 
 <style>
   .codex {
+    container: screen / size;
     position: fixed;
     inset: 0;
     display: flex;
@@ -308,7 +309,9 @@
     min-width: 0;
     overflow-x: auto;
   }
+  /* Tabs keep their width and the row scrolls sideways. */
   .tab {
+    flex: none;
     white-space: nowrap;
   }
   button {
@@ -765,5 +768,77 @@
   }
   .paper .big {
     font-size: 17px;
+  }
+
+  /* A phone held upright: thin arrows, and each page stacked in one column that scrolls as a whole. */
+  @media (max-width: 600px) {
+    main {
+      gap: 2px;
+      padding: 0 2px;
+    }
+    .arrow {
+      width: 24px;
+      font-size: 20px;
+      background: none;
+      border-color: transparent;
+    }
+    footer {
+      flex-wrap: wrap;
+    }
+    footer select {
+      max-width: 60%;
+    }
+    .where {
+      white-space: nowrap;
+    }
+    .sample {
+      margin-left: 0;
+      font-size: 12px;
+    }
+    .map,
+    .faction {
+      flex-direction: column;
+      height: auto;
+    }
+    .map .board {
+      flex: none;
+      height: min(100vw, 55vh);
+    }
+    .map .facts {
+      flex: none;
+      width: auto;
+    }
+    .facts {
+      flex: none;
+      overflow-y: visible;
+    }
+    .hero {
+      width: auto;
+      height: min(80vw, 40vh);
+    }
+    .intro {
+      flex-direction: column;
+      align-items: center;
+    }
+    .intro-text {
+      align-self: stretch;
+      flex: none;
+    }
+    .grid2 {
+      grid-template-columns: 1fr;
+    }
+    .named {
+      flex-wrap: wrap;
+    }
+    .sections {
+      grid-template-columns: 1fr 1fr;
+    }
+    .options {
+      grid-template-columns: 1fr;
+    }
+    .card-picture {
+      width: 100%;
+      height: auto;
+    }
   }
 </style>

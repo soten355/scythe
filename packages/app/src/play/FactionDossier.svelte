@@ -207,7 +207,7 @@
     grid-template-rows: auto 1fr;
     background: var(--bg);
     overflow: hidden;
-    padding: var(--safe-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
   }
   .scene,
   .shade {
@@ -278,7 +278,7 @@
   h2 {
     margin: 0;
     font-family: var(--font-heading);
-    font-size: clamp(24px, 5vh, 38px);
+    font-size: clamp(24px, 5cqh, 38px);
     color: color-mix(in srgb, var(--c) 45%, white);
   }
   .sub,

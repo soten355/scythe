@@ -331,7 +331,7 @@
   .sun {
     left: 50%;
     top: 52%;
-    width: 22vh;
+    width: 22cqh;
     aspect-ratio: 1;
     transform: translate(-50%, -50%);
     border-radius: 50%;
@@ -417,7 +417,7 @@
     animation: fall linear infinite;
   }
   @keyframes fall {
-    to { transform: translate(-40px, 105vh); }
+    to { transform: translate(-40px, 105cqh); }
   }
 
   /* Mountain: alpenglow, drifting clouds, a circling bird. */
@@ -433,7 +433,7 @@
   }
   .clouds i {
     position: absolute;
-    height: 5vh;
+    height: 5cqh;
     border-radius: 50%;
     background: rgb(255 200 180 / 0.35);
     filter: blur(4px);
@@ -449,9 +449,9 @@
     animation: soar 18s ease-in-out infinite;
   }
   @keyframes soar {
-    25% { transform: translate(18vw, -4vh) scale(0.8); }
-    50% { transform: translate(34vw, 2vh) scale(0.6); }
-    75% { transform: translate(14vw, 6vh) scale(0.85); }
+    25% { transform: translate(18cqw, -4cqh) scale(0.8); }
+    50% { transform: translate(34cqw, 2cqh) scale(0.6); }
+    75% { transform: translate(14cqw, 6cqh) scale(0.85); }
   }
 
   /* Farm: golden evening, a turning windmill, swaying wheat. */
@@ -460,7 +460,7 @@
   }
   .farm .sun {
     top: 56%;
-    width: 30vh;
+    width: 30cqh;
     background: radial-gradient(#fff6d8, #ffc860 50%, transparent 70%);
   }
   .blades {
@@ -536,7 +536,7 @@
   @keyframes float {
     0% { opacity: 0; transform: translate(0, 0); }
     15% { opacity: 1; }
-    100% { opacity: 0; transform: translate(30px, -80vh); }
+    100% { opacity: 0; transform: translate(30px, -80cqh); }
   }
 
   @keyframes drift {

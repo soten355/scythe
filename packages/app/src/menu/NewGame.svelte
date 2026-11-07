@@ -438,4 +438,51 @@
     padding: 3px 6px;
     max-width: 160px;
   }
+
+  /* A phone held upright: one column that scrolls as a whole, with the seats after the map and players. */
+  @media (max-width: 600px) {
+    header {
+      flex-wrap: wrap;
+    }
+    .skin {
+      order: 1;
+      flex-basis: 100%;
+      margin-left: 0;
+    }
+    .skin select {
+      flex: 1;
+      max-width: none;
+    }
+    .columns {
+      flex-direction: column;
+      overflow-y: auto;
+    }
+    .col:first-child {
+      display: contents;
+    }
+    .col:first-child > section:nth-child(3) {
+      order: 1;
+    }
+    .seats {
+      flex: none;
+      overflow-y: visible;
+    }
+    .counts button {
+      flex: 1;
+      width: auto;
+      padding: 10px 0;
+    }
+    .picks label {
+      width: 100%;
+    }
+    .picks label span {
+      flex: none;
+      width: 62px;
+    }
+    .picks select {
+      flex: 1;
+      min-width: 0;
+      padding: 6px 4px;
+    }
+  }
 </style>

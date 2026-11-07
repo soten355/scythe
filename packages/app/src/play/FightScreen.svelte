@@ -170,7 +170,7 @@
   }
   .undo {
     position: absolute;
-    left: calc(env(safe-area-inset-left) + 8px);
+    left: calc(var(--safe-left) + 8px);
   }
   .side {
     position: absolute;
@@ -182,10 +182,10 @@
     z-index: 1;
   }
   .side.left {
-    left: env(safe-area-inset-left);
+    left: var(--safe-left);
   }
   .side.right {
-    right: env(safe-area-inset-right);
+    right: var(--safe-right);
     flex-direction: row-reverse;
   }
   .figures {
@@ -281,7 +281,7 @@
   .tray {
     position: absolute;
     left: 50%;
-    bottom: calc(env(safe-area-inset-bottom) + 6px);
+    bottom: calc(var(--safe-bottom) + 6px);
     transform: translateX(-50%);
     z-index: 3;
     width: min(460px, 60%);

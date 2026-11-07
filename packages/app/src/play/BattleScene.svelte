@@ -144,11 +144,11 @@
   }
   /* Room at the edge for those standing behind the lead. */
   .slot.left {
-    left: env(safe-area-inset-left);
+    left: var(--safe-left);
     transform: translateX(calc(var(--n) * 24%));
   }
   .slot.right {
-    right: env(safe-area-inset-right);
+    right: var(--safe-right);
     transform: translateX(calc(var(--n) * -24%));
   }
   .member {
@@ -248,7 +248,7 @@
   /* The tallies, on the ground below each side. */
   .tally {
     position: absolute;
-    bottom: calc(env(safe-area-inset-bottom) + 22px);
+    bottom: calc(var(--safe-bottom) + 22px);
     padding: 6px 12px;
     border-radius: 8px;
     background: rgb(20 14 10 / 0.65);
@@ -257,11 +257,11 @@
     z-index: 6;
   }
   .tally.left {
-    left: calc(env(safe-area-inset-left) + 12px);
+    left: calc(var(--safe-left) + 12px);
     border-left: 3px solid var(--c);
   }
   .tally.right {
-    right: calc(env(safe-area-inset-right) + 12px);
+    right: calc(var(--safe-right) + 12px);
     border-right: 3px solid var(--c);
     text-align: right;
   }
@@ -327,7 +327,7 @@
     position: absolute;
     left: 50%;
     top: 42%;
-    width: 60vh;
+    width: 60cqh;
     aspect-ratio: 1;
     transform: translate(-50%, -50%);
     border-radius: 50%;
@@ -344,8 +344,8 @@
     position: absolute;
     left: 50%;
     top: 46%;
-    width: 80vh;
-    height: 60vh;
+    width: 80cqh;
+    height: 60cqh;
     transform: translate(-50%, -50%);
     z-index: 4;
     pointer-events: none;
@@ -354,7 +354,7 @@
     position: absolute;
     left: calc(50% + var(--x));
     top: calc(50% + var(--y));
-    width: calc(var(--s) * 34vh);
+    width: calc(var(--s) * 34cqh);
     aspect-ratio: 1;
     translate: -50% -50%;
     border-radius: 50%;
@@ -374,7 +374,7 @@
     position: absolute;
     left: 0;
     right: 0;
-    bottom: calc(env(safe-area-inset-bottom) + 10px);
+    bottom: calc(var(--safe-bottom) + 10px);
     z-index: 5;
     padding: 6px 0 8px;
     text-align: center;
@@ -395,7 +395,7 @@
     color: var(--glow);
   }
   .who {
-    font-size: clamp(28px, 8vh, 60px);
+    font-size: clamp(28px, 8cqh, 60px);
     font-weight: 900;
     line-height: 1.05;
     color: #fff;
@@ -422,7 +422,7 @@
   }
   .skip {
     position: absolute;
-    bottom: calc(env(safe-area-inset-bottom) + 8px);
+    bottom: calc(var(--safe-bottom) + 8px);
     left: 0;
     right: 0;
     margin: 0;

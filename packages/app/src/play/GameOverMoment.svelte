@@ -80,9 +80,9 @@
     position: absolute;
     top: 42%;
     left: 50%;
-    width: 160vmax;
-    height: 160vmax;
-    margin: -80vmax 0 0 -80vmax;
+    width: 160cqmax;
+    height: 160cqmax;
+    margin: -80cqmax 0 0 -80cqmax;
     background: repeating-conic-gradient(from 0deg, rgb(255 233 168 / 0.09) 0deg 8deg, transparent 8deg 20deg);
     opacity: 0;
     animation:
@@ -90,8 +90,8 @@
       turn 30s linear infinite;
   }
   .big-star {
-    width: min(30vh, 30vw);
-    height: min(30vh, 30vw);
+    width: min(30cqh, 30cqw);
+    height: min(30cqh, 30cqw);
     z-index: 1;
     opacity: 0;
     animation: drop 0.75s cubic-bezier(0.3, 1.5, 0.5, 1) 0.15s forwards;
@@ -101,9 +101,9 @@
     position: absolute;
     top: 42%;
     left: 50%;
-    width: 40vmin;
-    height: 40vmin;
-    margin: -20vmin 0 0 -20vmin;
+    width: 40cqmin;
+    height: 40cqmin;
+    margin: -20cqmin 0 0 -20cqmin;
     border-radius: 50%;
     border: 3px solid #ffe9a8;
     opacity: 0;
@@ -131,7 +131,7 @@
   .title {
     z-index: 1;
     display: flex;
-    font-size: clamp(34px, 9vh, 72px);
+    font-size: clamp(34px, 9cqh, 72px);
     font-weight: 900;
     letter-spacing: 0.08em;
     color: #ffe9a8;
@@ -159,7 +159,7 @@
   }
   .tap {
     position: absolute;
-    bottom: calc(env(safe-area-inset-bottom) + 12px);
+    bottom: calc(var(--safe-bottom) + 12px);
     opacity: 0;
     animation: appear 0.5s ease-out 3.2s forwards;
   }
@@ -176,7 +176,7 @@
   @keyframes drop {
     0% {
       opacity: 0;
-      transform: translateY(-60vh) scale(2.2) rotate(-40deg);
+      transform: translateY(-60cqh) scale(2.2) rotate(-40deg);
     }
     60% {
       opacity: 1;

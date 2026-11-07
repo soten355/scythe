@@ -19,6 +19,7 @@
   import { battleOf, type Battle } from './fight';
   import { fade } from 'svelte/transition';
   import { guide } from './camera';
+  import { frameRect } from './frame';
   import { showMoment, type Moment } from './fly';
   import { inkOn } from './ink';
   import { BONUS_ICONS, ENCOUNTER_CARD_ICON, RECRUIT_ICON, RESOURCE_ICONS, STAR_ICON, STAR_KIND_ICONS, type Icon } from './icons';
@@ -330,8 +331,8 @@
 
   /** Scroll so all of `el` shows if it fits, otherwise its top. */
   function showInPanel(panel: HTMLElement, el: Element) {
-    const box = panel.getBoundingClientRect();
-    const r = el.getBoundingClientRect();
+    const box = frameRect(panel);
+    const r = frameRect(el);
     let by = 0;
     if (r.height > box.height || r.top < box.top) by = r.top - box.top;
     else if (r.bottom > box.bottom) by = r.bottom - box.bottom;
@@ -734,7 +735,7 @@
     inset: 0;
     display: flex;
     flex-direction: column;
-    padding: var(--safe-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
   }
   header {
     display: flex;
@@ -749,10 +750,12 @@
     cursor: pointer;
   }
   /* As tall as the other top-bar buttons on a phone held sideways. */
-  @media (pointer: coarse) and (max-height: 500px) {
-    .menu {
-      min-height: 38px;
-      min-width: 44px;
+  @media (pointer: coarse) {
+    @container screen (max-height: 500px) {
+      .menu {
+        min-height: 38px;
+        min-width: 44px;
+      }
     }
   }
   .menu-backdrop {
@@ -765,7 +768,7 @@
   .menu-list {
     position: fixed;
     top: calc(var(--safe-top) + 30px);
-    left: calc(env(safe-area-inset-left) + 6px);
+    left: calc(var(--safe-left) + 6px);
     z-index: 31;
     display: flex;
     flex-direction: column;
@@ -964,7 +967,7 @@
     margin-top: 4px;
   }
   .stories .list {
-    max-height: 60vh;
+    max-height: 60cqh;
     overflow-y: auto;
     text-align: left;
   }
@@ -1045,7 +1048,7 @@
     justify-content: center;
   }
   .box {
-    width: min(340px, 90vw);
+    width: min(340px, 90cqw);
     padding: 16px;
     border: 2px solid var(--c);
     border-radius: 10px;
@@ -1232,8 +1235,8 @@
     margin: 0 0 6px;
   }
   .box.encounter {
-    width: min(640px, 94vw);
-    max-height: 92vh;
+    width: min(640px, 94cqw);
+    max-height: 92cqh;
     overflow-y: auto;
   }
   .encounter .heading {
@@ -1256,7 +1259,7 @@
   .encounter .card-picture {
     position: relative;
     aspect-ratio: 3 / 2;
-    height: clamp(120px, 44vh, 400px);
+    height: clamp(120px, 44cqh, 400px);
     max-width: 100%;
     margin: 0 auto 8px;
     border-radius: 8px;

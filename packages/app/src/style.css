@@ -23,6 +23,9 @@
  */
 :root {
   --safe-top: env(safe-area-inset-top);
+  --safe-right: env(safe-area-inset-right);
+  --safe-bottom: env(safe-area-inset-bottom);
+  --safe-left: env(safe-area-inset-left);
 }
 @media (pointer: coarse) and (max-height: 500px) {
   :root {
@@ -64,8 +67,8 @@ select {
   touch-action: manipulation;
 }
 
-/* Top-bar buttons big enough for a thumb on a phone held sideways (a link gets its height as a box). */
-@media (pointer: coarse) and (max-height: 500px) {
+/* Top-bar buttons big enough for a thumb on a phone, held either way (a link gets its height as a box). */
+@media (pointer: coarse) and (max-height: 500px), (pointer: coarse) and (max-width: 600px) {
   header button,
   header a,
   header select,
@@ -88,23 +91,4 @@ h1 {
   margin: 0;
   color: var(--accent);
   font-weight: 600;
-}
-
-/* iOS ignores the manifest's orientation lock, so cover the app in portrait. */
-#rotate-hint {
-  display: none;
-}
-
-@media (orientation: portrait) {
-  #rotate-hint {
-    position: fixed;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--bg);
-    color: var(--fg);
-    font-size: 1.2rem;
-    z-index: 1000;
-  }
 }

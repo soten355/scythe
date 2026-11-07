@@ -1,5 +1,6 @@
 // Big moments over the map: a large icon pinned in the middle, then flown to
 // where it belongs.
+import { frameRect, gameFrame } from './frame';
 import type { Icon } from './icons';
 import { inkOn } from './ink';
 import { MECH_PARTS } from './shapes';
@@ -92,14 +93,14 @@ function sideElement(side: Side): HTMLElement {
 }
 
 const isShown = (el: Element | null) => {
-  const r = el?.getBoundingClientRect();
-  return !!r && r.width > 0 && r.bottom > 0 && r.top < innerHeight;
+  const r = el && frameRect(el);
+  return !!r && r.width > 0 && r.bottom > 0 && r.top < (gameFrame()?.clientHeight ?? innerHeight);
 };
 const onScreen = (selectors: string[]) => selectors.map((s) => document.querySelector(s)).find(isShown) ?? null;
 
 /** `right`, `down`: how far right of and below the middle to pin it, in the big icon's size. */
 async function pin(el: Element, over: Element, target: Element | null, parts?: Element[], right = 0, down = 0): Promise<void> {
-  const box = over.getBoundingClientRect();
+  const box = frameRect(over);
   const size = Math.min(110, box.height * 0.35);
   const [cx, cy] = [box.left + box.width / 2 + right * size, box.top + box.height / 2 + down * size];
   Object.assign((el as HTMLElement).style, {
@@ -112,15 +113,15 @@ async function pin(el: Element, over: Element, target: Element | null, parts?: E
     pointerEvents: 'none',
     filter: 'drop-shadow(0 6px 12px rgb(0 0 0 / 0.5))',
   });
-  document.body.append(el);
+  (gameFrame() ?? document.body).append(el);
   // A target that isn't on screen (a closed drawer, say): just fade out in place.
-  const to = target?.getBoundingClientRect();
+  const to = target ? frameRect(target) : undefined;
   const visible = to && isShown(target);
   const [dx, dy] = visible ? [to.left + to.width / 2 - cx, to.top + to.height / 2 - cy] : [0, 0];
   const at = (x: number, y: number, scale: number) => `translate(-50%, -50%) translate(${x}px, ${y}px) scale(${scale})`;
   // A piece on the map: end at its size there.
   const onMap = target instanceof SVGElement;
-  const end = !visible ? 0.6 : onMap ? to.width / el.getBoundingClientRect().width : 0.18;
+  const end = !visible ? 0.6 : onMap ? to.width / frameRect(el).width : 0.18;
   // The piece on the map waits under the big one until it lands.
   if (onMap) target.style.visibility = 'hidden';
 

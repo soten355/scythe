@@ -5,7 +5,7 @@ items (`- [ ]` → `- [x]`) as they're completed.**
 
 ## Goal
 Personal offline PWA of Scythe (base game; Invaders from Afar later, in Phase 5) for iPhone
-(landscape only) and Mac browser. Clean and functional first; animation,
+(the game always shows in landscape, however the phone is held; the menus work either way up) and Mac browser. Clean and functional first; animation,
 sound and 3D later.
 
 ## Repo layout

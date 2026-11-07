@@ -16,6 +16,7 @@
   import { tick, untrack } from 'svelte';
   import type { Travel } from './travel';
   import { between, fitView, panBy, worldOf, zoomAt, type Limits, type View } from './camera';
+  import { framePoint, frameRect } from './frame';
   import { boardArea, center, corners, HEX_HEIGHT, HEX_VIEWBOX, HEX_WIDTH, points, sharedEdge, SIZE, spotsArea, type Point } from './geometry';
   import HexIcon from './HexIcon.svelte';
   import CrestDrawn from './CrestDrawn.svelte';
@@ -142,10 +143,10 @@
   }
 
   let svg: SVGSVGElement | undefined = $state();
-  /** The board point under a spot on the screen. */
-  function toWorld(clientX: number, clientY: number): Point {
-    const r = svg!.getBoundingClientRect();
-    return worldOf(shownView, [(clientX - r.left) / r.width, (clientY - r.top) / r.height]);
+  /** The board point under a spot, given as the game sees it (see frame.ts). */
+  function toWorld(x: number, y: number): Point {
+    const r = frameRect(svg!);
+    return worldOf(shownView, [(x - r.left) / r.width, (y - r.top) / r.height]);
   }
 
   // Wheel or trackpad: zoom around the pointer. (Added by hand so it can stop the page scrolling.)
@@ -158,7 +159,7 @@
       const dy = e.deltaY * (e.deltaMode === 1 ? 16 : 1);
       // A trackpad pinch arrives as a wheel with ctrlKey and small steps.
       const factor = Math.exp(dy * (e.ctrlKey ? 0.01 : 0.0015));
-      view = zoomAt(shownView, factor, toWorld(e.clientX, e.clientY), aspect, limits);
+      view = zoomAt(shownView, factor, toWorld(...framePoint(el, e.clientX, e.clientY)), aspect, limits);
     };
     el.addEventListener('wheel', onWheel, { passive: false });
     return () => el.removeEventListener('wheel', onWheel);
@@ -171,7 +172,7 @@
   function down(e: PointerEvent) {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     cancelAnimationFrame(anim);
-    pointers.set(e.pointerId, [e.clientX, e.clientY]);
+    pointers.set(e.pointerId, framePoint(e.currentTarget as Element, e.clientX, e.clientY));
     if (pointers.size === 1) {
       travelled = 0;
       dragged = false;
@@ -180,8 +181,8 @@
   function move(e: PointerEvent) {
     const prev = pointers.get(e.pointerId);
     if (!prev || !svg) return;
-    const now: Point = [e.clientX, e.clientY];
-    const r = svg.getBoundingClientRect();
+    const now = framePoint(svg, e.clientX, e.clientY);
+    const r = frameRect(svg);
     const perPixel = shownView.w / r.width;
     if (pointers.size === 1) {
       travelled += Math.hypot(now[0] - prev[0], now[1] - prev[1]);
@@ -794,9 +795,11 @@
     gap: 6px;
   }
   /* A phone held sideways: in a row along the bottom, clear of the round and bonus cards above. */
-  @media (pointer: coarse) and (max-height: 500px) {
-    .zoom {
-      flex-direction: row;
+  @media (pointer: coarse) {
+    @container screen (max-height: 500px) {
+      .zoom {
+        flex-direction: row;
+      }
     }
   }
   .zoom button {
