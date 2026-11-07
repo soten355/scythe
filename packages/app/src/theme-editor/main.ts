@@ -7,6 +7,7 @@
 // at once and used by the game the next time it opens; themes can be saved
 // to a file and opened on another device. Plain DOM, no framework; shares
 // its look with the other editors.
+import '../shared/fill-screen';
 import type { Terrain } from '@scythe/engine';
 import '../shared/forms.css';
 import './theme-editor.css';

@@ -2,6 +2,7 @@
 // conditions, all of which must hold), then add it to the game or save it to
 // a file. Plain DOM, no framework; shares its look with the other card
 // editors.
+import '../shared/fill-screen';
 import { OBJECTIVE_PROGRESS, OBJECTIVE_STATS, OBJECTIVE_UNITS, RESOURCES, type ObjectiveCard, type ObjectiveCheck, type Resource } from '@scythe/engine';
 import '../shared/forms.css';
 import '../faction-editor/faction-editor.css';

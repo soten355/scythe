@@ -1,3 +1,4 @@
+import './shared/fill-screen';
 import { mount } from 'svelte';
 import { registerSW } from 'virtual:pwa-register';
 import './style.css';

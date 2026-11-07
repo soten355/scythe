@@ -1,4 +1,5 @@
 // play.html (older links and home-screen icons) opens the same app as index.html.
+import '../shared/fill-screen';
 import { mount } from 'svelte';
 import { registerSW } from 'virtual:pwa-register';
 import '../style.css';

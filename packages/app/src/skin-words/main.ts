@@ -4,6 +4,7 @@
 // does in the game (the rules never change, only the words). A blank keeps
 // the original. Every change is kept on this device at once. Plain DOM, no
 // framework; shares its look with the other editors.
+import '../shared/fill-screen';
 import type { Faction } from '@scythe/engine';
 import '../shared/forms.css';
 import './skin-words.css';

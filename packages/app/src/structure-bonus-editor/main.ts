@@ -2,6 +2,7 @@
 // about your structures, and the coins for each step), then add them to the
 // game or save them to a file. Plain DOM, no framework; shares its look with
 // the card editors.
+import '../shared/fill-screen';
 import { STRUCTURE_FEATURES, type StructureCount, type Terrain } from '@scythe/engine';
 import { baseStructureBonuses } from '@scythe/content';
 import '../shared/forms.css';

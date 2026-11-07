@@ -1,5 +1,6 @@
 // Player mat editor: enter or design player mats, then export them as data
 // for packages/content. Plain DOM, no framework.
+import '../shared/fill-screen';
 import { baseMats } from '@scythe/content';
 import {
   BOTTOM_ACTIONS,

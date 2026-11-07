@@ -2,6 +2,7 @@
 // part, pay this to gain that, and its bottom part, a move), then add it to
 // the game or save it to a file. Plain DOM, no framework; shares its look
 // with the encounter card editor.
+import '../shared/fill-screen';
 import { RESOURCES, type BottomActionType, type FactoryCard } from '@scythe/engine';
 import '../shared/forms.css';
 import '../faction-editor/faction-editor.css';

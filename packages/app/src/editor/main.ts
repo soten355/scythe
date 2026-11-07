@@ -1,6 +1,7 @@
 // Map editor: paint terrain, markers, rivers and home bases onto a hex grid,
 // then export the layout text for packages/content. Plain DOM + SVG, no
 // framework (the UI framework hasn't been chosen yet).
+import '../shared/fill-screen';
 import { baseBoardLayout } from '@scythe/content';
 import { buildBoard } from '@scythe/engine';
 import { addToGame, ask, askText, tell } from '../shared/editor-utils';

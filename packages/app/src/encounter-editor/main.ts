@@ -3,6 +3,7 @@
 // add it to the game or save it to a file. Pictures are kept on the device
 // (the cards hold a short reference) and go in the deck's file. Plain DOM, no
 // framework.
+import '../shared/fill-screen';
 import { RESOURCES, type BottomActionType, type EncounterCard, type EncounterShow } from '@scythe/engine';
 import '../shared/forms.css';
 import '../faction-editor/faction-editor.css';

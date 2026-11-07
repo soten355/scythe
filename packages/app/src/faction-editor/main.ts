@@ -5,6 +5,7 @@
 // their rules here: their name, colour and wording go straight into the skin
 // in use (so the codex, new games and menus show them), and the rest is shown
 // as it is. Plain DOM, no framework.
+import '../shared/fill-screen';
 import { baseBoard, baseFactions } from '@scythe/content';
 import { MAX_POWER, RECRUIT_BONUSES, validateFaction, type Faction, type RecruitBonus } from '@scythe/engine';
 import '../shared/forms.css';

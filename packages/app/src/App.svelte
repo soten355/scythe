@@ -276,10 +276,11 @@
   @media (orientation: portrait) and (pointer: coarse) and (max-width: 600px) {
     .game-frame {
       inset: 0 auto auto 0;
-      width: 100dvh;
-      height: 100vw;
+      /* The real screen where it's known (shared/screen-fill.ts): iOS can report 100dvh short. */
+      width: var(--screen-height, 100dvh);
+      height: var(--screen-width, 100vw);
       transform-origin: top left;
-      transform: translateX(100vw) rotate(90deg);
+      transform: translateX(var(--screen-width, 100vw)) rotate(90deg);
       --safe-top: calc(env(safe-area-inset-right) + 18px);
       --safe-right: env(safe-area-inset-bottom);
       --safe-bottom: env(safe-area-inset-left);
