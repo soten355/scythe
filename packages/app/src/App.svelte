@@ -282,7 +282,8 @@
       transform-origin: top left;
       transform: translateX(var(--screen-width, 100vw)) rotate(90deg);
       --safe-top: calc(env(safe-area-inset-right) + 18px);
-      --safe-right: env(safe-area-inset-bottom);
+      /* The home bar's end: taps still work there, so only clear the screen's rounded corners. */
+      --safe-right: 8px;
       --safe-bottom: env(safe-area-inset-left);
       --safe-left: env(safe-area-inset-top);
     }
