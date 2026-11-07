@@ -16,6 +16,7 @@
   import { tick, untrack } from 'svelte';
   import type { Travel } from './travel';
   import { between, fitView, panBy, worldOf, zoomAt, type Limits, type View } from './camera';
+  import { bakeMap, type BakedMap } from './baked-map';
   import { framePoint, frameRect } from './frame';
   import { boardArea, center, corners, HEX_HEIGHT, HEX_VIEWBOX, HEX_WIDTH, points, sharedEdge, SIZE, spotsArea, type Point } from './geometry';
   import HexIcon from './HexIcon.svelte';
@@ -68,6 +69,38 @@
     const count = look.arts(terrain).length;
     return count ? `url(#art-${terrain}-${hexArtIndex(game.setup.seed, id, count)})` : look.fill(terrain);
   }
+  /** The hex art painted into one picture, which is far quicker to move (see baked-map.ts). Until it's ready, or if it can't be made, the hexes draw their own. */
+  let baked = $state.raw<BakedMap | null>(null);
+  /** What the painted picture shows, as text: the board can be rebuilt after every action, and only a real change repaints it. */
+  const bakeKey = $derived(`${game.setup.seed}|${Object.values(game.setup.board.hexes).map((h) => `${h.id},${h.q},${h.r},${h.terrain}`).join(';')}`);
+  $effect(() => {
+    void bakeKey;
+    if (!arts.length) return;
+    const behind = !look.background;
+    let gone = false;
+    let made: BakedMap | null = null;
+    untrack(() =>
+      bakeMap(
+        hexes
+          .filter((h) => look.arts(h.terrain).length)
+          .map((h) => {
+            const art = look.arts(h.terrain);
+            return { corners: corners(center(h)), url: art[hexArtIndex(game.setup.seed, h.id, art.length)]!, fill: behind ? look.fill(h.terrain) : undefined };
+          }),
+      ),
+    ).then(
+      (picture) => {
+        if (gone) URL.revokeObjectURL(picture.url);
+        else baked = made = picture;
+      },
+      () => {},
+    );
+    return () => {
+      gone = true;
+      baked = null;
+      if (made) URL.revokeObjectURL(made.url);
+    };
+  });
   const RESOURCE_COLOR: Record<Resource, string> = { oil: '#1b1b1b', metal: '#9aa3ad', wood: '#7a4a24', food: '#f0d54a' };
   const STRUCTURE_LETTER: Record<Structure, string> = { mine: 'Mi', mill: 'Ml', armory: 'Ar', monument: 'Mo' };
   /** The faction picture for each kind of unit. */
@@ -546,7 +579,7 @@
       <rect x={f.x + f.width - fx} y={f.y} width={fx} height={f.height} fill="url(#fade-left)" />
     </g>
   {/if}
-  {#if arts.length}
+  {#if arts.length && !baked}
     <defs>
       {#each arts as a (a.id)}
         <!-- The box is the hex's shape, so the picture is only ever cropped to fit, never stretched. -->
@@ -558,6 +591,9 @@
       {/each}
     </defs>
   {/if}
+  {#if baked}
+    <image href={baked.url} x={baked.x} y={baked.y} width={baked.width} height={baked.height} preserveAspectRatio="none" class="passive" />
+  {/if}
   {#each hexes as h (h.id)}
     {@const c = center(h)}
     {@const lit = prompt.highlights.has(h.id)}
@@ -565,7 +601,7 @@
     <polygon
       points={points(corners(c))}
       fill={hexFill(h.id, h.terrain)}
-      fill-opacity={look.painted ? 0 : undefined}
+      fill-opacity={look.painted || (baked && look.arts(h.terrain).length) ? 0 : undefined}
       class="hex"
       class:painted={look.painted}
       class:edges={look.painted && look.edges}
