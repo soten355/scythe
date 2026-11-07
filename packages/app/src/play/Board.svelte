@@ -18,6 +18,7 @@
   import { between, fitView, panBy, worldOf, zoomAt, type Limits, type View } from './camera';
   import { boardArea, center, corners, HEX_HEIGHT, HEX_VIEWBOX, HEX_WIDTH, points, sharedEdge, SIZE, spotsArea, type Point } from './geometry';
   import HexIcon from './HexIcon.svelte';
+  import CrestDrawn from './CrestDrawn.svelte';
   import { MAP_PICTURE, mapPictureFrame } from './map-picture';
   import { LABEL_Y, MECH, MEEPLE } from './shapes';
   import { boardLook, DEFAULT_THEME, hexArtIndex, TERRAINS, type BoardLook } from '../theme/theme';
@@ -609,12 +610,23 @@
         <circle cx={home.c[0]} cy={home.c[1]} r={SIZE * 0.55} stroke-width="2.5" />
       </g>
     {/if}
+    <!-- A faction's base shows its crest; the circle over it stays for tapping and highlights. An unused base is just the dark circle. -->
+    {#if home.faction}
+      {@const box = SIZE * 1.1}
+      {@const crest = look.piece(home.faction.id, 'crest')}
+      {#if crest}
+        <image href={crest} x={home.c[0] - box / 2} y={home.c[1] - box / 2} width={box} height={box} class="home-crest" />
+      {:else}
+        <g class="home-crest"><CrestDrawn faction={home.faction} x={home.c[0] - box / 2} y={home.c[1] - box / 2} width={box} height={box} /></g>
+      {/if}
+    {/if}
     <circle
       cx={home.c[0]}
       cy={home.c[1]}
       r={SIZE * 0.55}
-      fill={home.faction?.color ?? '#444'}
+      fill={home.faction ? 'transparent' : '#444'}
       class="home"
+      class:crested={home.faction}
       class:lit
       class:selected={prompt.selected === home.key}
       class:tappable
@@ -626,9 +638,12 @@
     {#if home.characterHome}
       {@const pick = home.mine ? pickable('home', 'character') : { key: '', select: undefined, selected: false }}
       {@const sel = pick.select}
+      <!-- At the crest's lower right, like a badge, so the crest still shows. -->
+      {@const cx = home.c[0] + SIZE * 0.38}
+      {@const cy = home.c[1] + SIZE * 0.38}
       <circle
-        cx={home.c[0]}
-        cy={home.c[1]}
+        {cx}
+        {cy}
         r="7"
         class="character"
         data-piece={pick.key || undefined}
@@ -643,9 +658,9 @@
       />
       {@const url = home.faction && look.piece(home.faction.id, 'character')}
       {#if url}
-        <image href={url} x={home.c[0] - 7} y={home.c[1] - 10} width="14" height="18" preserveAspectRatio="xMidYMax meet" class="piece-art" />
+        <image href={url} x={cx - 7} y={cy - 10} width="14" height="18" preserveAspectRatio="xMidYMax meet" class="piece-art" />
       {:else}
-        <text x={home.c[0]} y={home.c[1] + 3.5} class="piece-text dark">{home.faction?.name[0]}</text>
+        <text x={cx} y={cy + 3.5} class="piece-text dark">{home.faction?.name[0]}</text>
       {/if}
     {/if}
     {#if home.others}
@@ -825,6 +840,12 @@
   }
   .outline {
     fill: none;
+    pointer-events: none;
+  }
+  .home.crested {
+    stroke: none;
+  }
+  .home-crest {
     pointer-events: none;
   }
   .outline.lit,
