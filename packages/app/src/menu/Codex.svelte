@@ -144,36 +144,39 @@
                 </div>
               </div>
               <div class="facts">
-                <!-- Who they are: their portrait, large, beside their crest, name, start and ability. -->
-                <div class="intro" class:with-portrait={portrait}>
-                  {#if portrait}
-                    <div class="portrait"><img src={portrait} alt="" /></div>
-                  {/if}
-                  <div class="intro-text">
-                    <div class="title">
-                      <div class="crest big"><FactionEmblem {faction} /></div>
-                      <div>
-                        <h2>{faction.name}</h2>
-                        <p class="chips">{#each f.start as s (s)}<span>{s}</span>{/each}</p>
+                <!-- Who they are: their crest, large, beside their name, start and capital city. -->
+                <div class="title">
+                  <div class="crest big"><FactionEmblem {faction} /></div>
+                  <div class="title-text">
+                    <h2>{faction.name}</h2>
+                    <p class="chips">{#each f.start as s (s)}<span>{s}</span>{/each}</p>
+                    {#if lore?.capital}
+                      <div class="capital">
+                        <h3>Capital city</h3>
+                        <p>{lore.capital}</p>
                       </div>
-                    </div>
-                    <div class="box ability">
-                      <h3>Faction ability</h3>
-                      <p><b>{f.ability.name}</b> {f.ability.description}</p>
-                    </div>
+                    {/if}
                   </div>
                 </div>
+                <div class="box ability">
+                  <h3>Faction ability</h3>
+                  <p><b>{f.ability.name}</b> {f.ability.description}</p>
+                </div>
                 <!-- Their story, from the skin in use: only what's been written. -->
-                {#if lore?.characterName || lore?.characterBio}
-                  <div class="box lore">
-                    <h3>The character</h3>
-                    {#if lore.characterName}<p class="who-name">{lore.characterName}</p>{/if}
-                    {#if lore.characterBio}<p>{lore.characterBio}</p>{/if}
+                {#if portrait || lore?.characterName || lore?.characterBio}
+                  <div class="box lore character-box">
+                    {#if portrait}
+                      <div class="portrait"><img src={portrait} alt="" /></div>
+                    {/if}
+                    <div class="character-text">
+                      <h3>The character</h3>
+                      {#if lore?.characterName}<p class="who-name">{lore.characterName}</p>{/if}
+                      {#if lore?.characterBio}<p>{lore.characterBio}</p>{/if}
+                    </div>
                   </div>
                 {/if}
-                {#if lore?.capital || lore?.history || lore?.goals}
+                {#if lore?.history || lore?.goals}
                   <div class="box lore">
-                    {#if lore.capital}<h3>Capital city</h3><p>{lore.capital}</p>{/if}
                     {#if lore.history}<h3>History</h3><p>{lore.history}</p>{/if}
                     {#if lore.goals}<h3>Goals</h3><p>{lore.goals}</p>{/if}
                   </div>
@@ -601,26 +604,24 @@
     height: 56px;
     flex: none;
   }
-  .intro {
+  /* The portrait: big and round in a ring of the faction's colour, beside the character's description. */
+  .character-box {
     display: flex;
     gap: 14px;
     align-items: flex-start;
   }
-  .intro-text {
+  .character-text {
     flex: 1;
     min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
   }
-  /* The portrait: big and round in a ring of the faction's colour, its crest pinned to the lower right. */
   .portrait {
     position: relative;
     flex: none;
-    width: clamp(96px, 22vh, 170px);
+    width: clamp(72px, min(20vh, 24vw), 140px);
     aspect-ratio: 1;
   }
   .portrait img {
+    display: block;
     width: 100%;
     height: 100%;
     border-radius: 50%;
@@ -630,15 +631,22 @@
     background: color-mix(in srgb, var(--c) 35%, var(--bg));
     box-shadow: 0 6px 16px rgb(0 0 0 / 0.45);
   }
-  /* The crest, large, beside the name. */
+  /* The crest, large, beside the name and capital city. */
   .title {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 14px;
+  }
+  .title-text {
+    flex: 1;
+    min-width: 0;
+  }
+  .capital {
+    margin-top: 6px;
   }
   .crest.big {
-    width: clamp(56px, 13vh, 96px);
-    height: clamp(56px, 13vh, 96px);
+    width: clamp(96px, min(26vh, 30vw), 180px);
+    height: clamp(96px, min(26vh, 30vw), 180px);
     filter: drop-shadow(0 3px 6px rgb(0 0 0 / 0.5));
   }
 
@@ -815,14 +823,6 @@
     .hero {
       width: auto;
       height: min(80vw, 40vh);
-    }
-    .intro {
-      flex-direction: column;
-      align-items: center;
-    }
-    .intro-text {
-      align-self: stretch;
-      flex: none;
     }
     .grid2 {
       grid-template-columns: 1fr;
