@@ -32,6 +32,12 @@
     --safe-top: calc(env(safe-area-inset-top) + 18px);
   }
 }
+/* A phone held upright: iOS fades the screen's top a little below its safe area, so start below the fade. */
+@media (pointer: coarse) and (max-width: 600px) and (orientation: portrait) {
+  :root {
+    --safe-top: calc(env(safe-area-inset-top) + 24px);
+  }
+}
 
 html,
 body {
