@@ -59,11 +59,14 @@
   <div class="shade" aria-hidden="true"></div>
 
   <nav class="tabs">
-    {#each game.setup.players as p, s (s)}
-      <button class="tab" class:on={s === seat} style:--t={p.faction.color} style:--t-ink={inkOn(p.faction.color)} onclick={() => onSwitch(s)} aria-pressed={s === seat}>
-        {p.faction.name}
-      </button>
-    {/each}
+    <!-- The faction names slide sideways when they don't fit; the close button stays put beside them. -->
+    <div class="tab-row">
+      {#each game.setup.players as p, s (s)}
+        <button class="tab" class:on={s === seat} style:--t={p.faction.color} style:--t-ink={inkOn(p.faction.color)} onclick={() => onSwitch(s)} aria-pressed={s === seat}>
+          {p.faction.name}
+        </button>
+      {/each}
+    </div>
     <button class="close" onclick={onClose} aria-label="Close">✕</button>
   </nav>
 
@@ -231,9 +234,16 @@
     gap: 6px;
     padding: 6px 8px;
     align-items: center;
-    overflow-x: auto;
   }
-  /* Tabs keep their width and the row scrolls sideways. */
+  /* Tabs keep their width and their row scrolls sideways (the close button doesn't). */
+  .tab-row {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
   .tab {
     flex: none;
     padding: 4px 12px;
@@ -250,7 +260,6 @@
     color: var(--t-ink);
   }
   .close {
-    margin-left: auto;
     width: 36px;
     height: 36px;
     border-radius: 50%;
