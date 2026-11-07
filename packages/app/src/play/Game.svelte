@@ -14,6 +14,7 @@
   import FactionEmblem from './FactionEmblem.svelte';
   import FactionDossier from './FactionDossier.svelte';
   import FightScreen from './FightScreen.svelte';
+  import MapScreen from './MapScreen.svelte';
   import GameOver from './GameOver.svelte';
   import GameOverMoment from './GameOverMoment.svelte';
   import { battleOf, type Battle } from './fight';
@@ -407,6 +408,9 @@
   /** This game's structure bonus tile, scored at the end; tap it for its payouts. */
   const tile = $derived(structureBonusTile(game));
   let tileOpen = $state(false);
+  /** Phone only: the map with nothing over it (no round, bonus tile or hex names), and the map's own screen. */
+  let clearMap = $state(false);
+  let exploring = $state(false);
 </script>
 
 {#snippet current()}
@@ -493,7 +497,7 @@
   <main>
     <div class="board" bind:this={boardArea}>
       <!-- Where we are in the story, like a date on the map. -->
-      <div class="corner">
+      {#if !clearMap}<div class="corner">
         <div class="round"><small>Round</small><b>{round}</b></div>
         {#if tile}
           <!-- The structure bonus tile, for all to see: what it counts; tap for the coins it pays at the end. -->
@@ -503,8 +507,8 @@
             {#if tileOpen}<span class="pays">{paysText(tile.pays)}<br /><i>at the end of the game</i></span>{/if}
           </button>
         {/if}
-      </div>
-      <Board game={shown} {prompt} onTap={tap} onPick={(sel) => (selection = sel)} guideTo={guide(game, prompt)} paused={handoff !== null} {travel} moveMs={settings.moveMs} {look} /></div>
+      </div>{/if}
+      <Board game={shown} {prompt} onTap={tap} onPick={(sel) => (selection = sel)} guideTo={guide(game, prompt)} paused={handoff !== null} {travel} moveMs={settings.moveMs} {look} clear={clearMap} onClear={() => (clearMap = !clearMap)} onExplore={() => (exploring = true)} /></div>
     <aside style:--c={color(seatNow)}>
       {#if panelPicture}<div class="panel-picture" style:background-image="url({panelPicture})" aria-hidden="true"></div>{/if}
       <!-- Whoever acts now: their crest shows, then fades behind the text as it appears (again each time play passes, once the pass screen is gone). -->
@@ -561,6 +565,10 @@
       </div>
     </aside>
   </main>
+
+  {#if exploring}
+    <MapScreen game={shown} {round} {look} onClose={() => (exploring = false)} />
+  {/if}
 
   <!-- A fight takes over the screen until it's decided. -->
   <FightScreen game={shown} {prompt} seat={seatNow} waiting={botNow ? `${botLabel(seatNow)} is choosing…` : null} {canUndo} onUndo={undo} onSelect={(sel) => (selection = sel)} onPress={press} {battle} onBattleDone={() => (battle = null)} />

@@ -37,6 +37,10 @@
     travel = null,
     moveMs = 350,
     look = boardLook(DEFAULT_THEME),
+    clear = false,
+    onClear,
+    onExplore,
+    tapAny = false,
   }: {
     game: GameState;
     prompt: Prompt;
@@ -49,6 +53,14 @@
     moveMs?: number;
     /** Pictures and colours from the theme (the usual look by default). */
     look?: BoardLook;
+    /** A clear view (phone): no hex names or terrain symbols, and only the button that brings them back. */
+    clear?: boolean;
+    /** Shows the clear-view button (phone only). */
+    onClear?: () => void;
+    /** Shows the button that opens the map screen (phone only; elsewhere it's the whole-map button). */
+    onExplore?: () => void;
+    /** Every hex can be tapped (the map screen asks what's on it), not just the ones the turn offers. */
+    tapAny?: boolean;
   } = $props();
 
   /** The travel that has landed (its piece is drawn normally again). */
@@ -606,16 +618,16 @@
       class:painted={look.painted}
       class:edges={look.painted && look.edges}
       class:tappable
-      onclick={() => tappable && onTap(h.id)}
+      onclick={() => (tappable || tapAny) && onTap(h.id)}
       role="button"
       tabindex="-1"
       onkeydown={() => {}}
     />
     {@const icon = look.symbol(h.terrain)}
-    {#if icon}<HexIcon {icon} x={c[0]} y={c[1]} size={SIZE * 0.65} faded />{/if}
+    {#if icon && !clear}<HexIcon {icon} x={c[0]} y={c[1]} size={SIZE * 0.65} faded />{/if}
     {#if h.tunnel}<HexIcon icon={look.tunnel} x={c[0]} y={c[1] - SIZE * 0.62} size={SIZE * 0.36} />{/if}
     {#if game.encounterTokens.includes(h.id)}<HexIcon icon={look.encounter} x={c[0]} y={c[1] + SIZE * 0.62} size={SIZE * 0.36} />{/if}
-    <text x={c[0] - SIZE * 0.5} y={c[1] - SIZE * 0.45} class="id">{h.id}</text>
+    {#if !clear}<text x={c[0] - SIZE * 0.5} y={c[1] - SIZE * 0.45} class="id">{h.id}</text>{/if}
   {/each}
 
   {#each board.rivers as [a, b] (a + b)}
@@ -794,9 +806,15 @@
   </g>
 </svg>
   <div class="zoom">
-    <button aria-label="Zoom in" onclick={() => zoomBy(0.65)}>+</button>
-    <button aria-label="Zoom out" onclick={() => zoomBy(1.55)}>−</button>
-    <button aria-label="Whole map" onclick={() => glide(fitView(limits.world, aspect, limits), 450)}>⤢</button>
+    {#if !clear}
+      <button aria-label="Zoom in" onclick={() => zoomBy(0.65)}>+</button>
+      <button aria-label="Zoom out" onclick={() => zoomBy(1.55)}>−</button>
+      <button aria-label="Whole map" class:not-phone={!!onExplore} onclick={() => glide(fitView(limits.world, aspect, limits), 450)}>⤢</button>
+      {#if onExplore}<button aria-label="Open the map screen" class="phone-only" onclick={onExplore}>⤢</button>{/if}
+    {/if}
+    {#if onClear}
+      <button aria-label={clear ? 'Show everything again' : 'Clear display'} aria-pressed={clear} class="phone-only" class:on={clear} onclick={onClear}>👁</button>
+    {/if}
   </div>
 </div>
 
@@ -837,6 +855,24 @@
         flex-direction: row;
       }
     }
+  }
+  /* Phone-only buttons (clear view, map screen), and the desktop button they stand in for. */
+  .phone-only {
+    display: none;
+  }
+  @media (pointer: coarse) {
+    @container screen (max-height: 500px) {
+      .phone-only {
+        display: block;
+      }
+      .not-phone {
+        display: none;
+      }
+    }
+  }
+  .zoom button.on {
+    background: var(--accent);
+    color: var(--on-accent);
   }
   .zoom button {
     width: 38px;
