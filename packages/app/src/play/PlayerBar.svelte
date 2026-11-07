@@ -107,6 +107,12 @@
   .res {
     opacity: 0.75;
   }
+  /* A phone held sideways: as tall as the other top-bar buttons. */
+  @media (pointer: coarse) and (max-height: 500px) {
+    .player {
+      min-height: 38px;
+    }
+  }
   /* A phone: drop the resource line, so every player fits without scrolling (their screen shows it). */
   @media (max-width: 760px) {
     .details,

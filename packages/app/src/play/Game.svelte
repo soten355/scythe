@@ -734,7 +734,7 @@
     inset: 0;
     display: flex;
     flex-direction: column;
-    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    padding: var(--safe-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
   }
   header {
     display: flex;
@@ -748,6 +748,13 @@
     font-size: 18px;
     cursor: pointer;
   }
+  /* As tall as the other top-bar buttons on a phone held sideways. */
+  @media (pointer: coarse) and (max-height: 500px) {
+    .menu {
+      min-height: 38px;
+      min-width: 44px;
+    }
+  }
   .menu-backdrop {
     position: fixed;
     inset: 0;
@@ -757,7 +764,7 @@
   }
   .menu-list {
     position: fixed;
-    top: calc(env(safe-area-inset-top) + 30px);
+    top: calc(var(--safe-top) + 30px);
     left: calc(env(safe-area-inset-left) + 6px);
     z-index: 31;
     display: flex;

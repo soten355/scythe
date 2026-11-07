@@ -15,6 +15,21 @@
   font-family: var(--font-body);
 }
 
+/*
+ * The top of the screen on a phone held sideways. iOS reports no safe area there,
+ * but keeps that edge for its own gestures, so taps close to it often don't reach
+ * the page. Every screen starts its top bar below this. To change the margin,
+ * change it here (and in shared/forms.css, for the editors).
+ */
+:root {
+  --safe-top: env(safe-area-inset-top);
+}
+@media (pointer: coarse) and (max-height: 500px) {
+  :root {
+    --safe-top: calc(env(safe-area-inset-top) + 18px);
+  }
+}
+
 html,
 body {
   margin: 0;
@@ -37,9 +52,31 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+  padding: var(--safe-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
     env(safe-area-inset-left);
   box-sizing: border-box;
+}
+
+/* Taps act at once, without waiting to see if it's a double tap. */
+button,
+a,
+select {
+  touch-action: manipulation;
+}
+
+/* Top-bar buttons big enough for a thumb on a phone held sideways (a link gets its height as a box). */
+@media (pointer: coarse) and (max-height: 500px) {
+  header button,
+  header a,
+  header select,
+  nav button {
+    min-height: 38px;
+    min-width: 44px;
+  }
+  header a {
+    display: inline-flex;
+    align-items: center;
+  }
 }
 
 h1,

@@ -110,7 +110,7 @@
     display: flex;
     flex-direction: column;
     gap: 6px;
-    padding: calc(env(safe-area-inset-top) + 8px) calc(env(safe-area-inset-right) + 12px) calc(env(safe-area-inset-bottom) + 8px)
+    padding: calc(var(--safe-top) + 8px) calc(env(safe-area-inset-right) + 12px) calc(env(safe-area-inset-bottom) + 8px)
       calc(env(safe-area-inset-left) + 12px);
     background: radial-gradient(ellipse at top, color-mix(in srgb, var(--c) 35%, var(--bg)), #120e0b 70%);
     font-size: 13px;

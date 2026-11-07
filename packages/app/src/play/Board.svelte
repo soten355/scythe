@@ -793,6 +793,12 @@
     flex-direction: column;
     gap: 6px;
   }
+  /* A phone held sideways: in a row along the bottom, clear of the round and bonus cards above. */
+  @media (pointer: coarse) and (max-height: 500px) {
+    .zoom {
+      flex-direction: row;
+    }
+  }
   .zoom button {
     width: 38px;
     height: 38px;

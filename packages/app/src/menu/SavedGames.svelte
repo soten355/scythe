@@ -76,7 +76,7 @@
     inset: 0;
     display: flex;
     flex-direction: column;
-    padding: calc(env(safe-area-inset-top) + 6px) calc(env(safe-area-inset-right) + 10px) calc(env(safe-area-inset-bottom) + 6px)
+    padding: calc(var(--safe-top) + 6px) calc(env(safe-area-inset-right) + 10px) calc(env(safe-area-inset-bottom) + 6px)
       calc(env(safe-area-inset-left) + 10px);
     gap: 8px;
     font-size: 13px;

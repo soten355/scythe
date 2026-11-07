@@ -152,7 +152,7 @@
   }
   header {
     position: absolute;
-    top: calc(env(safe-area-inset-top) + 6px);
+    top: calc(var(--safe-top) + 6px);
     left: 0;
     right: 0;
     display: flex;
