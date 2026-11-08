@@ -190,6 +190,8 @@ export interface GameState {
   encounterDiscard: string[];
   /** The most recent fight, as both sides revealed it. */
   lastCombat?: CombatResult;
+  /** Enemy workers the current player has sent home this turn (by moving onto them, or winning a fight they started); gone at the turn's end. */
+  workersSentHome?: number;
 }
 
 export type Action =

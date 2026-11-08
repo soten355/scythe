@@ -92,6 +92,9 @@ const losePopularity = (state: GameState, seat: number, n: number): GameState =>
     ? state
     : updatePlayer(state, seat, { popularity: Math.max(0, Math.min(MAX_POPULARITY, state.players[seat]!.popularity - n)) });
 
+/** Notes enemy workers the current player sent home this turn (for objectives). */
+const sentHome = (state: GameState, n: number): GameState => (n ? { ...state, workersSentHome: (state.workersSentHome ?? 0) + n } : state);
+
 /**
  * Called when the current player's move is over: sends home enemy workers
  * the mover's characters and mechs landed on, then starts the fights, if any.
@@ -110,7 +113,7 @@ export function afterMove(state: GameState, section: Section): GameState {
       fights.push(hex);
     } else {
       const workers = state.players[enemy]!.workers.filter((w) => w === hex).length;
-      next = losePopularity(retreat(next, enemy, hex), seat, workers);
+      next = sentHome(losePopularity(retreat(next, enemy, hex), seat, workers), workers);
     }
   }
   return nextFight(next, section, fights);
@@ -265,7 +268,7 @@ function resolve(state: GameState, turn: CombatStep, fight: Fight): GameState {
   }
   if (attackerWins) {
     const workers = next.players[loser.seat]!.workers.filter((w) => w === fight.hex).length;
-    next = losePopularity(next, result.winner, workers);
+    next = sentHome(losePopularity(next, result.winner, workers), workers);
   }
   if (total(loser) > 0) next = drawCombatCards(next, loser.seat, 1);
   const combatStars = next.players[result.winner]!.stars.filter((s) => s === 'combat').length;

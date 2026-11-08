@@ -3,7 +3,7 @@
 // a file. Plain DOM, no framework; shares its look with the other card
 // editors.
 import '../shared/fill-screen';
-import { OBJECTIVE_PROGRESS, OBJECTIVE_STATS, OBJECTIVE_UNITS, RESOURCES, type ObjectiveCard, type ObjectiveCheck, type Resource } from '@scythe/engine';
+import { OBJECTIVE_EVENTS, OBJECTIVE_PROGRESS, OBJECTIVE_STATS, OBJECTIVE_TERRAINS, OBJECTIVE_UNITS, RESOURCES, type ObjectiveCard, type ObjectiveCheck, type Resource, type TerritoryCheck } from '@scythe/engine';
 import '../shared/forms.css';
 import '../faction-editor/faction-editor.css';
 import '../encounter-editor/encounter-editor.css';
@@ -12,7 +12,7 @@ import { EMPTY_LIBRARY } from '../content/library';
 import { addToGame, ask, esc, setPath, showExport, tell } from '../shared/editor-utils';
 import { exportContent } from '../saves/files';
 import { objectiveText } from '../play/objective-text';
-import { addCheck, cleanCard, deckProblems, editable, formatCards, newCard, nextId, removeCheck, setKind, toggleResource, type CheckKind } from './model';
+import { addCheck, addPart, cleanCard, deckProblems, editable, formatCards, newCard, nextId, removeCheck, removePart, setKind, setPartKind, toggleResource, type CheckKind, type PartKind } from './model';
 
 const STORAGE_KEY = 'scythe-objective-editor';
 
@@ -22,12 +22,33 @@ const KINDS: [CheckKind, string][] = [
   ['eachResource', 'Each of some kinds of resource'],
   ['units', 'Units (on a terrain)'],
   ['territories', 'Territories you control'],
-  ['progress', 'Upgrades, mechs, structures, recruits or workers'],
+  ['progress', 'Upgrades, mechs, structures, recruits, workers, Factory card or fights won'],
+  ['around', 'Territories around one lake (or next to the Factory)'],
+  ['oneTerritory', 'All on one territory you control'],
+  ['same', 'Two counts the same (workers and recruits)'],
+  ['highest', 'The most of something among all players'],
+  ['thisTurn', 'Done this turn (enemy workers sent home)'],
 ];
+const PART_KINDS: [PartKind, string][] = [
+  ['units', 'Your units'],
+  ['structures', 'Your structures'],
+  ['tokens', 'Your tokens (units and structures)'],
+  ['resources', 'Resources (in all)'],
+  ['eachResource', 'Each of some kinds of resource'],
+];
+const EVENT_NAMES: Record<string, string> = { workersSentHome: 'Enemy workers sent home' };
 const STAT_NAMES: Record<string, string> = { power: 'Power', popularity: 'Popularity', coins: 'Coins', combatCards: 'Combat cards' };
 const UNIT_NAMES: Record<string, string> = { character: 'Character', mech: 'Mechs', worker: 'Workers', any: 'Any units' };
-const PROGRESS_NAMES: Record<string, string> = { upgrades: 'Upgrades made', mechs: 'Mechs deployed', structures: 'Structures built', recruits: 'Recruits enlisted', workers: 'Workers' };
-const TERRAINS = ['farm', 'forest', 'mountain', 'tundra', 'village', 'lake', 'factory'];
+const PROGRESS_NAMES: Record<string, string> = {
+  upgrades: 'Upgrades made',
+  mechs: 'Mechs deployed',
+  structures: 'Structures built',
+  recruits: 'Recruits enlisted',
+  workers: 'Workers',
+  factoryCards: 'Factory cards (0 or 1)',
+  fightsWon: 'Fights won',
+};
+const TERRAINS = OBJECTIVE_TERRAINS;
 
 interface EditorState {
   cards: ObjectiveCard[];
@@ -71,25 +92,67 @@ const select = (path: string, value: string | undefined, choices: [string, strin
     .join('')}</select></label>`;
 const named = (values: string[], names: Record<string, string>): [string, string][] => values.map((v) => [v, names[v] ?? title(v)]);
 
+/** Resource tick boxes for condition `i` (or its part `part`). */
+const resourceBoxes = (i: number, kinds: Resource[] = [], part?: number) =>
+  `<div class="actions">${RESOURCES.map(
+    (r) => `<label class="check"><input type="checkbox" data-check="${i}" ${part !== undefined ? `data-part="${part}"` : ''} data-resource="${r}" ${kinds.includes(r) ? 'checked' : ''}> ${title(r)}</label>`,
+  ).join('')}</div>`;
+/** A tick box for a yes-or-no setting of a condition. */
+const tick = (path: string, on: boolean | undefined, label: string) => `<label class="check"><input type="checkbox" data-tick="${path}" ${on ? 'checked' : ''}> ${label}</label>`;
+
+/** The boxes for one part of a one-territory condition. */
+function partFields(c: TerritoryCheck, i: number, k: number, count: number): string {
+  const p = `checks.${i}.checks.${k}`;
+  const bounds = (b: { atLeast?: number; atMost?: number }) => `${num(`${p}.atLeast`, b.atLeast, 'At least')}${num(`${p}.atMost`, b.atMost, 'At most')}`;
+  const kind = `<label>Part ${k + 1}<select data-part-kind="${i}.${k}">${PART_KINDS.map(([v, name]) => `<option value="${v}" ${v === c.kind ? 'selected' : ''}>${name}</option>`).join('')}</select></label>`;
+  let fields = '';
+  switch (c.kind) {
+    case 'units':
+      fields = select(`${p}.unit`, c.unit, named(OBJECTIVE_UNITS, UNIT_NAMES), 'Which') + bounds(c);
+      break;
+    case 'structures':
+    case 'tokens':
+      fields = bounds(c);
+      break;
+    case 'resources':
+      fields = `${resourceBoxes(i, c.resources, k)}<span class="hint">(none ticked: any kind)</span>${bounds(c)}`;
+      break;
+    case 'eachResource':
+      fields = resourceBoxes(i, c.resources, k) + num(`${p}.atLeast`, c.atLeast, 'At least, of each');
+      break;
+  }
+  const remove = count > 1 ? `<button class="remove" data-act="remove-part" data-index="${i}" data-part="${k}">Remove part</button>` : '';
+  return `<div class="part">${kind}${fields}${remove}</div>`;
+}
+
 function checkFields(c: ObjectiveCheck, i: number): string {
   const p = `checks.${i}`;
-  const resources = (kinds: Resource[] = []) =>
-    `<div class="actions">${RESOURCES.map((r) => `<label class="check"><input type="checkbox" data-check="${i}" data-resource="${r}" ${kinds.includes(r) ? 'checked' : ''}> ${title(r)}</label>`).join('')}</div>`;
+  const resources = (kinds: Resource[] = []) => resourceBoxes(i, kinds);
   const terrain = (value?: string) => select(`${p}.terrain`, value, named(TERRAINS, {}), 'On', 'Any terrain');
   const bounds = (b: { atLeast?: number; atMost?: number }) => `${num(`${p}.atLeast`, b.atLeast, 'At least')}${num(`${p}.atMost`, b.atMost, 'At most')}`;
   switch (c.kind) {
     case 'stat':
       return select(`${p}.stat`, c.stat, named(OBJECTIVE_STATS, STAT_NAMES), 'What') + bounds(c);
     case 'resources':
-      return `${resources(c.resources)}<span class="hint">(none ticked: any kind)</span>${bounds(c)}`;
+      return `${resources(c.resources)}<span class="hint">(none ticked: any kind)</span>${tick(`${p}.oneKind`, c.oneKind, 'The most of any one kind')}${bounds(c)}`;
     case 'eachResource':
       return resources(c.resources) + num(`${p}.atLeast`, c.atLeast, 'At least, of each');
     case 'units':
       return select(`${p}.unit`, c.unit, named(OBJECTIVE_UNITS, UNIT_NAMES), 'Which') + terrain(c.terrain) + bounds(c);
     case 'territories':
-      return select(`${p}.terrain`, c.terrain, named(TERRAINS, {}), 'Of terrain', 'Any (the Factory counts 3)') + bounds(c);
+      return select(`${p}.terrain`, c.terrain, named(TERRAINS, {}), 'Of terrain', 'Any (the Factory counts 3)') + tick(`${p}.tunnel`, c.tunnel, 'Tunnels only') + bounds(c);
     case 'progress':
       return select(`${p}.what`, c.what, named(OBJECTIVE_PROGRESS, PROGRESS_NAMES), 'What') + bounds(c);
+    case 'around':
+      return select(`${p}.terrain`, c.terrain, named(TERRAINS, {}), 'Around one') + bounds(c);
+    case 'oneTerritory':
+      return `<div class="parts">${c.checks.map((part, k) => partFields(part, i, k, c.checks.length)).join('')}<div><button data-act="add-part" data-index="${i}">+ Add part</button> <span class="hint">All of these on the same territory.</span></div></div>`;
+    case 'same':
+      return select(`${p}.what.0`, c.what[0], named(OBJECTIVE_PROGRESS, PROGRESS_NAMES), 'As many') + select(`${p}.what.1`, c.what[1], named(OBJECTIVE_PROGRESS, PROGRESS_NAMES), 'As');
+    case 'highest':
+      return `${select(`${p}.stat`, c.stat, named(OBJECTIVE_STATS, STAT_NAMES), 'What')}<span class="hint">Ties count.</span>`;
+    case 'thisTurn':
+      return select(`${p}.what`, c.what, named(OBJECTIVE_EVENTS, EVENT_NAMES), 'What') + bounds(c);
   }
 }
 
@@ -184,8 +247,16 @@ root.addEventListener('change', (e) => {
     // A different kind of condition: its own boxes.
     update(setKind(card(), Number(el.dataset.kind.replace('kind-', '')), el.value as CheckKind));
     render();
+  } else if (el instanceof HTMLSelectElement && el.dataset.partKind) {
+    const [i, k] = el.dataset.partKind.split('.').map(Number);
+    update(setPartKind(card(), i!, k!, el.value as PartKind));
+    render();
   } else if (el.dataset.resource) {
-    update(toggleResource(card(), Number(el.dataset.check), el.dataset.resource as Resource, el.checked));
+    const part = el.dataset.part === undefined ? undefined : Number(el.dataset.part);
+    update(toggleResource(card(), Number(el.dataset.check), el.dataset.resource as Resource, el.checked, part));
+    renderStatus();
+  } else if (el.dataset.tick) {
+    update(setPath(card(), el.dataset.tick, el.checked));
     renderStatus();
   } else if (el.dataset.flag === 'endOfTurn') {
     update({ ...card(), endOfTurn: el.checked });
@@ -215,6 +286,12 @@ root.addEventListener('click', async (e) => {
       break;
     case 'remove':
       update(removeCheck(card(), Number(btn.dataset.index)));
+      break;
+    case 'add-part':
+      update(addPart(card(), Number(btn.dataset.index)));
+      break;
+    case 'remove-part':
+      update(removePart(card(), Number(btn.dataset.index), Number(btn.dataset.part)));
       break;
     case 'add':
     case 'file': {

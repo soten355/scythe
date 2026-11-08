@@ -22,6 +22,32 @@ describe('objective conditions in words', () => {
     expect(checkText({ kind: 'progress', what: 'mechs', atMost: 0 })).toBe('no mechs deployed');
   });
 
+  it('words the conditions added for the full deck', () => {
+    expect(checkText({ kind: 'progress', what: 'factoryCards', atLeast: 1 })).toBe('a Factory card');
+    expect(checkText({ kind: 'progress', what: 'factoryCards', atMost: 0 })).toBe('no Factory card');
+    expect(checkText({ kind: 'progress', what: 'fightsWon', atLeast: 1 })).toBe('at least 1 fight won');
+    expect(checkText({ kind: 'territories', tunnel: true, atLeast: 3 })).toBe('at least 3 tunnel territories');
+    expect(checkText({ kind: 'resources', oneKind: true, atLeast: 9 })).toBe('at least 9 of one kind of resource on territories you control');
+    expect(checkText({ kind: 'around', terrain: 'lake', atLeast: 5 })).toBe('at least 5 territories around the same lake');
+    expect(checkText({ kind: 'around', terrain: 'factory', atLeast: 2 })).toBe('at least 2 territories next to the Factory');
+    expect(checkText({ kind: 'same', what: ['workers', 'recruits'] })).toBe('as many workers as recruits enlisted');
+    expect(checkText({ kind: 'highest', stat: 'power' })).toBe('the most power of any player (ties count)');
+    expect(checkText({ kind: 'thisTurn', what: 'workersSentHome', atLeast: 1 })).toBe('at least 1 enemy worker sent home this turn');
+    expect(
+      checkText({
+        kind: 'oneTerritory',
+        checks: [
+          { kind: 'units', unit: 'character', atLeast: 1 },
+          { kind: 'units', unit: 'mech', atLeast: 1, atMost: 1 },
+          { kind: 'resources', atLeast: 5 },
+        ],
+      }),
+    ).toBe('one territory you control with your character, exactly 1 mech and at least 5 resources');
+    expect(checkText({ kind: 'oneTerritory', checks: [{ kind: 'tokens', atLeast: 6 }, { kind: 'eachResource', resources: ['oil', 'food'], atLeast: 1 }] })).toBe(
+      'one territory you control with at least 6 of your tokens (character, mechs, workers, structures) and at least 1 each of oil and food',
+    );
+  });
+
   it('words a whole card, saying when it ends your turn', () => {
     const quiet: ObjectiveCard = { id: 'q', name: 'Quiet', endOfTurn: true, checks: [{ kind: 'stat', stat: 'power', atMost: 0 }, { kind: 'stat', stat: 'coins', atLeast: 5 }] };
     expect(objectiveText(quiet)).toBe('At the end of your turn: no power and at least 5 coins');

@@ -99,8 +99,9 @@ export function recruitPayouts(state: GameState, seat: number, section: SectionI
 
 export function endTurn(state: GameState): GameState {
   const section = state.turn.step === 'chooseSection' ? null : state.turn.section;
+  const { workersSentHome: _, ...rest } = state;
   return {
-    ...updatePlayer(state, state.currentPlayer, { lastSection: section }),
+    ...updatePlayer(rest, state.currentPlayer, { lastSection: section }),
     currentPlayer: nextSeat(state, state.currentPlayer),
     turn: { step: 'chooseSection' },
     turnsTaken: state.turnsTaken + 1,

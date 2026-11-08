@@ -39,3 +39,31 @@
 .flags {
   padding: 0 10px 8px;
 }
+
+/* "All on one territory": its parts, each a row of its own inside the condition. */
+.check-row .parts {
+  flex-basis: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-left: 10px;
+  border-left: 2px solid currentColor;
+}
+
+.check-row .part {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 6px 12px;
+}
+
+.check-row .part > label {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  font-size: 0.75rem;
+}
+
+.check-row .part .remove {
+  margin-left: auto;
+}

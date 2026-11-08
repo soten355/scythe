@@ -73,6 +73,129 @@ describe('conditions', () => {
   });
 });
 
+describe('more conditions', () => {
+  // Conditions written `as const` below, so they're read-only: fine here, as they're only read.
+  const check = (state: GameState, ...checks: object[]) => objectiveMet(state, 0, { id: 't', name: 'T', checks: checks as ObjectiveCard['checks'] });
+  const other = (state: GameState, p1: Partial<PlayerState>): GameState => ({ ...state, players: [state.players[0]!, { ...state.players[1]!, ...p1 }] });
+
+  it('counts a Factory card held, and fights won (a combat star for each)', () => {
+    expect(check(game(), { kind: 'progress', what: 'factoryCards', atLeast: 1 })).toBe(false);
+    expect(check(game({ factoryCard: 'f1' }), { kind: 'progress', what: 'factoryCards', atLeast: 1 })).toBe(true);
+    expect(check(game(), { kind: 'progress', what: 'factoryCards', atMost: 0 })).toBe(true);
+    expect(check(game({ stars: ['power'] }), { kind: 'progress', what: 'fightsWon', atLeast: 1 })).toBe(false);
+    expect(check(game({ stars: ['power', 'combat'] }), { kind: 'progress', what: 'fightsWon', atLeast: 1 })).toBe(true);
+  });
+
+  it('counts only tunnel territories when asked', () => {
+    // A4 and C1 are tunnels; A1 is not.
+    const tunnels = { kind: 'territories', tunnel: true, atLeast: 2 } as const;
+    expect(check(game({ workers: ['A1', 'A4'] }), tunnels)).toBe(false);
+    expect(check(game({ workers: ['A1', 'A4'], character: 'C1' }), tunnels)).toBe(true);
+  });
+
+  it('counts territories around one hex of a terrain (the lake B2, the Factory B3)', () => {
+    // B2's neighbours: A1, A2, B1, B3, C1, C2.
+    const lake = { kind: 'around', terrain: 'lake', atLeast: 3 } as const;
+    expect(check(game({ workers: ['A1', 'A2'] }), lake)).toBe(false);
+    expect(check(game({ workers: ['A1', 'A2'], character: 'C1' }), lake)).toBe(true);
+    // B3's neighbours: A2, A3, B2, B4, C2, C3. The Factory itself doesn't count.
+    const factory = { kind: 'around', terrain: 'factory', atLeast: 2 } as const;
+    expect(check(game({ workers: ['A2', 'B3'] }), factory)).toBe(false);
+    expect(check(game({ workers: ['A2', 'B4'] }), factory)).toBe(true);
+  });
+
+  it('asks for things all on one territory you control', () => {
+    const outpost = {
+      kind: 'oneTerritory',
+      checks: [
+        { kind: 'units', unit: 'character', atLeast: 1 },
+        { kind: 'units', unit: 'mech', atLeast: 1, atMost: 1 },
+        { kind: 'units', unit: 'worker', atLeast: 1, atMost: 1 },
+        { kind: 'resources', atLeast: 5 },
+      ],
+    } as const;
+    const there = { character: 'A1', mechs: ['A1'], workers: ['A1', 'A2'] };
+    expect(check(game(there, { resources: { A1: { oil: 3, wood: 2 } } }), outpost)).toBe(true);
+    // Resources on another hex don't help.
+    expect(check(game(there, { resources: { A1: { oil: 3 }, A2: { wood: 2 } } }), outpost)).toBe(false);
+    // Two workers there is too many.
+    expect(check(game({ ...there, workers: ['A1', 'A1'] }, { resources: { A1: { oil: 5 } } }), outpost)).toBe(false);
+    // Tokens: character, mechs, workers and structures together.
+    const tokens = { kind: 'oneTerritory', checks: [{ kind: 'tokens', atLeast: 4 }] } as const;
+    expect(check(game({ character: 'A1', mechs: ['A1'], workers: ['A1', 'A2'] }), tokens)).toBe(false);
+    expect(check(game({ character: 'A1', mechs: ['A1'], workers: ['A1', 'A2'], structures: { mill: 'A1' } }), tokens)).toBe(true);
+    // Each kind of resource on the one hex.
+    const stores = { kind: 'oneTerritory', checks: [{ kind: 'eachResource', resources: ['oil', 'food'], atLeast: 1 }, { kind: 'structures', atLeast: 1 }] } as const;
+    expect(check(game({ structures: { mine: 'A1' } }, { resources: { A1: { oil: 1, food: 1 } } }), stores)).toBe(true);
+    expect(check(game({ structures: { mine: 'A2' } }, { resources: { A1: { oil: 1, food: 1 } } }), stores)).toBe(false);
+  });
+
+  it('counts the most of any one kind of resource you control', () => {
+    const hoard = { kind: 'resources', oneKind: true, atLeast: 4 } as const;
+    expect(check(game({}, { resources: { A1: { oil: 2, food: 2 } } }), hoard)).toBe(false);
+    expect(check(game({}, { resources: { A1: { oil: 2, food: 1 }, A2: { oil: 2 } } }), hoard)).toBe(true);
+  });
+
+  it('compares two counts: as many workers as recruits', () => {
+    const even = { kind: 'same', what: ['workers', 'recruits'] } as const;
+    expect(check(game({ recruits: [0] }), even)).toBe(false);
+    expect(check(game({ recruits: [0, 1] }), even)).toBe(true);
+  });
+
+  it('asks for the most of something among all players, ties allowed', () => {
+    const top = { kind: 'highest', stat: 'power' } as const;
+    expect(check(other(game({ power: 5 }), { power: 6 }), top)).toBe(false);
+    expect(check(other(game({ power: 6 }), { power: 6 }), top)).toBe(true);
+  });
+
+  it("counts enemy workers your move sent home this turn, and forgets them when the turn ends", () => {
+    // Player 1's lone worker on A3; player 0's character walks onto it.
+    let state = other(game({ power: 7, character: 'A2' }), { workers: ['A3'] });
+    const sent = { kind: 'thisTurn', what: 'workersSentHome', atLeast: 1 } as const;
+    expect(check(state, sent)).toBe(false);
+    state = play(state, { type: 'chooseSection', section: 2 }, { type: 'moveUnit', unit: { kind: 'character' }, to: 'A3' }, { type: 'endMove' });
+    expect(state.players[1]!.workers).toEqual(['home']);
+    expect(check(state, sent)).toBe(true);
+    state = play(state, { type: 'skipBottom' });
+    expect(state.currentPlayer).toBe(1);
+    expect(check({ ...state, currentPlayer: 0 }, sent)).toBe(false);
+  });
+
+  it('checks the new conditions when a card is entered', () => {
+    const fine: ObjectiveCard = {
+      id: 'n',
+      name: 'New',
+      checks: [
+        { kind: 'around', terrain: 'lake', atLeast: 5 },
+        { kind: 'oneTerritory', checks: [{ kind: 'tokens', atLeast: 6 }] },
+        { kind: 'same', what: ['workers', 'recruits'] },
+        { kind: 'highest', stat: 'power' },
+        { kind: 'thisTurn', what: 'workersSentHome', atLeast: 1 },
+        { kind: 'territories', tunnel: true, atLeast: 3 },
+      ],
+    };
+    expect(validateObjectiveCard(fine)).toEqual([]);
+    const odd = {
+      id: 'x',
+      name: 'X',
+      checks: [
+        { kind: 'around', terrain: 'sea', atLeast: 1 },
+        { kind: 'oneTerritory', checks: [] },
+        { kind: 'oneTerritory', checks: [{ kind: 'units', unit: 'ghost', atLeast: 1 }] },
+        { kind: 'same', what: ['workers'] },
+        { kind: 'highest', stat: 'luck' },
+      ],
+    } as unknown as ObjectiveCard;
+    expect(validateObjectiveCard(odd)).toEqual([
+      'condition 1 names an unknown terrain',
+      'condition 2 needs at least one thing to find on the territory',
+      'condition 3, part 1 counts something unknown',
+      'condition 4 needs two things to compare',
+      'condition 5 counts something unknown',
+    ]);
+  });
+});
+
 describe('completing an objective', () => {
   it('is offered at any point of your turn once its condition is met, and places a star', () => {
     expect(offered(game({ coins: 9 }))).toEqual([]);
