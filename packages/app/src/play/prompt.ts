@@ -424,7 +424,8 @@ export function title(state: GameState): string {
           const cost = produceCost(player);
           const costs = (['power', 'popularity', 'coins'] as const).filter((k) => cost[k]).map((k) => `1 ${k}`);
           const pay = costs.length ? `, paying ${costs.join(' + ')}` : '';
-          return `${who} · Produce: tap up to ${topValue(player, mat, turn.section as SectionIndex, 'hexes')} hexes${pay}`;
+          const mill = player.structures.mill ? " plus your mill's" : '';
+          return `${who} · Produce: tap up to ${topValue(player, mat, turn.section as SectionIndex, 'hexes')} hexes${mill}${pay}`;
         }
         case 'bolster':
           return `${who} · Bolster: pay ${top.cost} coin`;
@@ -800,16 +801,23 @@ function producePrompt(state: GameState, actions: Action[], picked: HexId[]): Pr
   const { mat } = state.setup.players[state.currentPlayer]!;
   const player = state.players[state.currentPlayer]!;
   const options = actions.flatMap((a) => (a.type === 'produce' ? [a.hex] : []));
-  const slots = topValue(player, mat, turn.section, 'hexes') - (state.turn.step === 'producing' ? state.turn.produced.length : 0);
-  const full = picked.length >= slots;
+  // The mill's hex is an extra one, on top of the mat's hexes: it gets a slot of its own while it can still produce.
+  const mill = player.structures.mill;
+  const millOpen = !!mill && options.includes(mill);
+  const produced = state.turn.step === 'producing' ? state.turn.produced : [];
+  const workerSlots = topValue(player, mat, turn.section, 'hexes') - produced.filter((h) => h !== mill).length;
+  const slots = workerSlots + (millOpen ? 1 : 0);
+  const workerPicks = picked.filter((h) => h !== mill);
+  const full = workerPicks.length >= workerSlots;
 
-  // Every legal hex stays tappable: a picked one un-picks; once the slots are full, a new one swaps out the oldest pick.
+  // Every legal hex stays tappable: a picked one un-picks; once the slots are full, a new one swaps out the oldest pick (never the mill's).
   const highlights = new Set<Location>();
   const tapSelects = new Map<Location, Selection>();
   for (const hex of options) {
     const isPicked = picked.includes(hex);
     highlights.add(hex);
-    tapSelects.set(hex, { produce: isPicked ? picked.filter((h) => h !== hex) : [...(full ? picked.slice(1) : picked), hex] });
+    const swapOut = hex !== mill && full ? workerPicks[0] : undefined;
+    tapSelects.set(hex, { produce: isPicked ? picked.filter((h) => h !== hex) : [...picked.filter((h) => h !== swapOut), hex] });
   }
 
   // Produce each picked hex in turn; one can stop counting if an earlier one used up the room for workers.

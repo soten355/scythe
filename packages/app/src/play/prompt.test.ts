@@ -174,6 +174,30 @@ describe('producing', () => {
     expect(after.resources).toEqual({ A5: { oil: 1 }, A4: { wood: 1 } });
     expect(after.turn.step).toBe('bottom');
   });
+
+  it("gives the mill's hex a slot of its own, on top of the mat's hexes", () => {
+    const state = producing();
+    const milled: GameState = { ...state, players: [{ ...state.players[0]!, structures: { mill: 'A2' } }, state.players[1]!] };
+    expect(prompt(milled).slots).toHaveLength(3);
+    // Both workers' hexes picked: the mill's hex still adds on, swapping nothing out.
+    const p = prompt(milled, { produce: ['A4', 'A5'] });
+    expect(p.tapSelects.get('A2')).toEqual({ produce: ['A4', 'A5', 'A2'] });
+    // Mill's hex and one worker's hex picked: the other worker's hex adds on too.
+    expect(prompt(milled, { produce: ['A2', 'A4'] }).tapSelects.get('A5')).toEqual({ produce: ['A2', 'A4', 'A5'] });
+    // All three picked: a fourth worker hex would swap out the oldest worker hex, never the mill's.
+    const all = prompt(milled, { produce: ['A2', 'A4', 'A5'] });
+    expect(all.slots!.every((s) => 'text' in s)).toBe(true);
+    const go = all.buttons.find((b) => b.label === 'Produce')!;
+    const after = applyAll(milled, go.actions);
+    expect(Object.keys(after.resources).sort()).toEqual(['A2', 'A4', 'A5']);
+    expect(after.turn.step).toBe('bottom');
+  });
+
+  it('swaps out the oldest worker hex, not the mill, once the worker slots are full', () => {
+    const state = producing();
+    const milled: GameState = { ...state, players: [{ ...state.players[0]!, workers: ['A4', 'A5', 'A6'], structures: { mill: 'A2' } }, state.players[1]!] };
+    expect(prompt(milled, { produce: ['A2', 'A4', 'A5'] }).tapSelects.get('A6')).toEqual({ produce: ['A2', 'A5', 'A6'] });
+  });
 });
 
 // Bottom-row actions: pay by tapping hexes, pick what to do, then press the action's button.
