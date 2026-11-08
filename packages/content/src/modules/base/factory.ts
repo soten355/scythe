@@ -2,21 +2,22 @@ import type { FactoryCard } from '@scythe/engine';
 
 // The Factory deck that ships with the game: 12 cards, each a top part (pay
 // this to gain that) and a bottom part (a move). The effects follow the
-// physical deck as the owner entered them; the names are this game's own.
+// physical deck as the owner entered them; the names are this game's own:
+// new technology the factions find inside the Factory.
 
 export const baseFactoryCards: FactoryCard[] = [
-  { id: 'factory-1', name: 'Threshing Engine', cost: { coins: 1, power: 1 }, gain: { produce: 2 }, move: { units: 1, hexes: 2 } },
-  { id: 'factory-2', name: 'Recruiting Office', cost: { coins: 2 }, gain: { power: 1, actions: ['enlist'] }, move: { units: 1, hexes: 2 } },
-  { id: 'factory-3', name: 'Parade Grounds', cost: { power: 1 }, gain: { popularity: 2 }, move: { units: 1, hexes: 2 } },
-  { id: 'factory-4', name: 'Assembly Line', cost: { popularity: 1 }, gain: { oneOf: true, actions: ['deploy', 'build'] }, move: { units: 1, hexes: 2 } },
-  { id: 'factory-5', name: 'Training Manuals', cost: { popularity: 1 }, gain: { oneOf: true, actions: ['upgrade', 'enlist'] }, move: { units: 1, hexes: 2 } },
-  { id: 'factory-6', name: 'Arms Broker', cost: { combatCards: 1 }, gain: { coins: 3 }, move: { units: 1, hexes: 2 } },
-  { id: 'factory-7', name: 'Workshop Blueprints', cost: { coins: 2 }, gain: { popularity: 1, actions: ['upgrade'] }, move: { units: 1, hexes: 2 } },
-  { id: 'factory-8', name: 'Peace Envoy', cost: { combatCards: 1 }, gain: { popularity: 2 }, move: { units: 1, hexes: 2 } },
-  { id: 'factory-9', name: 'Mech Foundry', cost: { coins: 2 }, gain: { power: 1, actions: ['deploy'] }, move: { units: 1, hexes: 2 } },
-  { id: 'factory-10', name: "Masons' Guild", cost: { coins: 2 }, gain: { popularity: 1, actions: ['build'] }, move: { units: 1, hexes: 2 } },
-  { id: 'factory-11', name: 'Supply Drop', cost: { combatCards: 1 }, gain: { anyResources: 3 }, move: { units: 1, hexes: 2 } },
-  { id: 'factory-12', name: 'War Bonds', cost: { power: 1 }, gain: { coins: 3 }, move: { units: 1, hexes: 2 } },
+  { id: 'factory-1', name: 'Steam Harvester', cost: { coins: 1, power: 1 }, gain: { produce: 2 }, move: { units: 1, hexes: 2 } },
+  { id: 'factory-2', name: 'Telegraph Network', cost: { coins: 2 }, gain: { power: 1, actions: ['enlist'] }, move: { units: 1, hexes: 2 } },
+  { id: 'factory-3', name: 'Newsreel Projector', cost: { power: 1 }, gain: { popularity: 2 }, move: { units: 1, hexes: 2 } },
+  { id: 'factory-4', name: 'Hydraulic Press', cost: { popularity: 1 }, gain: { oneOf: true, actions: ['deploy', 'build'] }, move: { units: 1, hexes: 2 } },
+  { id: 'factory-5', name: 'Calculating Engine', cost: { popularity: 1 }, gain: { oneOf: true, actions: ['upgrade', 'enlist'] }, move: { units: 1, hexes: 2 } },
+  { id: 'factory-6', name: 'Ballistics Patent', cost: { combatCards: 1 }, gain: { coins: 3 }, move: { units: 1, hexes: 2 } },
+  { id: 'factory-7', name: 'Electric Lighting', cost: { coins: 2 }, gain: { popularity: 1, actions: ['upgrade'] }, move: { units: 1, hexes: 2 } },
+  { id: 'factory-8', name: 'Wireless Broadcast', cost: { combatCards: 1 }, gain: { popularity: 2 }, move: { units: 1, hexes: 2 } },
+  { id: 'factory-9', name: 'Clockwork Servos', cost: { coins: 2 }, gain: { power: 1, actions: ['deploy'] }, move: { units: 1, hexes: 2 } },
+  { id: 'factory-10', name: 'Steam Crane', cost: { coins: 2 }, gain: { popularity: 1, actions: ['build'] }, move: { units: 1, hexes: 2 } },
+  { id: 'factory-11', name: 'Pneumatic Freight', cost: { combatCards: 1 }, gain: { anyResources: 3 }, move: { units: 1, hexes: 2 } },
+  { id: 'factory-12', name: 'Minting Press', cost: { power: 1 }, gain: { coins: 3 }, move: { units: 1, hexes: 2 } },
 ];
 
 // A small made-up deck, kept for tests that were written against it.
