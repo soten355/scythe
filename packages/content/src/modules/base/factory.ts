@@ -8,7 +8,7 @@ import type { FactoryCard } from '@scythe/engine';
 export const baseFactoryCards: FactoryCard[] = [
   { id: 'factory-1', name: 'Steam Harvester', cost: { coins: 1, power: 1 }, gain: { produce: 2 }, move: { units: 1, hexes: 2 } },
   { id: 'factory-2', name: 'Telegraph Network', cost: { coins: 2 }, gain: { power: 1, actions: ['enlist'] }, move: { units: 1, hexes: 2 } },
-  { id: 'factory-3', name: 'Newsreel Projector', cost: { power: 1 }, gain: { popularity: 2 }, move: { units: 1, hexes: 2 } },
+  { id: 'factory-3', name: 'Laser Projector', cost: { power: 1 }, gain: { popularity: 2 }, move: { units: 1, hexes: 2 } },
   { id: 'factory-4', name: 'Hydraulic Press', cost: { popularity: 1 }, gain: { oneOf: true, actions: ['deploy', 'build'] }, move: { units: 1, hexes: 2 } },
   { id: 'factory-5', name: 'Calculating Engine', cost: { popularity: 1 }, gain: { oneOf: true, actions: ['upgrade', 'enlist'] }, move: { units: 1, hexes: 2 } },
   { id: 'factory-6', name: 'Ballistics Patent', cost: { combatCards: 1 }, gain: { coins: 3 }, move: { units: 1, hexes: 2 } },
