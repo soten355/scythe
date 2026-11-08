@@ -134,7 +134,11 @@ export type TurnStep =
   /** Factory cards to choose one from, after the character ends its move on the Factory. */
   | { step: 'factoryCard'; section: Section; offered: string[] }
   /** Using the Factory card's top part: resources paid so far (and whether a combat card stood in for one). */
-  | { step: 'factoryTop'; section: typeof FACTORY; paid: ResourcePile; coerced?: true }
+  | { step: 'factoryTop'; section: typeof FACTORY; paid: ResourcePile; coerced?: true; cardsPaid?: number }
+  /** The Factory card gives one of its rewards: the player picks which (see factoryOptions). */
+  | { step: 'factoryChoice'; section: typeof FACTORY }
+  /** Resources of the player's choice from the Factory card: on `hex` once picked, `left` still to place; then producing and free actions. */
+  | { step: 'factoryResources'; section: typeof FACTORY; left: number; hex?: HexId; then: { produce: number; actions: BottomActionType[] } }
   /** Producing from the Factory card's top part: up to `left` more hexes with the player's workers, then `todo`'s free actions. */
   | { step: 'factoryProduce'; section: typeof FACTORY; left: number; produced: HexId[]; todo: BottomActionType[] }
   /** Free bottom-row actions the Factory card's top part gave, still to take. */
@@ -238,6 +242,10 @@ export type Action =
   | { type: 'takeFactoryCard'; card: string }
   | { type: 'factoryPay'; hex: HexId; resource: Resource }
   | { type: 'factoryUse' }
+  | { type: 'factoryPayCard'; value: number }
+  | { type: 'factoryChoose'; option: number }
+  | { type: 'factoryResourceHex'; hex: HexId }
+  | { type: 'factoryResource'; resource: Resource }
   // On your own turn, whenever its conditions hold: reveal an objective card and place a star.
   | { type: 'completeObjective'; card: string }
   // Bottom row: pay the cost one resource at a time, then the action itself.
@@ -333,6 +341,8 @@ function stepActions(state: GameState, seat: number): Action[] {
       return encounterActions(state, turn);
     case 'factoryCard':
     case 'factoryTop':
+    case 'factoryChoice':
+    case 'factoryResources':
     case 'factoryProduce':
     case 'factoryRewards':
       return factoryActions(state, turn);
@@ -395,6 +405,8 @@ function step(state: GameState, action: Action): GameState {
       return applyEncounter(state, turn, action);
     case 'factoryCard':
     case 'factoryTop':
+    case 'factoryChoice':
+    case 'factoryResources':
     case 'factoryProduce':
     case 'factoryRewards':
       return applyFactory(state, turn, action);

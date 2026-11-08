@@ -16,7 +16,11 @@ const cards: FactoryCard[] = [
   { id: 'f4', name: 'Four', cost: { coins: 1 }, gain: { popularity: 1 }, move: { units: 1, hexes: 1 } },
   { id: 'f5', name: 'Five', cost: { coins: 1 }, gain: { produce: 2 }, move: { units: 1, hexes: 1 } },
   { id: 'f6', name: 'Six', cost: { coins: 1 }, gain: { produce: 1, actions: ['upgrade'] }, move: { units: 1, hexes: 1 } },
+  { id: 'f7', name: 'Seven', cost: { popularity: 1 }, gain: { oneOf: true, coins: 2, actions: ['upgrade', 'deploy'] }, move: { units: 1, hexes: 1 } },
+  { id: 'f8', name: 'Eight', cost: { combatCards: 1 }, gain: { coins: 3 }, move: { units: 1, hexes: 1 } },
+  { id: 'f9', name: 'Nine', cost: { combatCards: 1 }, gain: { anyResources: 3 }, move: { units: 1, hexes: 1 } },
 ];
+const ALL = ['f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8', 'f9'];
 
 function game(p0: Partial<PlayerState> = {}, p1: Partial<PlayerState> = {}, opts: { rule?: AbilityRule; resources?: GameState['resources'] } = {}): GameState {
   const setup = {
@@ -53,7 +57,7 @@ const holding = (card: string, p0: Partial<PlayerState> = {}, opts: { rule?: Abi
 describe('setting up the Factory', () => {
   it('shuffles the Factory cards, without changing the combat deck', () => {
     const state = newGame({ ...testSetup, factory: cards });
-    expect([...state.factoryDeck].sort()).toEqual(['f1', 'f2', 'f3', 'f4', 'f5', 'f6']);
+    expect([...state.factoryDeck].sort()).toEqual(ALL);
     expect(state.combatDeck).toEqual(newGame(testSetup).combatDeck);
   });
 
@@ -75,7 +79,7 @@ describe('taking a Factory card', () => {
   it('keeps the one picked; the others go back under the deck', () => {
     const state = play(arrive(), { type: 'takeFactoryCard', card: 'f2' });
     expect(state.players[0]!.factoryCard).toBe('f2');
-    expect(state.factoryDeck).toEqual(['f4', 'f5', 'f6', 'f1', 'f3']);
+    expect(state.factoryDeck).toEqual(['f4', 'f5', 'f6', 'f7', 'f8', 'f9', 'f1', 'f3']);
     expect(state.turn).toMatchObject({ step: 'bottom', section: 2 });
   });
 
@@ -190,6 +194,52 @@ describe('the Factory card as a fifth section', () => {
     expect(types(state)).toEqual(['upgrade']);
   });
 
+  it('"or": pays, then gives just one of its rewards, the player choosing', () => {
+    let state = play(holding('f7', { popularity: 2, coins: 0 }), choose(FACTORY), use);
+    expect(state.players[0]!.popularity).toBe(1);
+    expect(state.turn).toMatchObject({ step: 'factoryChoice', section: FACTORY });
+    // Coins, a free Upgrade, a free Deploy: one each.
+    expect(legalActions(state, 0)).toEqual([0, 1, 2].map((option) => ({ type: 'factoryChoose', option })));
+    const coins = play(state, { type: 'factoryChoose', option: 0 });
+    expect(coins.players[0]!.coins).toBe(2);
+    expect(coins.turn).toMatchObject({ step: 'top', section: FACTORY });
+    state = play(state, { type: 'factoryChoose', option: 2 });
+    expect(types(state)).toEqual(['deploy']);
+    expect(state.players[0]!.coins).toBe(0);
+  });
+
+  it('"or": a reward with nothing to do for it isn\'t offered', () => {
+    // All four mechs out: no Deploy to choose.
+    const state = play(holding('f7', { popularity: 2, mechs: ['A1', 'A1', 'A1', 'A1'], mechAbilities: [0, 1, 2, 3] }), choose(FACTORY), use);
+    expect(legalActions(state, 0)).toEqual([0, 1].map((option) => ({ type: 'factoryChoose', option })));
+  });
+
+  it('pays combat cards of your choice from your hand', () => {
+    let state = play(holding('f8', { combatCards: [2, 5, 5], coins: 0 }), choose(FACTORY));
+    expect(legalActions(state, 0)).toEqual([{ type: 'factoryPayCard', value: 2 }, { type: 'factoryPayCard', value: 5 }, skip]);
+    state = play(state, { type: 'factoryPayCard', value: 5 });
+    expect(state.players[0]!.combatCards).toEqual([2, 5]);
+    expect(state.combatDiscard).toContain(5);
+    expect(legalActions(state, 0)).toEqual([use]);
+    expect(play(state, use).players[0]!.coins).toBe(3);
+  });
+
+  it("can't pay combat cards you don't have", () => {
+    const state = play(holding('f8', { combatCards: [] }), choose(FACTORY));
+    expect(types(state)).toEqual(['skipTop']);
+  });
+
+  it('puts resources of your choice on one hex you control: the hex first, then each resource', () => {
+    let state = play(holding('f9', { combatCards: [3], workers: ['A1', 'A2'] }), choose(FACTORY), { type: 'factoryPayCard', value: 3 }, use);
+    expect(state.turn).toMatchObject({ step: 'factoryResources', left: 3 });
+    expect(legalActions(state, 0)).toEqual([{ type: 'factoryResourceHex', hex: 'A1' }, { type: 'factoryResourceHex', hex: 'A2' }]);
+    state = play(state, { type: 'factoryResourceHex', hex: 'A2' });
+    expect(legalActions(state, 0)).toEqual(['oil', 'metal', 'wood', 'food'].map((resource) => ({ type: 'factoryResource', resource })));
+    state = play(state, { type: 'factoryResource', resource: 'oil' }, { type: 'factoryResource', resource: 'oil' }, { type: 'factoryResource', resource: 'food' });
+    expect(state.resources).toEqual({ A2: { oil: 2, food: 1 } });
+    expect(state.turn).toMatchObject({ step: 'top', section: FACTORY });
+  });
+
   it("bottom: moves as many units as the card says, as far as it says, with no coins instead", () => {
     // f1: one unit, up to two hexes.
     let state = play(holding('f1', { workers: ['A1', 'C4'], power: 0 }), choose(FACTORY), skip);
@@ -220,6 +270,13 @@ describe('checking a Factory card', () => {
     expect(validateFactoryCard(blank)).toEqual(['name is missing', 'ID is missing', 'its move must be at least 1 unit, at least 1 hex']);
     const odd = { ...cards[1]!, cost: { coins: -1, resources: { gold: 1 } }, gain: { actions: ['fly'] } } as unknown as FactoryCard;
     expect(validateFactoryCard(odd)).toEqual(['its cost must be whole numbers of 0 or more', 'its cost has an unknown resource', 'it gives an unknown action']);
+  });
+
+  it('checks the new parts: combat cards paid, resources of your choice, "or"', () => {
+    for (const c of cards) expect(validateFactoryCard(c), c.id).toEqual([]);
+    expect(validateFactoryCard({ ...cards[7]!, cost: { combatCards: -1 } })).toEqual(['its cost must be whole numbers of 0 or more']);
+    expect(validateFactoryCard({ ...cards[8]!, gain: { anyResources: 0.5 } })).toEqual(['its rewards must be whole numbers of 0 or more']);
+    expect(validateFactoryCard({ ...cards[6]!, gain: { oneOf: true, coins: 2 } })).toEqual(['"one of" needs at least two rewards to choose from']);
   });
 
   it('produce must be a whole number of hexes', () => {

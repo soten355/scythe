@@ -9,7 +9,7 @@ export function phase(state: GameState): Phase {
   const turn = state.turn;
   if (turn.step === 'chooseSection') return 'choose';
   // The Factory card's move stands in for a bottom row.
-  if (turn.section === FACTORY) return turn.step === 'factoryTop' || turn.step === 'factoryProduce' || turn.step === 'factoryRewards' ? 'top' : 'bottom';
+  if (turn.section === FACTORY) return ['factoryTop', 'factoryChoice', 'factoryResources', 'factoryProduce', 'factoryRewards'].includes(turn.step) ? 'top' : 'bottom';
   return turn.step === 'bottom' || turn.step === 'end' ? 'bottom' : 'top';
 }
 

@@ -91,6 +91,7 @@ function render() {
           ${num('cost.coins', c.cost.coins, 'Coins')}
           ${num('cost.popularity', c.cost.popularity, 'Popularity')}
           ${num('cost.power', c.cost.power, 'Power')}
+          ${num('cost.combatCards', c.cost.combatCards, 'Combat cards')}
         </div>
         <p class="part">Resources (from hexes you control)</p>
         <div class="amounts">${RESOURCES.map((r) => num(`cost.resources.${r}`, res[r], title(r))).join('')}</div>
@@ -101,11 +102,13 @@ function render() {
           ${num('gain.popularity', c.gain.popularity, 'Popularity')}
           ${num('gain.combatCards', c.gain.combatCards, 'Combat cards')}
           ${num('gain.produce', c.gain.produce, 'Produce on hexes (with your workers)')}
+          ${num('gain.anyResources', c.gain.anyResources, 'Resources of your choice (on one hex)')}
         </div>
         <p class="part">Free actions</p>
         <div class="actions">
           ${ACTIONS.map(([a, name]) => `<label class="check"><input type="checkbox" data-action="${a}" ${c.gain.actions?.includes(a) ? 'checked' : ''}> ${name}</label>`).join('')}
         </div>
+        <label class="check"><input type="checkbox" data-flag="oneOf" ${c.gain.oneOf ? 'checked' : ''}> Gain only one of these (the player chooses)</label>
         <p class="preview" data-preview="top">${esc(preview('top'))}</p>
       </div>
       <div class="card">
@@ -157,6 +160,9 @@ root.addEventListener('change', (e) => {
     render();
   } else if (el.dataset.action) {
     update(toggleAction(card(), el.dataset.action as BottomActionType, el.checked));
+    renderStatus();
+  } else if (el.dataset.flag === 'oneOf') {
+    update(setPath(card(), 'gain.oneOf', el.checked));
     renderStatus();
   }
 });

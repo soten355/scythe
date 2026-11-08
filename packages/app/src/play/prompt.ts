@@ -24,6 +24,7 @@ import {
   encounterOptionLimit,
   factoryCard,
   FACTORY,
+  factoryOptions,
   heldFactoryCard,
   unitsToMove,
   maxCombatCards,
@@ -268,6 +269,17 @@ export function label(state: GameState, action: Action): string {
       return `Pay 1 ${action.resource} from ${action.hex}`;
     case 'factoryUse':
       return 'Pay and use it';
+    case 'factoryPayCard':
+      return `Pay a ${action.value} combat card`;
+    case 'factoryChoose': {
+      const option = factoryOptions(heldFactoryCard(state, state.currentPlayer)!.gain)[action.option]!;
+      const text = gainText(option, '');
+      return text[0]!.toUpperCase() + text.slice(1);
+    }
+    case 'factoryResourceHex':
+      return `Put them on ${action.hex}`;
+    case 'factoryResource':
+      return action.resource[0]!.toUpperCase() + action.resource.slice(1);
     case 'skipBottom':
       return 'End turn';
     case 'gainCoins':
@@ -349,7 +361,7 @@ export function sectionHeadings(state: GameState): { top: string; bottom: string
   if (turn.section === FACTORY) {
     // The card's top part, then its move (in place of a bottom row).
     const card = heldFactoryCard(state, state.currentPlayer)!;
-    const onTop = turn.step === 'factoryTop' || turn.step === 'factoryProduce' || turn.step === 'factoryRewards';
+    const onTop = ['factoryTop', 'factoryChoice', 'factoryResources', 'factoryProduce', 'factoryRewards'].includes(turn.step);
     return {
       top: `Factory card · ${costText(card.cost)} → ${gainText(card.gain, '')}`,
       bottom: `Then ${moveText(card)}`,
@@ -401,6 +413,11 @@ export function title(state: GameState): string {
         if (pays.some((a) => a.type === 'factoryUse')) return `${who} · Factory card: paid; use it for ${gainText(card.gain, '')}`;
         return `${who} · Factory card: tap glowing hexes you control to pay ${costText(card.cost).replace(/^Pay /, '')}`;
       }
+      case 'factoryChoice':
+        return `${who} · Factory card: choose one: ${gainText(card.gain, '')}`;
+      case 'factoryResources':
+        if (!turn.hex) return `${who} · Factory card: tap a hex you control to put ${turn.left} resource${turn.left === 1 ? '' : 's'} of your choice on`;
+        return `${who} · Factory card: choose ${turn.left} more resource${turn.left === 1 ? '' : 's'} for ${turn.hex}`;
       case 'factoryProduce':
         return `${who} · Factory card: produce on up to ${turn.left} more ${turn.left === 1 ? 'hex' : 'hexes'} with your workers`;
       case 'factoryRewards':
@@ -505,6 +522,7 @@ function stepPrompt(state: GameState, actions: Action[], selection: Selection): 
   if (turn.step === 'encounter') return encounterPrompt(state, actions, selection);
   if (turn.step === 'factoryCard') return factoryOfferPrompt(state, actions);
   if (turn.step === 'factoryTop') return factoryTopPrompt(state, actions);
+  if (turn.step === 'factoryChoice' || turn.step === 'factoryResources') return factoryRewardPrompt(state, actions);
   if (turn.step === 'factoryRewards') return bottomPrompt(state, actions, selection, turn.todo[0]);
   if (actions.some((a) => a.type === 'produce')) return producePrompt(state, actions, selection.produce ?? []);
   if (turn.step === 'top' && actions.some((a) => a.type === 'tradePopularity')) return tradePrompt(state, actions, selection.trade);
@@ -1119,11 +1137,12 @@ function tradePrompt(state: GameState, actions: Action[], trade: Selection['trad
 }
 
 /** An encounter option's or Factory card's cost in words: "Free", "Pay 2 coins", "Lose 2 popularity", "Pay 1 wood and 1 coin". */
-export function costText(cost: EncounterCost & { resources?: ResourcePile }): string {
+export function costText(cost: EncounterCost & { resources?: ResourcePile; combatCards?: number }): string {
   const pays = [
     ...RESOURCES.filter((r) => cost.resources?.[r]).map((r) => `${cost.resources![r]} ${r}`),
     ...(cost.coins ? [plural(cost.coins, 'coin')] : []),
     ...(cost.power ? [`${cost.power} power`] : []),
+    ...(cost.combatCards ? [plural(cost.combatCards, 'combat card')] : []),
   ];
   const parts = [...(pays.length ? [`pay ${pays.join(' and ')}`] : []), ...(cost.popularity ? [`lose ${cost.popularity} popularity`] : [])];
   if (!parts.length) return 'Free';
@@ -1132,7 +1151,7 @@ export function costText(cost: EncounterCost & { resources?: ResourcePile }): st
 }
 
 /** What an encounter option gives, in words: "2 power, 1 combat card, 2 workers on A3, a free Deploy". */
-export function gainText(gain: EncounterGain & { produce?: number }, hex: HexId): string {
+export function gainText(gain: EncounterGain & { produce?: number; oneOf?: boolean }, hex: HexId): string {
   const parts: string[] = [];
   if (gain.produce) parts.push(`produce on up to ${gain.produce} ${gain.produce === 1 ? 'hex' : 'hexes'} with your workers`);
   if (gain.coins) parts.push(plural(gain.coins, 'coin'));
@@ -1142,10 +1161,12 @@ export function gainText(gain: EncounterGain & { produce?: number }, hex: HexId)
   const onHex: string[] = [];
   if (gain.workers) onHex.push(plural(gain.workers, 'worker'));
   for (const r of RESOURCES) if (gain.resources?.[r]) onHex.push(`${gain.resources[r]} ${r}`);
-  if (gain.anyResources) onHex.push(`${gain.anyResources} resource${gain.anyResources === 1 ? '' : 's'} of your choice`);
+  // A Factory card's (no hex given): all on one hex you control.
+  if (gain.anyResources) onHex.push(`${gain.anyResources} resource${gain.anyResources === 1 ? '' : 's'} of your choice${hex ? '' : ' on one hex you control'}`);
   if (onHex.length) parts.push(hex ? `${onHex.join(', ')} on ${hex}` : onHex.join(', '));
   for (const a of gain.actions ?? []) parts.push(`a free ${BOTTOM_NAMES[a]}`);
-  return parts.join(', ') || 'Nothing';
+  // An "or" Factory card: one of them.
+  return parts.join(gain.oneOf ? ' or ' : ', ') || 'Nothing';
 }
 
 const NUMBER_WORDS = ['none', 'one', 'two', 'three'];
@@ -1231,6 +1252,21 @@ function factoryOfferPrompt(state: GameState, actions: Action[]): Prompt {
  * each resource (a hex with several kinds pays them in turn), or a combat
  * card with Coercion; then one button pays the rest and takes the reward.
  */
+/** An "or" card's choice (a button each), or resources of your choice: tap the hex, then a button per resource. */
+function factoryRewardPrompt(state: GameState, actions: Action[]): Prompt {
+  const prompt: Prompt = { ...emptyPrompt(state), buttons: [] };
+  for (const a of actions) {
+    if (a.type === 'factoryResourceHex') {
+      prompt.highlights.add(a.hex);
+      prompt.tapActions.set(a.hex, a);
+    } else {
+      prompt.buttons.push({ label: label(state, a), action: a });
+    }
+  }
+  if (state.turn.step === 'factoryResources' && state.turn.hex) prompt.selected = state.turn.hex;
+  return prompt;
+}
+
 function factoryTopPrompt(state: GameState, actions: Action[]): Prompt {
   const prompt: Prompt = { ...emptyPrompt(state), buttons: [] };
   for (const a of actions) {

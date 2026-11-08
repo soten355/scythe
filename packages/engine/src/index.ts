@@ -16,6 +16,6 @@ export { rulesOf, rulesOfKind, hasRule } from './abilities';
 export { canPay as canPayEncounter, encounterCard, validateEncounterCard, optionLimit as encounterOptionLimit, type EncounterCard, type EncounterShow, type EncounterCost, type EncounterGain, type EncounterOption, type EncounterTask } from './encounters';
 export { objectiveCard, objectiveMet, validateObjectiveCard, OBJECTIVE_EVENTS, OBJECTIVE_PROGRESS, OBJECTIVE_STATS, OBJECTIVE_TERRAINS, OBJECTIVE_UNITS, type ObjectiveCard, type ObjectiveCheck, type ObjectiveEvent, type ObjectiveProgress, type ObjectiveStat, type ObjectiveUnit, type TerritoryCheck } from './objectives';
 export { structureBonusCoins, structureBonusCount, structureBonusTile, validateStructureBonus, STRUCTURE_FEATURES, type StructureBonusTile, type StructureCount, type StructureFeature } from './structure-bonus';
-export { factoryCard, heldFactoryCard, validateFactoryCard, type FactoryCard, type FactoryCost, type FactoryGain } from './factory';
+export { factoryCard, factoryOptions, heldFactoryCard, validateFactoryCard, type FactoryCard, type FactoryCost, type FactoryGain } from './factory';
 export { unitsToMove } from './top-actions';
 export * from './view';

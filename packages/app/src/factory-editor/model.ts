@@ -40,12 +40,12 @@ export function cleanCard(card: FactoryCard): FactoryCard {
   const keep = <T extends object>(obj: T): T => Object.fromEntries(Object.entries(obj).filter(([, v]) => typeof v === 'number' && Number.isFinite(v) && v !== 0)) as T;
   const { resources = {}, ...costCounts } = card.cost;
   const res = keep(resources);
-  const { actions = [], ...gainCounts } = card.gain;
+  const { actions = [], oneOf, ...gainCounts } = card.gain;
   return {
     id: card.id.trim(),
     name: card.name.trim(),
     cost: { ...keep(costCounts), ...(RESOURCES.some((r) => res[r]) && { resources: res }) },
-    gain: { ...keep(gainCounts), ...(actions.length && { actions: [...actions] }) },
+    gain: { ...keep(gainCounts), ...(actions.length && { actions: [...actions] }), ...(oneOf && { oneOf: true }) },
     // A blank move stays as it is, for the check to point out.
     move: { units: card.move.units, hexes: card.move.hexes },
   };

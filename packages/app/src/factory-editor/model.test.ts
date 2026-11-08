@@ -47,6 +47,15 @@ describe('the Factory card editor', () => {
     expect(cleanCard(card).gain).toEqual({});
   });
 
+  it('keeps the "or" switch, combat cards paid and resources of your choice', () => {
+    let card = setPath(newCard('c'), 'cost.combatCards', 1);
+    card = setPath(card, 'gain.anyResources', 3);
+    card = toggleAction(card, 'deploy', true);
+    card = setPath(card, 'gain.oneOf', true);
+    expect(cleanCard(card)).toMatchObject({ cost: { combatCards: 1 }, gain: { anyResources: 3, oneOf: true, actions: ['deploy'] } });
+    expect(cleanCard(setPath(card, 'gain.oneOf', false)).gain).toEqual({ anyResources: 3, actions: ['deploy'] });
+  });
+
   it('keeps a blank move blank, so the check catches it', () => {
     const card = cleanCard(setPath(newCard('c'), 'move.units', null));
     expect(validateFactoryCard(card)).toEqual(['its move must be at least 1 unit, at least 1 hex']);

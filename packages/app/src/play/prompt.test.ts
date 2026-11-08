@@ -759,6 +759,37 @@ describe('the Factory', () => {
     expect(after.turn).toMatchObject({ step: 'top', section: FACTORY });
   });
 
+  it('words and plays "or" cards, combat card costs and resources of your choice', () => {
+    const or = { id: 'test-or', name: 'Or', cost: { popularity: 1 }, gain: { oneOf: true, actions: ['deploy', 'build'] }, move: { units: 1, hexes: 1 } } as const;
+    const drop = { id: 'test-drop', name: 'Drop', cost: { combatCards: 1 }, gain: { anyResources: 3 }, move: { units: 1, hexes: 1 } };
+    expect(costText(drop.cost)).toBe('Pay 1 combat card');
+    expect(gainText(or.gain as never, '')).toBe('a free Deploy or a free Build');
+    expect(gainText(drop.gain, '')).toBe('3 resources of your choice on one hex you control');
+    const cards = [...sampleFactoryCards, or as never, drop];
+
+    // "Or": a button each.
+    let base = withFactory({ factoryCard: 'test-or', popularity: 3 });
+    let state = play({ ...base, setup: { ...base.setup, factory: cards } } as GameState, { type: 'chooseSection', section: FACTORY }, { type: 'factoryUse' });
+    let p = prompt(state);
+    expect(p.title).toBe('Nordic · Factory card: choose one: a free Deploy or a free Build');
+    expect(p.buttons.map((b) => b.label)).toEqual(['A free Deploy', 'A free Build']);
+    expect(sectionHeadings(state)?.status.top).toBe('now');
+
+    // A combat card to pay, then a hex to tap, then a button per resource.
+    base = withFactory({ factoryCard: 'test-drop', combatCards: [4] });
+    state = play({ ...base, setup: { ...base.setup, factory: cards } } as GameState, { type: 'chooseSection', section: FACTORY });
+    expect(prompt(state).buttons.map((b) => b.label)).toEqual(['Pay a 4 combat card', 'Skip to the move']);
+    state = play(state, { type: 'factoryPayCard', value: 4 }, { type: 'factoryUse' });
+    p = prompt(state);
+    expect(p.title).toBe('Nordic · Factory card: tap a hex you control to put 3 resources of your choice on');
+    expect([...p.highlights].sort()).toEqual(['A4', 'A5']);
+    state = play(state, p.tapActions.get('A5')!);
+    p = prompt(state);
+    expect(p.title).toBe('Nordic · Factory card: choose 3 more resources for A5');
+    expect(p.buttons.map((b) => b.label)).toEqual(['Oil', 'Metal', 'Wood', 'Food']);
+    expect(p.selected).toBe('A5');
+  });
+
   it("then moves, with no coins instead, and the move's skip ends the turn", () => {
     const state = applyAction(withFactory({ factoryCard: 'sample-f01', power: 0 }), { type: 'chooseSection', section: FACTORY });
     const moving = applyAction(state, { type: 'skipTop' });

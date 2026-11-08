@@ -57,6 +57,8 @@ export function tellTurn(history: GameState[], steps: Action[][], turn: Turn): s
         else if (a.type === 'deploy') told.push(`Deployed a mech on ${a.hex} (${label(s, a).replace(/^Mech: /, '')})`);
         else if (a.type === 'build') told.push(`Built the ${a.structure} on ${a.hex}`);
         else if (a.type === 'encounterOption') told.push(`Had an encounter (option ${a.option + 1})`);
+        else if (a.type === 'factoryChoose') told.push(`Took ${label(s, a).toLowerCase()} from its Factory card`);
+        else if (a.type === 'factoryResource' && s.turn.step === 'factoryResources') told.push(`Put 1 ${a.resource} on ${s.turn.hex}`);
         else if (a.type === 'completeObjective') told.push(label(s, a).replace(/^★ Complete objective/, 'Completed the objective'));
         else if (TOLD.has(a.type)) told.push(label(s, a));
       }

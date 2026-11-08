@@ -31,6 +31,8 @@ export interface FactoryCost {
   power?: number;
   /** Paid from hexes the player controls. */
   resources?: ResourcePile;
+  /** Combat cards of the player's choice, discarded from their hand. */
+  combatCards?: number;
 }
 
 export interface FactoryGain {
@@ -40,6 +42,10 @@ export interface FactoryGain {
   combatCards?: number;
   /** Produce on up to this many hexes with your workers on them (before any free actions); the card's cost stands in for Produce's own. */
   produce?: number;
+  /** So many resources of the player's choice (any mix), all placed on one hex they control. */
+  anyResources?: number;
+  /** "Or": the player gets just one of the rewards listed (each amount, and each free action, is one choice). */
+  oneOf?: boolean;
   /** Bottom-row actions taken for free, in this order. */
   actions?: BottomActionType[];
 }
@@ -55,7 +61,7 @@ export interface FactoryCard {
   move: { units: number; hexes: number };
 }
 
-type FactoryStep = Extract<TurnStep, { step: 'factoryCard' | 'factoryTop' | 'factoryProduce' | 'factoryRewards' }>;
+type FactoryStep = Extract<TurnStep, { step: 'factoryCard' | 'factoryTop' | 'factoryChoice' | 'factoryResources' | 'factoryProduce' | 'factoryRewards' }>;
 
 const RESOURCES: Resource[] = ['oil', 'metal', 'wood', 'food'];
 
@@ -108,18 +114,41 @@ const available = (state: GameState, seat: number, r: Resource) =>
 const coercionValues = (state: GameState, seat: number, coerced: boolean) =>
   coerced || !hasRule(state, seat, 'cardAsResource') ? [] : [...new Set(state.players[seat]!.combatCards)].sort((a, b) => a - b);
 
+/** Combat cards still to pay for the card's cost. */
+const cardsOwed = (card: FactoryCard, cardsPaid = 0) => Math.max(0, (card.cost.combatCards ?? 0) - cardsPaid);
+
 /** Whether the rest of the top part's cost can still be paid. */
-function canFinish(state: GameState, seat: number, card: FactoryCard, paid: ResourcePile, coerced: boolean): boolean {
+function canFinish(state: GameState, seat: number, card: FactoryCard, paid: ResourcePile, coerced: boolean, cardsPaid = 0): boolean {
   const p = state.players[seat]!;
   const { coins = 0, popularity = 0, power = 0 } = card.cost;
   if (p.coins < coins || p.popularity < popularity || p.power < power) return false;
+  const cards = cardsOwed(card, cardsPaid);
+  if (p.combatCards.length < cards) return false;
   const { left, total } = owed(card, paid, coerced);
   if (total === 0) return true;
   const short = RESOURCES.reduce((n, r) => n + Math.max(0, (left[r] ?? 0) - available(state, seat, r)), 0);
-  // One combat card covers one missing resource: one already paid, or one that can still be.
-  const cover = coerced || coercionValues(state, seat, coerced).length ? 1 : 0;
+  // One combat card covers one missing resource: one already paid, or one that can still be (if one's left over after the cost's own cards).
+  const cover = coerced || (coercionValues(state, seat, coerced).length && p.combatCards.length > cards) ? 1 : 0;
   return short <= cover;
 }
+
+/** What an "or" card offers: each amount it gives, and each free action, as a reward of its own. */
+export function factoryOptions(gain: FactoryGain): FactoryGain[] {
+  const amounts = (['coins', 'power', 'popularity', 'combatCards', 'produce', 'anyResources'] as const).filter((k) => gain[k]).map((k): FactoryGain => ({ [k]: gain[k] }));
+  return [...amounts, ...(gain.actions ?? []).map((a): FactoryGain => ({ actions: [a] }))];
+}
+
+/** Whether a reward would do anything now (a free action with nothing left to do it with, say, wouldn't). */
+function worthTaking(state: GameState, g: FactoryGain): boolean {
+  if (g.actions?.length) return g.actions.some((a) => effectOptions(state, a).length > 0);
+  if (g.produce) return produceHexes(state, []).length > 0;
+  if (g.anyResources) return resourceHexes(state).length > 0;
+  return true;
+}
+
+/** Hexes the current player controls that resources can be put on (not a lake). */
+const resourceHexes = (state: GameState): HexId[] =>
+  [...controlledHexes(state, state.currentPlayer)].filter((hex) => state.setup.board.hexes[hex]?.terrain !== 'lake');
 
 export function factoryActions(state: GameState, turn: FactoryStep): Action[] {
   const seat = state.currentPlayer;
@@ -128,23 +157,35 @@ export function factoryActions(state: GameState, turn: FactoryStep): Action[] {
       return turn.offered.map((card): Action => ({ type: 'takeFactoryCard', card }));
     case 'factoryRewards':
       return effectOptions(state, turn.todo[0]!);
+    case 'factoryChoice': {
+      const options = factoryOptions(heldFactoryCard(state, seat)!.gain);
+      return options.flatMap((g, option): Action[] => (worthTaking(state, g) ? [{ type: 'factoryChoose', option }] : []));
+    }
+    case 'factoryResources':
+      if (!turn.hex) return resourceHexes(state).map((hex): Action => ({ type: 'factoryResourceHex', hex }));
+      return RESOURCES.map((resource): Action => ({ type: 'factoryResource', resource }));
     case 'factoryProduce':
       return [...produceHexes(state, turn.produced).map((hex): Action => ({ type: 'produce', hex })), { type: 'endProduce' }];
     case 'factoryTop': {
       const card = heldFactoryCard(state, seat)!;
-      const started = Object.keys(turn.paid).length > 0 || !!turn.coerced;
+      const started = Object.keys(turn.paid).length > 0 || !!turn.coerced || !!turn.cardsPaid;
       const skip: Action[] = started ? [] : [{ type: 'skipTop' }];
-      if (!canFinish(state, seat, card, turn.paid, !!turn.coerced)) return skip;
+      if (!canFinish(state, seat, card, turn.paid, !!turn.coerced, turn.cardsPaid)) return skip;
       const { left, total } = owed(card, turn.paid, !!turn.coerced);
-      if (total === 0) return [{ type: 'factoryUse' }];
+      const cards = cardsOwed(card, turn.cardsPaid);
+      if (total === 0 && cards === 0) return [{ type: 'factoryUse' }];
       const pays: Action[] = [];
+      if (cards > 0) {
+        for (const value of [...new Set(state.players[seat]!.combatCards)].sort((a, b) => a - b)) pays.push({ type: 'factoryPayCard', value });
+      }
       for (const hex of controlledHexes(state, seat)) {
         for (const resource of RESOURCES) {
           if (left[resource] && (state.resources[hex]?.[resource] ?? 0) > 0) pays.push({ type: 'factoryPay', hex, resource });
         }
       }
-      const cards = coercionValues(state, seat, !!turn.coerced).map((value): Action => ({ type: 'payWithCard', value }));
-      return [...pays, ...cards, ...skip];
+      // Coercion, for a resource, only with a card to spare beyond the ones the cost asks for.
+      const coercion = total > 0 && state.players[seat]!.combatCards.length > cards ? coercionValues(state, seat, !!turn.coerced) : [];
+      return [...pays, ...coercion.map((value): Action => ({ type: 'payWithCard', value })), ...skip];
     }
   }
 }
@@ -165,6 +206,13 @@ export function applyFactory(state: GameState, turn: FactoryStep, action: Action
       const paid = { ...t.paid, [action.resource]: (t.paid[action.resource] ?? 0) + 1 };
       return { ...addResources(state, action.hex as HexId, action.resource, -1), turn: { ...t, paid } };
     }
+    case 'factoryPayCard': {
+      const t = turn as Extract<FactoryStep, { step: 'factoryTop' }>;
+      const hand = [...state.players[seat]!.combatCards];
+      hand.splice(hand.indexOf(action.value), 1);
+      const next = updatePlayer({ ...state, combatDiscard: [...state.combatDiscard, action.value] }, seat, { combatCards: hand });
+      return { ...next, turn: { ...t, cardsPaid: (t.cardsPaid ?? 0) + 1 } };
+    }
     case 'payWithCard': {
       const hand = [...state.players[seat]!.combatCards];
       hand.splice(hand.indexOf(action.value), 1);
@@ -179,9 +227,18 @@ export function applyFactory(state: GameState, turn: FactoryStep, action: Action
         popularity: p.popularity - (cost.popularity ?? 0),
         power: p.power - (cost.power ?? 0),
       });
-      next = updatePlayer(next, seat, gain(next.players[seat]!, g));
-      if (g.combatCards) next = drawCombatCards(next, seat, g.combatCards);
-      return producing(next, g.produce ?? 0, [], [...(g.actions ?? [])]);
+      if (g.oneOf) return { ...next, turn: { step: 'factoryChoice', section: FACTORY } };
+      return give(next, g);
+    }
+    case 'factoryChoose':
+      return give(state, factoryOptions(heldFactoryCard(state, seat)!.gain)[action.option]!);
+    case 'factoryResourceHex':
+      return { ...state, turn: { ...(turn as Extract<FactoryStep, { step: 'factoryResources' }>), hex: action.hex } };
+    case 'factoryResource': {
+      const t = turn as Extract<FactoryStep, { step: 'factoryResources' }>;
+      const next = addResources(state, t.hex!, action.resource, 1);
+      if (t.left > 1) return { ...next, turn: { ...t, left: t.left - 1 } };
+      return producing(next, t.then.produce, [], t.then.actions);
     }
     case 'produce': {
       const t = turn as Extract<FactoryStep, { step: 'factoryProduce' }>;
@@ -197,6 +254,17 @@ export function applyFactory(state: GameState, turn: FactoryStep, action: Action
     default:
       throw new Error(`unreachable: ${action.type} at the Factory`);
   }
+}
+
+/** Gives a reward (the whole top part, or the one picked on an "or" card): amounts, then resources, producing and free actions, in that order. */
+function give(state: GameState, g: FactoryGain): GameState {
+  const seat = state.currentPlayer;
+  const { coins, power, popularity } = g;
+  let next = updatePlayer(state, seat, gain(state.players[seat]!, { coins, power, popularity }));
+  if (g.combatCards) next = drawCombatCards(next, seat, g.combatCards);
+  const then = { produce: g.produce ?? 0, actions: [...(g.actions ?? [])] };
+  if (g.anyResources && resourceHexes(next).length) return { ...next, turn: { step: 'factoryResources', section: FACTORY, left: g.anyResources, then } };
+  return producing(next, then.produce, [], then.actions);
 }
 
 /** Hexes with the current player's workers that would produce something and haven't yet this turn. */
@@ -232,9 +300,10 @@ export function validateFactoryCard(card: FactoryCard): string[] {
   if (!card.id?.trim()) problems.push('ID is missing');
   const cost = card.cost ?? {};
   const gain = card.gain ?? {};
-  if (![cost.coins, cost.popularity, cost.power, ...Object.values(cost.resources ?? {})].every(amount)) problems.push('its cost must be whole numbers of 0 or more');
+  if (![cost.coins, cost.popularity, cost.power, cost.combatCards, ...Object.values(cost.resources ?? {})].every(amount)) problems.push('its cost must be whole numbers of 0 or more');
   if (Object.keys(cost.resources ?? {}).some((r) => !RESOURCES.includes(r as Resource))) problems.push('its cost has an unknown resource');
-  if (![gain.coins, gain.power, gain.popularity, gain.combatCards, gain.produce].every(amount)) problems.push('its rewards must be whole numbers of 0 or more');
+  if (![gain.coins, gain.power, gain.popularity, gain.combatCards, gain.produce, gain.anyResources].every(amount)) problems.push('its rewards must be whole numbers of 0 or more');
+  else if (gain.oneOf && factoryOptions(gain).length < 2) problems.push('"one of" needs at least two rewards to choose from');
   if ((gain.actions ?? []).some((a) => !ACTIONS.includes(a))) problems.push('it gives an unknown action');
   if (!atLeastOne(card.move?.units) || !atLeastOne(card.move?.hexes)) problems.push('its move must be at least 1 unit, at least 1 hex');
   return problems;
