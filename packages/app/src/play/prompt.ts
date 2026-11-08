@@ -349,7 +349,7 @@ export function sectionHeadings(state: GameState): { top: string; bottom: string
   if (turn.section === FACTORY) {
     // The card's top part, then its move (in place of a bottom row).
     const card = heldFactoryCard(state, state.currentPlayer)!;
-    const onTop = turn.step === 'factoryTop' || turn.step === 'factoryRewards';
+    const onTop = turn.step === 'factoryTop' || turn.step === 'factoryProduce' || turn.step === 'factoryRewards';
     return {
       top: `Factory card · ${costText(card.cost)} → ${gainText(card.gain, '')}`,
       bottom: `Then ${moveText(card)}`,
@@ -401,6 +401,8 @@ export function title(state: GameState): string {
         if (pays.some((a) => a.type === 'factoryUse')) return `${who} · Factory card: paid; use it for ${gainText(card.gain, '')}`;
         return `${who} · Factory card: tap glowing hexes you control to pay ${costText(card.cost).replace(/^Pay /, '')}`;
       }
+      case 'factoryProduce':
+        return `${who} · Factory card: produce on up to ${turn.left} more ${turn.left === 1 ? 'hex' : 'hexes'} with your workers`;
       case 'factoryRewards':
         return `${who} · Factory card: free ${BOTTOM_NAMES[turn.todo[0]!]}: ${EFFECT_HOW[turn.todo[0]!]}`;
       case 'top':
@@ -801,11 +803,13 @@ function producePrompt(state: GameState, actions: Action[], picked: HexId[]): Pr
   const { mat } = state.setup.players[state.currentPlayer]!;
   const player = state.players[state.currentPlayer]!;
   const options = actions.flatMap((a) => (a.type === 'produce' ? [a.hex] : []));
+  // A Factory card's produce: so many hexes with workers, no extra for the mill.
+  const fromCard = state.turn.step === 'factoryProduce' ? state.turn : null;
   // The mill's hex is an extra one, on top of the mat's hexes: it gets a slot of its own while it can still produce.
-  const mill = player.structures.mill;
+  const mill = fromCard ? undefined : player.structures.mill;
   const millOpen = !!mill && options.includes(mill);
   const produced = state.turn.step === 'producing' ? state.turn.produced : [];
-  const workerSlots = topValue(player, mat, turn.section, 'hexes') - produced.filter((h) => h !== mill).length;
+  const workerSlots = fromCard ? fromCard.left : topValue(player, mat, turn.section, 'hexes') - produced.filter((h) => h !== mill).length;
   const slots = workerSlots + (millOpen ? 1 : 0);
   const workerPicks = picked.filter((h) => h !== mill);
   const full = workerPicks.length >= workerSlots;
@@ -829,7 +833,7 @@ function producePrompt(state: GameState, actions: Action[], picked: HexId[]): Pr
     run.push(a);
     s = applyAction(s, a);
   }
-  if (run.length && s.turn.step === 'producing') run.push({ type: 'endProduce' });
+  if (run.length && (s.turn.step === 'producing' || s.turn.step === 'factoryProduce')) run.push({ type: 'endProduce' });
 
   const buttons: Button[] = [];
   if (run.length) buttons.push({ label: 'Produce', actions: run, primary: true });
@@ -1128,8 +1132,9 @@ export function costText(cost: EncounterCost & { resources?: ResourcePile }): st
 }
 
 /** What an encounter option gives, in words: "2 power, 1 combat card, 2 workers on A3, a free Deploy". */
-export function gainText(gain: EncounterGain, hex: HexId): string {
+export function gainText(gain: EncounterGain & { produce?: number }, hex: HexId): string {
   const parts: string[] = [];
+  if (gain.produce) parts.push(`produce on up to ${gain.produce} ${gain.produce === 1 ? 'hex' : 'hexes'} with your workers`);
   if (gain.coins) parts.push(plural(gain.coins, 'coin'));
   if (gain.power) parts.push(`${gain.power} power`);
   if (gain.popularity) parts.push(`${gain.popularity} popularity`);

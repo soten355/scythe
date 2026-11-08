@@ -394,7 +394,8 @@ function produceOptions(state: GameState, section: SectionIndex, produced: HexId
     .map((hex) => ({ type: 'produce', hex }));
 }
 
-function produce(state: GameState, seat: number, hex: HexId): GameState {
+/** Produces on one hex: its resources (or, on a village, new workers). */
+export function produce(state: GameState, seat: number, hex: HexId): GameState {
   const player = state.players[seat]!;
   const y = yieldOf(state, player, hex)!;
   if (y.what === 'worker') {

@@ -40,6 +40,13 @@ describe('the Factory card editor', () => {
     for (const c of sampleFactoryCards) expect(cleanCard(editable(c))).toEqual(c);
   });
 
+  it('keeps a produce reward, and drops it when blank', () => {
+    let card = setPath(newCard('c'), 'gain.produce', 2);
+    expect(cleanCard(card).gain).toEqual({ produce: 2 });
+    card = setPath(card, 'gain.produce', null);
+    expect(cleanCard(card).gain).toEqual({});
+  });
+
   it('keeps a blank move blank, so the check catches it', () => {
     const card = cleanCard(setPath(newCard('c'), 'move.units', null));
     expect(validateFactoryCard(card)).toEqual(['its move must be at least 1 unit, at least 1 hex']);

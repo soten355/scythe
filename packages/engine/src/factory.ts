@@ -20,7 +20,8 @@ import { applyEffect, effectOptions } from './bottom-actions';
 import { drawCombatCards } from './combat';
 import type { BottomActionType, Resource } from './mat';
 import { shuffle } from './rng';
-import { addResources, controlledHexes, gain, toBottomRow, updatePlayer } from './state';
+import { addResources, controlledHexes, gain, onBoard, toBottomRow, updatePlayer } from './state';
+import { produce, yieldOf } from './top-actions';
 
 export { FACTORY };
 
@@ -37,6 +38,8 @@ export interface FactoryGain {
   power?: number;
   popularity?: number;
   combatCards?: number;
+  /** Produce on up to this many hexes with your workers on them (before any free actions); the card's cost stands in for Produce's own. */
+  produce?: number;
   /** Bottom-row actions taken for free, in this order. */
   actions?: BottomActionType[];
 }
@@ -52,7 +55,7 @@ export interface FactoryCard {
   move: { units: number; hexes: number };
 }
 
-type FactoryStep = Extract<TurnStep, { step: 'factoryCard' | 'factoryTop' | 'factoryRewards' }>;
+type FactoryStep = Extract<TurnStep, { step: 'factoryCard' | 'factoryTop' | 'factoryProduce' | 'factoryRewards' }>;
 
 const RESOURCES: Resource[] = ['oil', 'metal', 'wood', 'food'];
 
@@ -125,6 +128,8 @@ export function factoryActions(state: GameState, turn: FactoryStep): Action[] {
       return turn.offered.map((card): Action => ({ type: 'takeFactoryCard', card }));
     case 'factoryRewards':
       return effectOptions(state, turn.todo[0]!);
+    case 'factoryProduce':
+      return [...produceHexes(state, turn.produced).map((hex): Action => ({ type: 'produce', hex })), { type: 'endProduce' }];
     case 'factoryTop': {
       const card = heldFactoryCard(state, seat)!;
       const started = Object.keys(turn.paid).length > 0 || !!turn.coerced;
@@ -176,8 +181,14 @@ export function applyFactory(state: GameState, turn: FactoryStep, action: Action
       });
       next = updatePlayer(next, seat, gain(next.players[seat]!, g));
       if (g.combatCards) next = drawCombatCards(next, seat, g.combatCards);
-      return rewards(next, [...(g.actions ?? [])]);
+      return producing(next, g.produce ?? 0, [], [...(g.actions ?? [])]);
     }
+    case 'produce': {
+      const t = turn as Extract<FactoryStep, { step: 'factoryProduce' }>;
+      return producing(produce(state, seat, action.hex), t.left - 1, [...t.produced, action.hex], t.todo);
+    }
+    case 'endProduce':
+      return rewards(state, (turn as Extract<FactoryStep, { step: 'factoryProduce' }>).todo);
     case 'upgrade':
     case 'deploy':
     case 'build':
@@ -186,6 +197,18 @@ export function applyFactory(state: GameState, turn: FactoryStep, action: Action
     default:
       throw new Error(`unreachable: ${action.type} at the Factory`);
   }
+}
+
+/** Hexes with the current player's workers that would produce something and haven't yet this turn. */
+function produceHexes(state: GameState, produced: HexId[]): HexId[] {
+  const player = state.players[state.currentPlayer]!;
+  return [...new Set(onBoard(player.workers))].filter((hex) => !produced.includes(hex) && yieldOf(state, player, hex));
+}
+
+/** Producing on up to `left` more hexes (skipped when there's nothing to produce on), then the free actions. */
+function producing(state: GameState, left: number, produced: HexId[], todo: BottomActionType[]): GameState {
+  if (left > 0 && produceHexes(state, produced).length) return { ...state, turn: { step: 'factoryProduce', section: FACTORY, left, produced, todo } };
+  return rewards(state, todo);
 }
 
 /** Free actions still to take (skipping any there's nothing left to do for), then the card's move. */
@@ -211,7 +234,7 @@ export function validateFactoryCard(card: FactoryCard): string[] {
   const gain = card.gain ?? {};
   if (![cost.coins, cost.popularity, cost.power, ...Object.values(cost.resources ?? {})].every(amount)) problems.push('its cost must be whole numbers of 0 or more');
   if (Object.keys(cost.resources ?? {}).some((r) => !RESOURCES.includes(r as Resource))) problems.push('its cost has an unknown resource');
-  if (![gain.coins, gain.power, gain.popularity, gain.combatCards].every(amount)) problems.push('its rewards must be whole numbers of 0 or more');
+  if (![gain.coins, gain.power, gain.popularity, gain.combatCards, gain.produce].every(amount)) problems.push('its rewards must be whole numbers of 0 or more');
   if ((gain.actions ?? []).some((a) => !ACTIONS.includes(a))) problems.push('it gives an unknown action');
   if (!atLeastOne(card.move?.units) || !atLeastOne(card.move?.hexes)) problems.push('its move must be at least 1 unit, at least 1 hex');
   return problems;

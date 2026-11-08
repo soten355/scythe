@@ -100,6 +100,7 @@ function render() {
           ${num('gain.power', c.gain.power, 'Power')}
           ${num('gain.popularity', c.gain.popularity, 'Popularity')}
           ${num('gain.combatCards', c.gain.combatCards, 'Combat cards')}
+          ${num('gain.produce', c.gain.produce, 'Produce on hexes (with your workers)')}
         </div>
         <p class="part">Free actions</p>
         <div class="actions">

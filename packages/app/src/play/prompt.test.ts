@@ -740,6 +740,25 @@ describe('the Factory', () => {
     expect(p.buttons).toEqual([{ label: 'Pay and use it', action: { type: 'factoryUse' }, primary: true }]);
   });
 
+  it('produces from the card: up to so many hexes with workers, picked then produced at once', () => {
+    const card = { id: 'test-produce', name: 'Test', cost: { coins: 1 }, gain: { produce: 2 }, move: { units: 1, hexes: 1 } };
+    expect(gainText(card.gain, '')).toBe('produce on up to 2 hexes with your workers');
+    const base = withFactory({ factoryCard: 'test-produce', structures: { mill: 'B1' } });
+    let state = { ...base, setup: { ...base.setup, factory: [...sampleFactoryCards, card] } } as GameState;
+    state = play(state, { type: 'chooseSection', section: FACTORY }, { type: 'factoryUse' });
+    let p = prompt(state);
+    expect(p.title).toBe('Nordic · Factory card: produce on up to 2 more hexes with your workers');
+    // Nordic's workers stand on A4 and A5; the mill (on B1, no workers there) gives no extra slot.
+    expect([...p.highlights].sort()).toEqual(['A4', 'A5']);
+    expect(p.slots).toHaveLength(2);
+    expect(sectionHeadings(state)?.status.top).toBe('now');
+    p = prompt(state, { produce: ['A4', 'A5'] });
+    const go = p.buttons.find((b) => b.label === 'Produce')!;
+    const after = play(state, ...go.actions!);
+    expect(Object.keys(after.resources).sort()).toEqual(['A4', 'A5']);
+    expect(after.turn).toMatchObject({ step: 'top', section: FACTORY });
+  });
+
   it("then moves, with no coins instead, and the move's skip ends the turn", () => {
     const state = applyAction(withFactory({ factoryCard: 'sample-f01', power: 0 }), { type: 'chooseSection', section: FACTORY });
     const moving = applyAction(state, { type: 'skipTop' });

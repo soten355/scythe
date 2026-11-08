@@ -135,6 +135,8 @@ export type TurnStep =
   | { step: 'factoryCard'; section: Section; offered: string[] }
   /** Using the Factory card's top part: resources paid so far (and whether a combat card stood in for one). */
   | { step: 'factoryTop'; section: typeof FACTORY; paid: ResourcePile; coerced?: true }
+  /** Producing from the Factory card's top part: up to `left` more hexes with the player's workers, then `todo`'s free actions. */
+  | { step: 'factoryProduce'; section: typeof FACTORY; left: number; produced: HexId[]; todo: BottomActionType[] }
   /** Free bottom-row actions the Factory card's top part gave, still to take. */
   | { step: 'factoryRewards'; section: typeof FACTORY; todo: BottomActionType[] }
   /** The bottom-row action (or the Factory card's move) is done; only End turn is left. */
@@ -331,6 +333,7 @@ function stepActions(state: GameState, seat: number): Action[] {
       return encounterActions(state, turn);
     case 'factoryCard':
     case 'factoryTop':
+    case 'factoryProduce':
     case 'factoryRewards':
       return factoryActions(state, turn);
     case 'bottom':
@@ -392,6 +395,7 @@ function step(state: GameState, action: Action): GameState {
       return applyEncounter(state, turn, action);
     case 'factoryCard':
     case 'factoryTop':
+    case 'factoryProduce':
     case 'factoryRewards':
       return applyFactory(state, turn, action);
     case 'bottom':

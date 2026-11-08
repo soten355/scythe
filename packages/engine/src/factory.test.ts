@@ -14,6 +14,8 @@ const cards: FactoryCard[] = [
   { id: 'f2', name: 'Two', cost: { resources: { oil: 1, metal: 1 } }, gain: { combatCards: 1, actions: ['upgrade'] }, move: { units: 2, hexes: 1 } },
   { id: 'f3', name: 'Three', cost: { popularity: 1 }, gain: { power: 2 }, move: { units: 1, hexes: 1 } },
   { id: 'f4', name: 'Four', cost: { coins: 1 }, gain: { popularity: 1 }, move: { units: 1, hexes: 1 } },
+  { id: 'f5', name: 'Five', cost: { coins: 1 }, gain: { produce: 2 }, move: { units: 1, hexes: 1 } },
+  { id: 'f6', name: 'Six', cost: { coins: 1 }, gain: { produce: 1, actions: ['upgrade'] }, move: { units: 1, hexes: 1 } },
 ];
 
 function game(p0: Partial<PlayerState> = {}, p1: Partial<PlayerState> = {}, opts: { rule?: AbilityRule; resources?: GameState['resources'] } = {}): GameState {
@@ -51,7 +53,7 @@ const holding = (card: string, p0: Partial<PlayerState> = {}, opts: { rule?: Abi
 describe('setting up the Factory', () => {
   it('shuffles the Factory cards, without changing the combat deck', () => {
     const state = newGame({ ...testSetup, factory: cards });
-    expect([...state.factoryDeck].sort()).toEqual(['f1', 'f2', 'f3', 'f4']);
+    expect([...state.factoryDeck].sort()).toEqual(['f1', 'f2', 'f3', 'f4', 'f5', 'f6']);
     expect(state.combatDeck).toEqual(newGame(testSetup).combatDeck);
   });
 
@@ -73,7 +75,7 @@ describe('taking a Factory card', () => {
   it('keeps the one picked; the others go back under the deck', () => {
     const state = play(arrive(), { type: 'takeFactoryCard', card: 'f2' });
     expect(state.players[0]!.factoryCard).toBe('f2');
-    expect(state.factoryDeck).toEqual(['f4', 'f1', 'f3']);
+    expect(state.factoryDeck).toEqual(['f4', 'f5', 'f6', 'f1', 'f3']);
     expect(state.turn).toMatchObject({ step: 'bottom', section: 2 });
   });
 
@@ -153,6 +155,41 @@ describe('the Factory card as a fifth section', () => {
     expect(state.turn).toMatchObject({ step: 'top', section: FACTORY });
   });
 
+  it('produces on up to so many hexes with your workers, then the move', () => {
+    // A1 farm, A2 forest, A4 tundra (oil); the mill on B4 has no worker there, so it isn't offered.
+    let state = play(holding('f5', { workers: ['A1', 'A2', 'A4', 'A4'], structures: { mill: 'B4' }, power: 0 }), choose(FACTORY), use);
+    expect(state.turn).toMatchObject({ step: 'factoryProduce', section: FACTORY, left: 2 });
+    expect(legalActions(state, 0)).toEqual([
+      { type: 'produce', hex: 'A1' },
+      { type: 'produce', hex: 'A2' },
+      { type: 'produce', hex: 'A4' },
+      { type: 'endProduce' },
+    ]);
+    state = play(state, { type: 'produce', hex: 'A4' });
+    expect(legalActions(state, 0)).toEqual([{ type: 'produce', hex: 'A1' }, { type: 'produce', hex: 'A2' }, { type: 'endProduce' }]);
+    state = play(state, { type: 'produce', hex: 'A2' });
+    // Two hexes: done, on to the move. The usual Produce cost (power with 4 workers) isn't paid: the card's cost is.
+    expect(state.resources).toEqual({ A4: { oil: 2 }, A2: { wood: 1 } });
+    expect(state.players[0]).toMatchObject({ power: 0 });
+    expect(state.turn).toMatchObject({ step: 'top', section: FACTORY });
+  });
+
+  it('can stop producing early, and skips it with no workers on the map', () => {
+    let state = play(holding('f5', { workers: ['A1'] }), choose(FACTORY), use, { type: 'endProduce' });
+    expect(state.resources).toEqual({});
+    expect(state.turn).toMatchObject({ step: 'top', section: FACTORY });
+    state = play(holding('f5', { workers: ['home'] }), choose(FACTORY), use);
+    expect(state.turn).toMatchObject({ step: 'top', section: FACTORY });
+  });
+
+  it('produces before any free bottom-row actions', () => {
+    let state = play(holding('f6', { workers: ['A1'] }), choose(FACTORY), use);
+    expect(state.turn).toMatchObject({ step: 'factoryProduce', left: 1 });
+    state = play(state, { type: 'produce', hex: 'A1' });
+    expect(state.resources).toEqual({ A1: { food: 1 } });
+    expect(types(state)).toEqual(['upgrade']);
+  });
+
   it("bottom: moves as many units as the card says, as far as it says, with no coins instead", () => {
     // f1: one unit, up to two hexes.
     let state = play(holding('f1', { workers: ['A1', 'C4'], power: 0 }), choose(FACTORY), skip);
@@ -183,5 +220,10 @@ describe('checking a Factory card', () => {
     expect(validateFactoryCard(blank)).toEqual(['name is missing', 'ID is missing', 'its move must be at least 1 unit, at least 1 hex']);
     const odd = { ...cards[1]!, cost: { coins: -1, resources: { gold: 1 } }, gain: { actions: ['fly'] } } as unknown as FactoryCard;
     expect(validateFactoryCard(odd)).toEqual(['its cost must be whole numbers of 0 or more', 'its cost has an unknown resource', 'it gives an unknown action']);
+  });
+
+  it('produce must be a whole number of hexes', () => {
+    expect(validateFactoryCard(cards[4]!)).toEqual([]);
+    expect(validateFactoryCard({ ...cards[4]!, gain: { produce: 1.5 } })).toEqual(['its rewards must be whole numbers of 0 or more']);
   });
 });
