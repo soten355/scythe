@@ -2,9 +2,9 @@
 // editors or brought in from files (content files, or what's inside any
 // save). Kept on the device and offered on the new game screen next to the
 // built-in ones. Games don't depend on the library: each save carries its own
-// copies. Encounter, Factory and objective cards each make one deck, and the
-// tiles one set: once there are any, new games use them in place of the
-// built-in ones.
+// copies. Encounter, Factory and objective cards each make one deck (the new
+// game screen picks the base deck, yours or both: see decks.ts), and the
+// tiles one set, used in place of the built-in ones once there are any.
 import { validateEncounterCard, validateFaction, validateFactoryCard, validateMat, validateObjectiveCard, validateStructureBonus, type Board, type EncounterCard, type Faction, type FactoryCard, type ObjectiveCard, type PlayerMat, type StructureBonusTile } from '@scythe/engine';
 import type { Catalog, MapOption } from '../menu/setup';
 import { readPictures } from './card-pictures';

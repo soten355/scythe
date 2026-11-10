@@ -3,7 +3,9 @@
   // maps (set up as a game starts on them), factions, mats, encounter cards, Factory cards, objectives and structure
   // bonus tiles. Tabs pick the kind; ‹ › (or swiping, or the arrow keys)
   // step through them; the list jumps to one. What each shows comes from
-  // codex.ts; the pictures from the theme and the device.
+  // codex.ts; the pictures from the theme and the device. With a deck of
+  // one's own, each deck tab shows either the base game's deck or yours
+  // (never the two combined).
   import type { Board as BoardData } from '@scythe/engine';
   import { fade, fly } from 'svelte/transition';
   import type { Catalog } from './setup';
@@ -18,13 +20,25 @@
   import FighterArt from '../play/FighterArt.svelte';
   import { inkOn } from '../play/ink';
   import type { SkinWords } from '../skins/skin';
+  import type { Library } from '../content/library';
+  import { DEFAULT_DECKS, withDecks, type DeckChoice, type DeckKind } from '../content/decks';
 
-  let { catalog, builtIn, board, look, words, onBack }: { catalog: Catalog; builtIn: Catalog; board: BoardData; look: BoardLook; words: SkinWords; onBack: () => void } = $props();
+  let { catalog: everything, builtIn, library, board, look, words, onBack }: { catalog: Catalog; builtIn: Catalog; library: Library; board: BoardData; look: BoardLook; words: SkinWords; onBack: () => void } = $props();
 
   let kind = $state<CodexKind>('maps');
   let index = $state(0);
   /** Which way the last step went, so the page slides in from that side. */
   let direction = $state(1);
+
+  /** Which deck each deck tab shows: the base game's or yours. */
+  let viewing: DeckChoice = $state({ ...DEFAULT_DECKS });
+  const catalog = $derived(withDecks(everything, builtIn, library, viewing));
+  const deckKind = $derived(kind === 'encounters' || kind === 'factory' || kind === 'objectives' ? (kind as DeckKind) : null);
+  function view(deck: DeckKind, source: 'base' | 'mine') {
+    viewing = { ...viewing, [deck]: source };
+    index = 0;
+    direction = 1;
+  }
 
   const list = $derived(codexList(catalog, kind));
   const count = $derived(list.items.length);
@@ -270,6 +284,12 @@
   </main>
 
   <footer>
+    {#if deckKind && library[deckKind].length}
+      <div class="sources" role="group" aria-label="Which deck">
+        <button class:chosen={viewing[deckKind] !== 'mine'} onclick={() => view(deckKind!, 'base')}>Base game</button>
+        <button class:chosen={viewing[deckKind] === 'mine'} onclick={() => view(deckKind!, 'mine')}>Yours</button>
+      </div>
+    {/if}
     {#if count}
       <select value={at} onchange={(e) => ((direction = 1), (index = Number(e.currentTarget.value)))} aria-label="Go to">
         {#each list.items as item, i (item.id)}<option value={i}>{item.name}</option>{/each}
@@ -380,6 +400,22 @@
   }
   .where {
     opacity: 0.65;
+  }
+  .sources {
+    display: flex;
+    gap: 4px;
+  }
+  .sources button {
+    font: inherit;
+    color: var(--fg);
+    background: var(--raised);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 4px 8px;
+  }
+  .sources button.chosen {
+    border-color: var(--glow);
+    background: color-mix(in srgb, var(--glow) 22%, var(--panel));
   }
   .empty {
     text-align: center;

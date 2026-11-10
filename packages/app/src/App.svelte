@@ -22,6 +22,7 @@
   import type { SkinIndex } from './saves/store';
   import { untrack } from 'svelte';
   import { useCardPictures, useTheme } from './theme/current.svelte';
+  import { loadDecks, saveDecks, withDecks, type DeckChoice } from './content/decks';
   import { addToLibrary, catalogWith, EMPTY_LIBRARY, parseContentFile, removeFromLibrary, type Library, type LibraryKind } from './content/library';
 
   const builtIn = BUILT_IN;
@@ -50,6 +51,12 @@
   loadSkins().catch(() => {});
   /** What there is to pick from on the new game screen, named as the skin names it. */
   const catalog = $derived(applyWords(catalogWith(builtIn, library), skin.words));
+  /** Which encounter, Factory and objective decks new games use, remembered on the device. */
+  let decks: DeckChoice = $state.raw(loadDecks());
+  const chooseDecks = (next: DeckChoice) => {
+    decks = next;
+    saveDecks(next);
+  };
 
   async function refresh() {
     try {
@@ -238,13 +245,13 @@
 {#if screen === 'home'}
   <Home canContinue={resumable !== null} savedCount={saves.length} onContinue={() => resumable && play(resumable)} onNewGame={() => go('new')} onSaves={() => go('saves')} onCodex={() => go('codex')} onSkins={() => go('skins')} onWorkshop={() => go('workshop')} skinName={skin.name} />
 {:else if screen === 'codex'}
-  <Codex {catalog} {builtIn} board={builtIn.maps[0]!.board} {look} words={skin.words} onBack={() => go('home')} />
+  <Codex {catalog} {builtIn} {library} board={builtIn.maps[0]!.board} {look} words={skin.words} onBack={() => go('home')} />
 {:else if screen === 'skins'}
   <Skins index={skinIndex} factions={builtIn.factions} cards={ownCards} message={skinMessage} loadSkin={(id) => store.skin(id)} onUse={useSkin} onNew={makeSkin} onRename={renameSkin} onDelete={deleteSkin} onExport={exportSkinById} onImport={importSkin} onBack={() => go('home')} />
 {:else if screen === 'workshop'}
   <Workshop onBack={() => go('home')} />
 {:else if screen === 'new'}
-  <NewGame {catalog} {library} {message} onStart={start} onImport={importContent} onRemove={removeContent} onBack={() => go(current ? 'game' : 'home')} backLabel={current ? 'Back to the game' : 'Menu'} skins={[{ id: ORIGINAL.id, name: ORIGINAL.name }, ...skinIndex.skins]} skin={skin.id} onSkin={useSkin} />
+  <NewGame catalog={withDecks(catalog, builtIn, library, decks)} {library} {decks} onDecks={chooseDecks} {message} onStart={start} onImport={importContent} onRemove={removeContent} onBack={() => go(current ? 'game' : 'home')} backLabel={current ? 'Back to the game' : 'Menu'} skins={[{ id: ORIGINAL.id, name: ORIGINAL.name }, ...skinIndex.skins]} skin={skin.id} onSkin={useSkin} />
 {:else if screen === 'saves'}
   <SavedGames {saves} {message} onOpen={open} onExport={exportSave} onDelete={remove} onImport={importFile} onBack={() => go('home')} />
 {/if}

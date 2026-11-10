@@ -4,7 +4,8 @@
   // passed the device, or a bot at Easy, Medium or Hard), then start. The player's own maps,
   // factions and mats (made in the editors or brought in from files) are
   // offered after the built-in ones, and can be added or removed here. With
-  // skins of one's own, the skin to play in can be changed here too.
+  // skins of one's own, the skin to play in can be changed here too. Each
+  // deck of cards can be the base game's, the player's own, or both together.
   import { untrack } from 'svelte';
   import FactionEmblem from '../play/FactionEmblem.svelte';
   import FactionPortrait from '../play/FactionPortrait.svelte';
@@ -12,6 +13,7 @@
   import type { Level } from '@scythe/bots';
   import { botName } from '../play/seats';
   import type { Library, LibraryKind } from '../content/library';
+  import { DECK_KINDS, deckSources, fitDecks, type DeckChoice, type DeckKind, type DeckSource } from '../content/decks';
   import { botsOf, defaultChoice, fitChoice, MAX_PLAYERS, maxPlayers, MIN_PLAYERS, problems, setFaction, setBot, setMat, setPlayerCount, shuffleSeats, toSetup, turnOrderNames, type Catalog } from './setup';
 
   let {
@@ -26,8 +28,10 @@
     skins = [],
     skin = 'original',
     onSkin,
+    decks,
+    onDecks,
   }: {
-    /** Everything to pick from: built-in, then the library. */
+    /** Everything to pick from: built-in, then the library; its decks are the ones chosen in `decks`. */
     catalog: Catalog;
     /** The player's own (also in the catalog), to mark and remove. */
     library: Library;
@@ -42,7 +46,15 @@
     skins?: { id: string; name: string }[];
     skin?: string;
     onSkin?: (id: string) => void;
+    /** Which deck of each kind new games use. */
+    decks: DeckChoice;
+    onDecks: (decks: DeckChoice) => void;
   } = $props();
+
+  const DECK_NAMES: Record<DeckKind, string> = { encounters: 'Encounters', factory: 'Factory', objectives: 'Objectives' };
+  const SOURCE_NAMES: Record<DeckSource, string> = { base: 'Base game', mine: 'Yours', both: 'Both' };
+  const shownDecks = $derived(fitDecks(decks, library));
+  const cards = (n: number) => `${n} card${n === 1 ? '' : 's'}`;
 
   // Always starts from the default map and the first factions and mats.
   let picked = $state(untrack(() => defaultChoice(catalog)));
@@ -128,6 +140,24 @@
           <p class="hint">
             {catalog.factions.length} factions and {catalog.mats.length} player mats so far: one of each per player.
           </p>
+        {/if}
+      </section>
+
+      <section>
+        <h3>Decks</h3>
+        <div class="decks">
+          {#each DECK_KINDS as kind (kind)}
+            <span class="deck-name">{DECK_NAMES[kind]}</span>
+            <div class="sources">
+              {#each deckSources(library, kind) as source (source)}
+                <button class="small" class:chosen={shownDecks[kind] === source} onclick={() => onDecks({ ...shownDecks, [kind]: source })}>{SOURCE_NAMES[source]}</button>
+              {/each}
+            </div>
+            <small class="deck-size">{cards(catalog[kind]?.length ?? 0)}</small>
+          {/each}
+        </div>
+        {#if DECK_KINDS.some((kind) => !library[kind].length)}
+          <p class="hint">Make a deck of your own in the Workshop's card editors to play with it, or with both together.</p>
         {/if}
       </section>
 
@@ -350,6 +380,26 @@
   .counts button {
     width: 34px;
     padding: 6px 0;
+  }
+  .decks {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 5px 10px;
+  }
+  .sources {
+    display: flex;
+    gap: 5px;
+  }
+  .sources button {
+    white-space: nowrap;
+  }
+  .deck-name {
+    font-size: 13px;
+  }
+  .deck-size {
+    opacity: 0.6;
+    white-space: nowrap;
   }
   .hint {
     margin: 6px 0 0;
