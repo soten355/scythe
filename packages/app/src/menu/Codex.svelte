@@ -26,7 +26,7 @@
   /** Which way the last step went, so the page slides in from that side. */
   let direction = $state(1);
 
-  const list = $derived(codexList(catalog, builtIn, kind));
+  const list = $derived(codexList(catalog, kind));
   const count = $derived(list.items.length);
   const at = $derived(Math.min(index, Math.max(0, count - 1)));
 
@@ -72,11 +72,6 @@
   const objective = $derived(kind === 'objectives' ? catalog.objectives?.[at] : undefined);
   const tile = $derived(kind === 'structureBonuses' ? catalog.structureBonuses?.[at] : undefined);
   const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
-  const SAMPLE: Partial<Record<CodexKind, string>> = {
-    encounters: 'Made-up sample cards until you add your own from the encounter card editor.',
-    factory: 'Made-up sample cards until you add your own from the Factory card editor.',
-    objectives: 'Made-up sample cards until you add your own from the objective card editor.',
-  };
 </script>
 
 <svelte:window onkeydown={onkey} />
@@ -281,7 +276,6 @@
       </select>
       <span class="where">{at + 1} of {count}</span>
     {/if}
-    {#if list.sample}<span class="sample" transition:fade>{SAMPLE[kind]}</span>{/if}
   </footer>
 </div>
 
@@ -384,13 +378,8 @@
     padding: 4px 6px;
     max-width: 40%;
   }
-  .where,
-  .sample {
+  .where {
     opacity: 0.65;
-  }
-  .sample {
-    margin-left: auto;
-    font-style: italic;
   }
   .empty {
     text-align: center;
@@ -798,10 +787,6 @@
     }
     .where {
       white-space: nowrap;
-    }
-    .sample {
-      margin-left: 0;
-      font-size: 12px;
     }
     .map,
     .faction {

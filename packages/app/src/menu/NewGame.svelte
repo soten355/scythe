@@ -156,15 +156,6 @@
         {:else}
           <p class="hint">Import a content file or any saved game's file to play with its map, factions and mats; or add them from the editors. They stay on this device.</p>
         {/if}
-        {#if !library.encounters.length}
-          <p class="hint">Encounters use a made-up sample deck until you add your cards from the encounter card editor.</p>
-        {/if}
-        {#if !library.factory.length}
-          <p class="hint">The Factory uses a made-up sample deck until you add your cards from the Factory card editor.</p>
-        {/if}
-        {#if !library.objectives.length}
-          <p class="hint">Objectives use a made-up sample deck until you add your cards from the objective card editor.</p>
-        {/if}
       </section>
     </div>
 

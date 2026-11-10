@@ -21,12 +21,10 @@ export const CODEX_TABS: { kind: CodexKind; label: string; icon: string }[] = [
   { kind: 'structureBonuses', label: 'Bonus tiles', icon: '🏛️' },
 ];
 
-/** What a tab lists, in order, and whether it's the made-up sample deck (no deck of your own added yet). */
-export function codexList(catalog: Catalog, builtIn: Catalog, kind: CodexKind): { items: { id: string; name: string }[]; sample: boolean } {
+/** What a tab lists, in order. */
+export function codexList(catalog: Catalog, kind: CodexKind): { items: { id: string; name: string }[] } {
   const all = (kind === 'mats' ? [...catalog.mats].sort((a, b) => a.turnOrder - b.turnOrder) : (catalog[kind] ?? [])) as { id: string; name: string }[];
-  // The structure bonus tiles are the real ones; the decks are still made up.
-  const deck = kind === 'encounters' || kind === 'factory' || kind === 'objectives';
-  return { items: all.map(({ id, name }) => ({ id, name })), sample: deck && all.length > 0 && all === builtIn[kind] };
+  return { items: all.map(({ id, name }) => ({ id, name })) };
 }
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;

@@ -25,20 +25,17 @@ describe('the codex', () => {
     expect(CODEX_TABS.map((t) => t.kind)).toEqual(['maps', 'factions', 'mats', 'encounters', 'factory', 'objectives', 'structureBonuses']);
   });
 
-  it('lists what new games use, and says when a deck is the made-up sample', () => {
+  it('lists what new games use', () => {
     const catalog = catalogWith(BUILT_IN, EMPTY_LIBRARY);
-    const factions = codexList(catalog, BUILT_IN, 'factions');
+    const factions = codexList(catalog, 'factions');
     expect(factions.items.map((i) => i.name)).toEqual(baseFactions.map((f) => f.name));
-    expect(factions.sample).toBe(false);
-    expect(codexList(catalog, BUILT_IN, 'encounters').sample).toBe(true);
-    // The built-in structure bonus tiles are the real ones.
-    expect(codexList(catalog, BUILT_IN, 'structureBonuses').sample).toBe(false);
-    // Your own deck, once added, replaces the sample.
+    expect(codexList(catalog, 'encounters').items).toHaveLength(27);
+    // Your own deck, once added, replaces the built-in one.
     const mine = { ...BUILT_IN.encounters![0]!, id: 'mine-1', name: 'Mine' };
     const withMine = catalogWith(BUILT_IN, { ...EMPTY_LIBRARY, encounters: [mine] });
-    expect(codexList(withMine, BUILT_IN, 'encounters')).toEqual({ items: [{ id: 'mine-1', name: 'Mine' }], sample: false });
+    expect(codexList(withMine, 'encounters')).toEqual({ items: [{ id: 'mine-1', name: 'Mine' }] });
     // Mats in turn order.
-    expect(codexList(catalog, BUILT_IN, 'mats').items.map((i) => i.id)).toEqual([...baseMats].sort((a, b) => a.turnOrder - b.turnOrder).map((m) => m.id));
+    expect(codexList(catalog, 'mats').items.map((i) => i.id)).toEqual([...baseMats].sort((a, b) => a.turnOrder - b.turnOrder).map((m) => m.id));
   });
 
   it("tells a faction's start, abilities and recruit bonuses, and the land by its home base", () => {
@@ -83,9 +80,8 @@ describe('the codex', () => {
   });
 
   it('lists the maps, the default first', () => {
-    const maps = codexList(catalogWith(BUILT_IN, EMPTY_LIBRARY), BUILT_IN, 'maps');
+    const maps = codexList(catalogWith(BUILT_IN, EMPTY_LIBRARY), 'maps');
     expect(maps.items[0]).toEqual({ id: 'standard', name: 'Standard map' });
-    expect(maps.sample).toBe(false);
   });
 
   it("counts a map's land, rivers, tunnels and encounters, and says who starts at each home base", () => {

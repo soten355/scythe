@@ -14,7 +14,7 @@ export { invadersFromAfarModule } from './modules/invaders-from-afar';
 export { baseBoard, baseBoardLayout } from './modules/base/board';
 export { baseMats } from './modules/base/mats';
 export { baseFactions } from './modules/base/factions';
-export { sampleEncounters } from './modules/base/encounters';
+export { baseEncounters, sampleEncounters } from './modules/base/encounters';
 export { baseFactoryCards, sampleFactoryCards } from './modules/base/factory';
 export { baseObjectives, sampleObjectives } from './modules/base/objectives';
 export { baseStructureBonuses } from './modules/base/structure-bonuses';
