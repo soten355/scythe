@@ -75,8 +75,9 @@ function render() {
       <button data-act="new">New card</button>
       <button data-act="duplicate">Duplicate</button>
       <button data-act="delete">Delete</button>
+      <button data-act="clear" title="Start a new deck from one blank card">Clear all</button>
       <span class="spacer"></span>
-      <button data-act="add" title="New games use this deck in place of the sample one">Add deck to game</button>
+      <button data-act="add" title="Lets new games use this deck: pick Yours or Both on the new game screen">Add deck to game</button>
       <button data-act="file">Save deck to a file</button>
       <button data-act="export" class="primary">Export…</button>
     </header>
@@ -178,6 +179,11 @@ root.addEventListener('click', async (e) => {
       state = { cards: [...state.cards, copy], selected: state.cards.length };
       break;
     }
+    case 'clear':
+      // A fresh start for a new deck. The deck already added to the game stays until this one is added in its place.
+      if (!(await ask(`Clear all ${state.cards.length} card${state.cards.length === 1 ? '' : 's'} and start a new deck? Save the deck to a file first if you want to keep it. The deck you added to the game stays until you add another.`))) return;
+      state = { cards: [newCard('factory-1')], selected: 0 };
+      break;
     case 'delete':
       if (!(await ask(`Delete "${card().name}"?`))) return;
       state.cards.splice(state.selected, 1);
