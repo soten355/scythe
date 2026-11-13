@@ -18,6 +18,7 @@
   import FactionEmblem from '../play/FactionEmblem.svelte';
   import FightBackdrop from '../play/FightBackdrop.svelte';
   import FighterArt from '../play/FighterArt.svelte';
+  import PieceIcon from '../play/PieceIcon.svelte';
   import { inkOn } from '../play/ink';
   import type { SkinWords } from '../skins/skin';
   import type { Library } from '../content/library';
@@ -77,6 +78,16 @@
   const mapGame = $derived(map && mapStart(map.board, catalog.factions, catalog.mats, catalog.encounters));
   /** Nothing to do on a map in the codex: it's only to look at. */
   const LOOK_ONLY: Prompt = { title: '', buttons: [], highlights: new Set(), tapActions: new Map(), tapSelects: new Map() };
+  /** A faction's pieces on the board, in the order the faction page shows them. */
+  const BOARD_PIECES = [
+    { kind: 'character', label: 'Character' },
+    { kind: 'mech', label: 'Mech' },
+    { kind: 'worker', label: 'Worker' },
+    { kind: 'mine', label: 'Mine' },
+    { kind: 'mill', label: 'Mill' },
+    { kind: 'armory', label: 'Armory' },
+    { kind: 'monument', label: 'Monument' },
+  ] as const;
   const faction = $derived(kind === 'factions' ? catalog.factions[at] : undefined);
   /** The faction page's background: its own, else a fight backdrop at random (picked again for each page). */
   const scene = $derived(faction && codexScene(factionPicture(faction.id, 'scene'), backdropPictures()));
@@ -202,6 +213,18 @@
                 <div class="box">
                   <h3>Recruits: one-time bonuses</h3>
                   <p class="chips">{#each f.recruits as r, i (i)}<span>{r}</span>{/each}</p>
+                </div>
+                <!-- How its pieces look on the board, with the skin in use (its pictures, else the drawn shapes). -->
+                <div class="box">
+                  <h3>On the board</h3>
+                  <div class="pieces">
+                    {#each BOARD_PIECES as p (p.kind)}
+                      <figure>
+                        <div class="piece"><PieceIcon kind={p.kind} color={faction.color} initial={faction.name[0] ?? '?'} url={look.piece(faction.id, p.kind)} /></div>
+                        <figcaption>{p.label}</figcaption>
+                      </figure>
+                    {/each}
+                  </div>
                 </div>
               </div>
             </div>
@@ -673,6 +696,28 @@
     width: clamp(96px, min(26vh, 30vw), 180px);
     height: clamp(96px, min(26vh, 30vw), 180px);
     filter: drop-shadow(0 3px 6px rgb(0 0 0 / 0.5));
+  }
+
+  /* A faction's pieces as the board draws them, in a row (wrapping on a narrow screen). */
+  .pieces {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 14px;
+  }
+  .pieces figure {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+  .pieces .piece {
+    width: 44px;
+    height: 44px;
+  }
+  .pieces figcaption {
+    font-size: 11px;
+    opacity: 0.8;
   }
 
   /* A mat: its four sections side by side, as on the table. */

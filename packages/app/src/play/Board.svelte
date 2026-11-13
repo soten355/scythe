@@ -22,7 +22,7 @@
   import HexIcon from './HexIcon.svelte';
   import CrestDrawn from './CrestDrawn.svelte';
   import { MAP_PICTURE, mapPictureFrame } from './map-picture';
-  import { LABEL_Y, MECH, MEEPLE } from './shapes';
+  import { LABEL_Y, MECH, MEEPLE, STRUCTURE_LETTER } from './shapes';
   import { boardLook, DEFAULT_THEME, hexArtIndex, TERRAINS, type BoardLook } from '../theme/theme';
   import { isLight } from './ink';
   import type { Prompt, Selection } from './prompt';
@@ -114,7 +114,6 @@
     };
   });
   const RESOURCE_COLOR: Record<Resource, string> = { oil: '#1b1b1b', metal: '#9aa3ad', wood: '#7a4a24', food: '#f0d54a' };
-  const STRUCTURE_LETTER: Record<Structure, string> = { mine: 'Mi', mill: 'Ml', armory: 'Ar', monument: 'Mo' };
   /** The faction picture for each kind of unit. */
   const PART = { character: 'character', mechs: 'mech', workers: 'worker' } as const;
   /** How far left of a hex's centre its pieces sit, and the gap between them. */

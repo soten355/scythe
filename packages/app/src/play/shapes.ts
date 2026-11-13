@@ -1,6 +1,7 @@
 // Outlines for the pieces on the map, as SVG paths centred on 0,0 (about 13
 // units across): a meeple for a worker and a squat two-legged walker for a
 // mech. The character stays a plain circle. Original shapes.
+import type { Structure } from '@scythe/engine';
 
 /** A worker: round head, arms out, two legs. */
 export const MEEPLE =
@@ -19,3 +20,6 @@ export const MECH = MECH_PARTS.join(' ');
 
 /** Where a piece's label sits, relative to its centre. */
 export const LABEL_Y = { worker: 3.2, mech: 0.6, character: 3 } as const;
+
+/** What's written on a structure's square, when its faction has no picture for it. */
+export const STRUCTURE_LETTER: Record<Structure, string> = { mine: 'Mi', mill: 'Ml', armory: 'Ar', monument: 'Mo' };
