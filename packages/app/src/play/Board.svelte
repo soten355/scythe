@@ -41,6 +41,7 @@
     onClear,
     onExplore,
     tapAny = false,
+    showTurn = true,
   }: {
     game: GameState;
     prompt: Prompt;
@@ -61,6 +62,8 @@
     onExplore?: () => void;
     /** Every hex can be tapped (the map screen asks what's on it), not just the ones the turn offers. */
     tapAny?: boolean;
+    /** The current player's home base glows. Off where no one is taking a turn (the Codex's maps). */
+    showTurn?: boolean;
   } = $props();
 
   /** The travel that has landed (its piece is drawn normally again). */
@@ -649,7 +652,7 @@
     {/each}
     {@const lit = prompt.highlights.has(home.key)}
     {@const tappable = lit || prompt.tapSelects.has(home.key)}
-    {#if home.mine && home.faction}
+    {#if showTurn && home.mine && home.faction}
       <!-- The current player's home base glows in their colour. -->
       <!-- Soft rings rather than a blur: a blur redrawn every frame slows the phone. -->
       <g class="home-glow" stroke={home.faction.color}>

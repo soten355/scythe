@@ -122,7 +122,7 @@
           {:else if map && mapGame}
             {@const m = mapFacts(map.board, catalog.factions)}
             <div class="map">
-              <div class="board"><Board game={mapGame} prompt={LOOK_ONLY} onTap={() => {}} onPick={() => {}} {look} /></div>
+              <div class="board"><Board game={mapGame} prompt={LOOK_ONLY} showTurn={false} onTap={() => {}} onPick={() => {}} {look} /></div>
               <div class="facts">
                 <div>
                   <h2>{map.name}</h2>
