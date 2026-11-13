@@ -68,8 +68,9 @@
     const name = prompt('New name for this skin:', was)?.trim();
     if (name && name !== was) onRename(id, name);
   }
-  function remove(id: string, name: string) {
-    if (confirm(`Delete the skin "${name}" from this device? Its pictures and words go with it (save it to a file first to keep a copy). Games played in it show in the skin in use.`)) onDelete(id);
+  function remove(id: string, name: string, unsaved: boolean) {
+    const warning = unsaved ? `"${name}" isn't saved to a file: its latest changes will be lost for good. ` : '';
+    if (confirm(`${warning}Delete the skin "${name}" from this device? Its pictures and words go with it (save it to a file first to keep a copy). Games played in it show in the skin in use.`)) onDelete(id);
   }
 
   let fileInput: HTMLInputElement;
@@ -111,6 +112,7 @@
       <section class="skin" class:active>
         <div class="top">
           <h3>{s.name}</h3>
+          {#if 'unsaved' in s && s.unsaved}<span class="unsaved" title="Made here, or changed since it was opened or saved: save it to a file to keep a copy">⚠️ Not saved to a file</span>{/if}
           {#if active}<span class="badge">In use</span>{:else}<button class="primary" onclick={() => onUse(s.id)}>Use</button>{/if}
         </div>
         <div class="crests">
@@ -127,7 +129,7 @@
           {#if !original}
             <button onclick={() => rename(s.id, s.name)}>Rename</button>
             <button onclick={() => ((saving = { id: s.id, name: s.name }), (withCards = true))}>Save to a file</button>
-            <button class="danger" onclick={() => remove(s.id, s.name)}>Delete</button>
+            <button class="danger" onclick={() => remove(s.id, s.name, 'unsaved' in s && !!s.unsaved)}>Delete</button>
           {/if}
         </div>
         {#if active && !original}
@@ -259,6 +261,12 @@
     font-size: 12px;
     font-weight: 700;
     color: var(--accent);
+  }
+  .unsaved {
+    font-size: 12px;
+    font-weight: 700;
+    color: #e0a040;
+    white-space: nowrap;
   }
   .crests {
     display: flex;

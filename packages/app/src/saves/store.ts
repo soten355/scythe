@@ -19,7 +19,18 @@ const SKIN = 'skin:';
 /** The skins kept on this device, besides Original, and the one in use. */
 export interface SkinIndex {
   active: string;
-  skins: { id: string; name: string }[];
+  skins: SkinEntry[];
+}
+
+/**
+ * A skin in the list. `unsaved`: it has changes not in a skin file yet (made
+ * here as new, or changed since it was opened from or saved to a file). Left
+ * out for skins from before this was kept, which never warn.
+ */
+export interface SkinEntry {
+  id: string;
+  name: string;
+  unsaved?: boolean;
 }
 /** Encounter cards' pictures, each kept once in the library's store under "picture:<ref>". */
 const PICTURE = 'picture:';
@@ -132,12 +143,26 @@ export class SaveStore {
     return this.skin((await this.skinIndex()).active);
   }
 
-  /** Keeps a skin (new or changed); Original can't be changed. */
-  async putSkin(skin: Skin, { use = false } = {}): Promise<void> {
+  /**
+   * Keeps a skin (new or changed); Original can't be changed. `from` says where
+   * a skin new to the device came from: made here ('new': not in a file yet)
+   * or opened from a file ('file'). A change to a skin kept since then means
+   * it's no longer the same as any file.
+   */
+  async putSkin(skin: Skin, { use = false, from }: { use?: boolean; from?: 'new' | 'file' } = {}): Promise<void> {
     if (skin.id === ORIGINAL.id) throw new Error("The Original skin can't be changed.");
     const index = await this.skinIndex();
-    const skins = index.skins.some((s) => s.id === skin.id) ? index.skins.map((s) => (s.id === skin.id ? { id: skin.id, name: skin.name } : s)) : [...index.skins, { id: skin.id, name: skin.name }];
+    const entry = (unsaved: boolean | undefined): SkinEntry => (unsaved === undefined ? { id: skin.id, name: skin.name } : { id: skin.id, name: skin.name, unsaved });
+    const skins = index.skins.some((s) => s.id === skin.id)
+      ? index.skins.map((s) => (s.id === skin.id ? entry(s.unsaved === undefined ? undefined : true) : s))
+      : [...index.skins, entry(from === undefined ? undefined : from === 'new')];
     await this.write([[SKIN + skin.id, skin], [SKINS, { active: use ? skin.id : index.active, skins }]]);
+  }
+
+  /** Notes that a skin was just saved to a file, as it is now. */
+  async markSkinSaved(id: string): Promise<void> {
+    const index = await this.skinIndex();
+    await this.write([[SKINS, { ...index, skins: index.skins.map((s) => (s.id === id ? { ...s, unsaved: false } : s)) }]]);
   }
 
   /** Puts a skin in use. */
@@ -173,8 +198,9 @@ export class SaveStore {
    */
   async changeSkin(change: (skin: Skin) => Skin): Promise<Skin> {
     const skin = await this.activeSkin();
-    const next = change(skin.id === ORIGINAL.id ? newSkin('My skin', ORIGINAL, crypto.randomUUID()) : skin);
-    await this.putSkin(next, { use: true });
+    const starting = skin.id === ORIGINAL.id;
+    const next = change(starting ? newSkin('My skin', ORIGINAL, crypto.randomUUID()) : skin);
+    await this.putSkin(next, { use: true, from: starting ? 'new' : undefined });
     return next;
   }
 

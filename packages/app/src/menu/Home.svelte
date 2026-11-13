@@ -14,7 +14,8 @@
     onSkins,
     onWorkshop,
     skinName = 'Original',
-  }: { canContinue: boolean; savedCount: number; onContinue: () => void; onNewGame: () => void; onSaves: () => void; onCodex: () => void; onSkins: () => void; onWorkshop: () => void; skinName?: string } = $props();
+    unsavedSkins = 0,
+  }: { canContinue: boolean; savedCount: number; onContinue: () => void; onNewGame: () => void; onSaves: () => void; onCodex: () => void; onSkins: () => void; onWorkshop: () => void; skinName?: string; /** Skins made here or changed since their file, not saved to a file. */ unsavedSkins?: number } = $props();
 </script>
 
 <div class="home">
@@ -29,10 +30,11 @@
     <button onclick={onSaves}>Saved games{savedCount ? ` (${savedCount})` : ''}</button>
     <div class="pair">
       <button onclick={onCodex}>📖 Codex</button>
-      <button onclick={onSkins}>🎨 Skins</button>
+      <button onclick={onSkins} title={unsavedSkins ? 'A skin is not saved to a file' : undefined}>🎨 Skins{#if unsavedSkins}<span class="warn" aria-label="not saved to a file"> ⚠️</span>{/if}</button>
     </div>
     <button onclick={onWorkshop}>🛠️ Workshop</button>
   </nav>
+  {#if unsavedSkins}<p class="unsaved">⚠️ {unsavedSkins === 1 ? 'A skin is' : `${unsavedSkins} skins are`} not saved to a file. Save from 🎨 Skins to keep a copy.</p>{/if}
   <p class="meta">Skin: {skinName} · engine v{ENGINE_VERSION}</p>
 </div>
 
@@ -67,6 +69,13 @@
     background: var(--accent);
     color: var(--on-accent);
     font-weight: 700;
+  }
+  .unsaved {
+    margin: 0;
+    max-width: 260px;
+    text-align: center;
+    font-size: 12px;
+    color: #e0a040;
   }
   .meta {
     margin: 0;

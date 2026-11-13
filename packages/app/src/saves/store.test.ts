@@ -142,6 +142,42 @@ describe('skins on the device', () => {
     await expect(store.putSkin(ORIGINAL)).rejects.toThrow(/can't be changed/);
   });
 
+  describe('saved to a file, or not', () => {
+    const skin: Skin = { id: 's', name: 'Iron Tide', theme: DEFAULT_THEME, words };
+    const unsaved = async (id: string) => (await store.skinIndex()).skins.find((s) => s.id === id)?.unsaved;
+
+    it('a new skin is not saved to a file until it is', async () => {
+      await store.putSkin(skin, { from: 'new' });
+      expect(await unsaved('s')).toBe(true);
+      await store.markSkinSaved('s');
+      expect(await unsaved('s')).toBe(false);
+      // A change after that needs saving again.
+      await store.putSkin({ ...skin, words: ORIGINAL.words });
+      expect(await unsaved('s')).toBe(true);
+    });
+
+    it('"My skin", started by a change while Original is in use, is new too', async () => {
+      const made = await store.changeSkin((s) => ({ ...s, words }));
+      expect(await unsaved(made.id)).toBe(true);
+    });
+
+    it('an opened skin file is saved until it is changed, or renamed', async () => {
+      await store.putSkin(skin, { from: 'file', use: true });
+      expect(await unsaved('s')).toBe(false);
+      await store.changeSkin((s) => ({ ...s, words: ORIGINAL.words }));
+      expect(await unsaved('s')).toBe(true);
+      await store.markSkinSaved('s');
+      await store.putSkin({ ...skin, name: 'Iron Tide II' });
+      expect(await unsaved('s')).toBe(true);
+    });
+
+    it("skins from before this was kept aren't flagged", async () => {
+      await store.putSkin(skin);
+      await store.putSkin({ ...skin, words: ORIGINAL.words });
+      expect(await unsaved('s')).toBeUndefined();
+    });
+  });
+
   it('a theme kept from before skins becomes a skin of its own, in use', async () => {
     const old = { ...setPicture(DEFAULT_THEME, 'hex.farm', 'data:image/png;base64,AA=='), name: 'Golden' };
     await (store as unknown as { write: (r: [string, unknown][]) => Promise<void> }).write([['theme', old]]);

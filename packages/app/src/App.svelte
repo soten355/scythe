@@ -160,14 +160,17 @@
   const makeSkin = (wanted: string, from: string) =>
     skinDo(async () => {
       const name = freeName(wanted, takenNames());
-      await store.putSkin(newSkin(name, await store.skin(from), crypto.randomUUID()), { use: true });
+      await store.putSkin(newSkin(name, await store.skin(from), crypto.randomUUID()), { use: true, from: 'new' });
       return `Made "${name}" and put it in use. Edit it from here or the Workshop.`;
     });
   const renameSkin = (id: string, name: string) => skinDo(async () => store.putSkin({ ...(await store.skin(id)), name: freeName(name, takenNames(id)) }));
   const deleteSkin = (id: string) => skinDo(() => store.deleteSkin(id), 'Deleted.');
   /** Saves a skin to a file, with the player's own card decks if asked. */
   const exportSkinById = (id: string, withCards: boolean) =>
-    skinDo(async () => void (await exportSkin(await store.skin(id), withCards ? cardsToShare(library, await store.cardPictures()) : undefined)));
+    skinDo(async () => {
+      // Read and saved as one, so the skin counts as saved as it is in the file.
+      if (await exportSkin(await store.skin(id), withCards ? cardsToShare(library, await store.cardPictures()) : undefined)) await store.markSkinSaved(id);
+    });
   const importSkin = (file: File) =>
     skinDo(async () => {
       const text = await file.text();
@@ -181,7 +184,7 @@
       } catch (e) {
         cardTrouble = e instanceof Error ? e.message : String(e);
       }
-      await store.putSkin(opened, { use: true });
+      await store.putSkin(opened, { use: true, from: 'file' });
       const added = `Added "${opened.name}" and put it in use.`;
       if (cardTrouble) return `${added} Its cards weren't used: ${cardTrouble}`;
       if (!cards) return added;
@@ -243,7 +246,7 @@
 {/if}
 
 {#if screen === 'home'}
-  <Home canContinue={resumable !== null} savedCount={saves.length} onContinue={() => resumable && play(resumable)} onNewGame={() => go('new')} onSaves={() => go('saves')} onCodex={() => go('codex')} onSkins={() => go('skins')} onWorkshop={() => go('workshop')} skinName={skin.name} />
+  <Home canContinue={resumable !== null} savedCount={saves.length} onContinue={() => resumable && play(resumable)} onNewGame={() => go('new')} onSaves={() => go('saves')} onCodex={() => go('codex')} onSkins={() => go('skins')} onWorkshop={() => go('workshop')} skinName={skin.name} unsavedSkins={skinIndex.skins.filter((s) => s.unsaved).length} />
 {:else if screen === 'codex'}
   <Codex {catalog} {builtIn} {library} board={builtIn.maps[0]!.board} {look} words={skin.words} onBack={() => go('home')} />
 {:else if screen === 'skins'}

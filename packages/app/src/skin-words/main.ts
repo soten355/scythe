@@ -152,7 +152,7 @@ root.addEventListener('click', async (e) => {
     render();
   } else if (el.dataset.act === 'start') {
     skin = newSkin('My skin', ORIGINAL, crypto.randomUUID());
-    await store.putSkin(skin, { use: true });
+    await store.putSkin(skin, { use: true, from: 'new' });
     status = 'Started "My skin" and put it in use. Rename it on the Skins screen.';
     render();
   }

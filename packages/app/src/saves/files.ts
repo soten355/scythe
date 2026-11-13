@@ -5,29 +5,30 @@ import { fileName, parseSaveFile, saveFileText, type SavedGame } from './save';
 import { themeFileName, themeFileText, type Theme } from '../theme/theme';
 import { skinFileName, skinFileText, type Skin, type SkinCards } from '../skins/skin';
 
-async function shareFile(name: string, text: string): Promise<void> {
-  await share(new File([text], name, { type: 'application/json' }));
+async function shareFile(name: string, text: string): Promise<boolean> {
+  return share(new File([text], name, { type: 'application/json' }));
 }
 
 /**
  * Hands a file to the share sheet where there is one (iPhone: Save to Files,
- * AirDrop), otherwise downloads it.
+ * AirDrop), otherwise downloads it. False if the share sheet was closed without sharing.
  */
-async function share(file: File): Promise<void> {
+async function share(file: File): Promise<boolean> {
   const name = file.name;
   if (navigator.canShare?.({ files: [file] })) {
     try {
       await navigator.share({ files: [file] });
-      return;
+      return true;
     } catch (e) {
       // Closing the share sheet isn't a failure; anything else falls back to a download.
-      if (e instanceof DOMException && e.name === 'AbortError') return;
+      if (e instanceof DOMException && e.name === 'AbortError') return false;
     }
   }
   const url = URL.createObjectURL(file);
   const link = Object.assign(document.createElement('a'), { href: url, download: name });
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+  return true;
 }
 
 export const exportSave = (save: SavedGame) => shareFile(fileName(save), saveFileText(save));
