@@ -61,21 +61,36 @@ const icon = (i: Icon | undefined, x: number, y: number, size: number, faded = f
   return `<text x="${x}" y="${y}" font-size="${size}" text-anchor="middle" dominant-baseline="central" ${faded ? 'opacity="0.45"' : ''}>${esc(i.text)}</text>`;
 };
 
-// ---- encounter card pictures (by card ID, in this skin) ---------------------------
+// ---- card pictures (by card ID, in this skin): encounter and Factory cards ----------
 
-/** The encounter cards a picture can be for: the base game's, then the player's own. */
-let encounterCards: { id: string; name: string }[] = (BUILT_IN.encounters ?? []).map((c) => ({ id: c.id, name: c.name }));
+type Deck = 'encounter' | 'factory';
+/** The cards a picture can be for in each deck: the base game's, then the player's own. */
+const decks: Record<Deck, { id: string; name: string }[]> = {
+  encounter: (BUILT_IN.encounters ?? []).map((c) => ({ id: c.id, name: c.name })),
+  factory: (BUILT_IN.factory ?? []).map((c) => ({ id: c.id, name: c.name })),
+};
+const DECK_TEXT: Record<Deck, { title: string; hint: string }> = {
+  encounter: {
+    title: 'Encounter card pictures',
+    hint: "A picture for each encounter card in this skin, shown above the card's story on any card without a picture of its own. Pick many at once: each file goes to the card its name matches (encounter-1.png is the first base-game card; your own cards go by their ID).",
+  },
+  factory: {
+    title: 'Factory card pictures',
+    hint: "A picture for each Factory card in this skin, shown when choosing a card at the Factory and in the Codex. Pick many at once: each file goes to the card its name matches (factory-1.png is the first base-game card; your own cards go by their ID).",
+  },
+};
 
-function cardPictures(): string {
-  const count = encounterCards.filter((c) => theme.pictures[cardSlot(c.id)]).length;
-  return `<section class="card-pictures"><h3>Encounter card pictures</h3>
-    <p class="hint">A picture for each encounter card in this skin, shown above the card's story on any card without a picture of its own. Pick many at once: each file goes to the card its name matches (encounter-1.png is the first base-game card; your own cards go by their ID). Best at 768 × 512 (3:2); bigger pictures are shrunk.</p>
+function cardPictures(deck: Deck): string {
+  const cards = decks[deck];
+  const count = cards.filter((c) => theme.pictures[cardSlot(c.id)]).length;
+  return `<section class="card-pictures"><h3>${DECK_TEXT[deck].title}</h3>
+    <p class="hint">${DECK_TEXT[deck].hint} Best at 768 × 512 (3:2); bigger pictures are shrunk.</p>
     <div class="card-buttons">
       <button data-act="cards-add">Add pictures…</button>
-      ${count ? `<button data-act="cards-clear">Clear all (${count})</button>` : ''}
+      ${count ? `<button data-act="cards-clear" data-deck="${deck}">Clear all (${count})</button>` : ''}
     </div>
     <div class="card-grid">
-      ${encounterCards
+      ${cards
         .map((c) => {
           const url = theme.pictures[cardSlot(c.id)];
           return `<div class="card-pic">
@@ -89,10 +104,10 @@ function cardPictures(): string {
   </section>`;
 }
 
-/** Puts each picture on the card its file name matches; says how many went in and which files matched no card. */
+/** Puts each picture on the card (of either deck) its file name matches; says how many went in and which files matched no card. */
 async function addCardPictures(files: File[]) {
   show(`Shrinking ${files.length} picture${files.length === 1 ? '' : 's'}…`);
-  const ids = encounterCards.map((c) => c.id);
+  const ids = [...decks.encounter, ...decks.factory].map((c) => c.id);
   let next = theme;
   let added = 0;
   const unmatched: string[] = [];
@@ -111,7 +126,7 @@ async function addCardPictures(files: File[]) {
     }
   }
   const parts = [`Added ${added} card picture${added === 1 ? '' : 's'}.`];
-  if (unmatched.length) parts.push(`No card for: ${unmatched.join(', ')} (name a file by its card's ID, like encounter-3.png).`);
+  if (unmatched.length) parts.push(`No card for: ${unmatched.join(', ')} (name a file by its card's ID, like encounter-3.png or factory-2.png).`);
   if (unreadable.length) parts.push(`Couldn't read: ${unreadable.join(', ')}.`);
   if (added) await keep(next, `${parts.join(' ')} Saved on this device.`);
   show(parts.join(' '), added === 0 || unmatched.length + unreadable.length > 0);
@@ -276,7 +291,8 @@ function render() {
             </section>`,
           )
           .join('')}
-        ${cardPictures()}
+        ${cardPictures('encounter')}
+        ${cardPictures('factory')}
       </div>
       <div class="side">
         <h3>Preview</h3>
@@ -322,8 +338,9 @@ root.addEventListener('click', async (e) => {
       await keep(clearPicture(theme, cardSlot(btn.dataset.card!)));
       break;
     case 'cards-clear': {
-      const slots = encounterCards.map((c) => cardSlot(c.id)).filter((slot) => theme.pictures[slot]);
-      if (await ask(`Remove all ${slots.length} encounter card pictures from this skin? (Save the skin to a file first to keep them.)`)) await keep(slots.reduce((t, slot) => clearPicture(t, slot), theme));
+      const deck = btn.dataset.deck as Deck;
+      const slots = decks[deck].map((c) => cardSlot(c.id)).filter((slot) => theme.pictures[slot]);
+      if (await ask(`Remove all ${slots.length} ${deck === 'factory' ? 'Factory' : 'encounter'} card pictures from this skin? (Save the skin to a file first to keep them.)`)) await keep(slots.reduce((t, slot) => clearPicture(t, slot), theme));
       break;
     }
     case 'remove-hex':
@@ -421,8 +438,10 @@ render();
 // The player's own encounter cards can have pictures here too, after the base game's.
 store.library().then(
   (library) => {
-    const known = new Set(encounterCards.map((c) => c.id));
-    encounterCards = [...encounterCards, ...library.encounters.filter((c) => !known.has(c.id)).map((c) => ({ id: c.id, name: c.name }))];
+    for (const [deck, own] of [['encounter', library.encounters], ['factory', library.factory]] as const) {
+      const known = new Set(decks[deck].map((c) => c.id));
+      decks[deck] = [...decks[deck], ...own.filter((c) => !known.has(c.id)).map((c) => ({ id: c.id, name: c.name }))];
+    }
     render();
   },
   () => {},

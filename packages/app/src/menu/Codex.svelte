@@ -14,7 +14,7 @@
   import type { BoardLook } from '../theme/theme';
   import { CODEX_TABS, codexList, codexScene, mapFacts, mapStart, encounterFacts, factionFacts, factoryFacts, matFacts, objectiveFacts, tileFacts, type CodexKind } from './codex';
   import { cardLook } from '../content/card-pictures';
-  import { backdropPictures, encounterPicture, factionPicture } from '../theme/current.svelte';
+  import { backdropPictures, encounterPicture, factionPicture, factoryPicture } from '../theme/current.svelte';
   import FactionEmblem from '../play/FactionEmblem.svelte';
   import FightBackdrop from '../play/FightBackdrop.svelte';
   import FighterArt from '../play/FighterArt.svelte';
@@ -276,8 +276,10 @@
             </div>
           {:else if factory}
             {@const c = factoryFacts(factory)}
+            {@const picture = factoryPicture(factory)}
             <div class="paper factory">
               <h2>🏭 {factory.name}</h2>
+              {#if picture}<div class="card-picture" style:background-image="url({picture})"></div>{/if}
               <p class="part">Top</p>
               <p>{c.top}</p>
               <p class="part">Then</p>

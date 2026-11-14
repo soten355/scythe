@@ -161,7 +161,7 @@ export interface Prompt {
     stop?: Button;
   };
   /** Factory cards to choose one from, shown in a pop-up: each card's top part and move, and the action keeping it. */
-  factoryOffer?: { cards: { name: string; top: string; move: string; action: Action }[] };
+  factoryOffer?: { cards: { id: string; name: string; top: string; move: string; action: Action }[] };
   /** A choice to make in a pop-up (a structure to build; a recruit's spot, then its one-time bonus); cancel goes back, when there's somewhere to go back to. */
   choice?: { message: string; options: { label: string; icon: Icon; select: Selection }[]; cancel?: Selection };
   /**
@@ -1245,7 +1245,7 @@ function factoryOfferPrompt(state: GameState, actions: Action[]): Prompt {
   const cards = actions.flatMap((a) => {
     if (a.type !== 'takeFactoryCard') return [];
     const card = factoryCard(state, a.card);
-    return [{ name: card.name, top: `${costText(card.cost)} → ${gainText(card.gain, '')}`, move: moveText(card), action: a }];
+    return [{ id: card.id, name: card.name, top: `${costText(card.cost)} → ${gainText(card.gain, '')}`, move: moveText(card), action: a }];
   });
   return { ...emptyPrompt(state), buttons: [], factoryOffer: { cards } };
 }

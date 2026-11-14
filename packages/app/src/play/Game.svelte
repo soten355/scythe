@@ -38,7 +38,7 @@
   import { botName, isBot, needsPass, people } from './seats';
   import { botTurnsSince, paceOf } from './narrate';
   import type { BoardLook } from '../theme/theme';
-  import { encounterPicture, uiPicture } from '../theme/current.svelte';
+  import { encounterPicture, factoryPicture, uiPicture } from '../theme/current.svelte';
   import { cardLook } from '../content/card-pictures';
 
   let {
@@ -688,7 +688,9 @@
         <p class="note">It becomes a fifth section beside your mat: its top part, then a move.</p>
         <div class="options" style:grid-template-columns="repeat({Math.min(f.cards.length, 4)}, 1fr)">
           {#each f.cards as c (c.name)}
+            {@const picture = factoryPicture(c)}
             <button onclick={() => press({ label: c.name, action: c.action })}>
+              {#if picture}<span class="factory-picture" style:background-image="url({picture})" aria-hidden="true"></span>{/if}
               <span class="text">{c.name}</span>
               <span class="cost">{c.top}</span>
               <span class="gain">Then {c.move}</span>
@@ -1376,6 +1378,15 @@
     gap: 6px;
     text-align: left;
     padding: 10px;
+  }
+  /* A Factory card's picture (from the skin), across the top of its button. */
+  .factory-picture {
+    display: block;
+    width: 100%;
+    aspect-ratio: 3 / 2;
+    max-height: 30cqh;
+    border-radius: 5px;
+    background: center / cover no-repeat;
   }
   .encounter .options button:disabled {
     opacity: 0.4;

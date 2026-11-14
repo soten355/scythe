@@ -17,6 +17,8 @@ export function useCardPictures(pictures: Record<string, string>) {
 export const cardPicture = (ref: string | undefined): string | undefined => (ref ? current.cards[ref] : undefined);
 
 /** The picture an encounter card shows: its own (if kept on this device), else the skin's for its ID. */
+/** A Factory card's picture: the skin's, for that card's ID. */
+export const factoryPicture = (card: { id: string }): string | undefined => current.theme.pictures[cardSlot(card.id)];
 export const encounterPicture = (card: { id: string; picture?: string }): string | undefined => cardPicture(card.picture) ?? current.theme.pictures[cardSlot(card.id)];
 
 export function useTheme(theme: Theme) {
