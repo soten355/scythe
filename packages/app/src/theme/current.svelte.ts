@@ -5,7 +5,7 @@
 // device (they belong to the decks, not the theme). The app sets the theme here
 // once it's read from the device; components ask for a picture and redraw
 // when it changes.
-import { backdropPicture, DEFAULT_THEME, factionSlot, type FactionPart, type Theme } from './theme';
+import { backdropPicture, cardSlot, DEFAULT_THEME, factionSlot, type FactionPart, type Theme } from './theme';
 
 const current = $state<{ theme: Theme; cards: Record<string, string> }>({ theme: DEFAULT_THEME, cards: {} });
 
@@ -15,6 +15,9 @@ export function useCardPictures(pictures: Record<string, string>) {
 
 /** An encounter card's picture, by its reference, if it's kept on this device. */
 export const cardPicture = (ref: string | undefined): string | undefined => (ref ? current.cards[ref] : undefined);
+
+/** The picture an encounter card shows: its own (if kept on this device), else the skin's for its ID. */
+export const encounterPicture = (card: { id: string; picture?: string }): string | undefined => cardPicture(card.picture) ?? current.theme.pictures[cardSlot(card.id)];
 
 export function useTheme(theme: Theme) {
   current.theme = theme;

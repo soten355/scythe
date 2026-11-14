@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addHexPicture, backdropPicture, hexArtIndex, hexPictures, readTheme, removeHexPicture, DEFAULT_UI_COLORS, FONTS, uiStyle, UI_COLORS, boardLook, clearPicture, copyFactionPictures, DEFAULT_THEME, FACTION_PARTS, factionSlot, parseThemeFile, pictureSpec, setColor, setPicture, SLOTS, themeFileText, type Theme } from './theme';
+import { addHexPicture, backdropPicture, cardIdForFile, cardSlot, hexArtIndex, hexPictures, readTheme, removeHexPicture, DEFAULT_UI_COLORS, FONTS, uiStyle, UI_COLORS, boardLook, clearPicture, copyFactionPictures, DEFAULT_THEME, FACTION_PARTS, factionSlot, parseThemeFile, pictureSpec, setColor, setPicture, SLOTS, themeFileText, type Theme } from './theme';
 import { baseBoard } from '@scythe/content';
 import { ENCOUNTER_ICON, TERRAIN_ICONS, TUNNEL_ICON } from '../play/icons';
 
@@ -320,5 +320,24 @@ describe('look and feel', () => {
     expect(odd.uiColors).toEqual({ text: '#abc' });
     expect(odd.bodyFont).toBe(DEFAULT_THEME.bodyFont);
     expect(odd.headingFont).toBe(DEFAULT_THEME.headingFont);
+  });
+});
+
+describe("encounter card pictures in a skin (by card ID)", () => {
+  it('are kept under card.<id>, shrunk like a card picture, and read back from a skin or theme file', () => {
+    expect(cardSlot('encounter-3')).toBe('card.encounter-3');
+    expect(pictureSpec(cardSlot('encounter-3'))).toEqual({ best: { width: 768, height: 512 }, max: 768, type: 'image/jpeg' });
+    const read = readTheme({ pictures: { 'card.encounter-1': JPEG, 'card.bad id!': JPEG, 'card.': JPEG, 'card.encounter-2': 'https://example.com/x.png' } });
+    expect(read.pictures).toEqual({ 'card.encounter-1': JPEG });
+  });
+
+  it("match a picture file to a card by its name: the card's ID, any case, any picture extension", () => {
+    const ids = ['encounter-1', 'encounter-12', 'card-3'];
+    expect(cardIdForFile('encounter-1.png', ids)).toBe('encounter-1');
+    expect(cardIdForFile('Encounter-12.JPG', ids)).toBe('encounter-12');
+    expect(cardIdForFile('card-3.webp', ids)).toBe('card-3');
+    expect(cardIdForFile('encounter-2.png', ids)).toBeUndefined();
+    expect(cardIdForFile('encounter-1.prompt.txt', ids)).toBeUndefined();
+    expect(cardIdForFile('my encounter-1.png', ids)).toBeUndefined();
   });
 });

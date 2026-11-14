@@ -33,6 +33,11 @@ describe('encounter card pictures', () => {
     expect(cardLook(card({ story: '', picture: 'pic-1', show: 'both' }), JPEG)).toEqual({ picture: JPEG });
   });
 
+  it("show the skin's picture for a card without one of its own, with its story by default", () => {
+    expect(cardLook(card(), JPEG)).toEqual({ picture: JPEG, story: 'A cart is stuck in the river.' });
+    expect(cardLook(card({ show: 'story' }), JPEG)).toEqual({ story: 'A cart is stuck in the river.' });
+  });
+
   it('shows the story instead when the picture is not on this device', () => {
     expect(cardLook(card({ picture: 'pic-1', show: 'picture' }), undefined)).toEqual({ story: 'A cart is stuck in the river.' });
     expect(cardLook(card({ picture: 'pic-1', show: 'both' }), undefined)).toEqual({ story: 'A cart is stuck in the river.' });

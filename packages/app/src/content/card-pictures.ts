@@ -23,11 +23,15 @@ export function pictureRef(url: string): string {
   return `pic-${(4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36)}`;
 }
 
-/** What a card shows above its options: the story by default, and the picture too if it has one; the story instead of a picture this device doesn't have. */
+/**
+ * What a card shows above its options: the story by default, and the picture
+ * too if it has one (its own, or the skin's for its ID); the story instead of
+ * a picture this device doesn't have.
+ */
 export function cardLook(card: Pick<EncounterCard, 'story' | 'picture' | 'show'>, picture: string | undefined): { picture?: string; story?: string } {
-  const show = card.show ?? (card.picture ? 'both' : 'story');
+  const show = card.show ?? (card.picture || picture ? 'both' : 'story');
   const wantsPicture = show === 'picture' || show === 'both';
-  const hasPicture = wantsPicture && !!card.picture && !!picture;
+  const hasPicture = wantsPicture && !!picture;
   const wantsStory = show === 'story' || show === 'both' || (wantsPicture && !hasPicture);
   return { ...(hasPicture && { picture }), ...(wantsStory && card.story && { story: card.story }) };
 }

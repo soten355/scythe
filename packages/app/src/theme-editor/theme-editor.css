@@ -229,3 +229,53 @@ label.check {
 .editing b {
   color: var(--accent);
 }
+
+/* Encounter card pictures: a grid of every card, each with its picture (3:2) and name. */
+.card-pictures .hint {
+  margin: 0 0 8px;
+  font-size: 12px;
+  opacity: 0.75;
+}
+.card-buttons {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 10px;
+}
+.card-pic {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.thumb.card {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 3 / 2;
+}
+.thumb.card img {
+  object-fit: cover;
+}
+.card-pic small {
+  font-size: 11px;
+  opacity: 0.8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.card-pic .remove {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 22px;
+  height: 22px;
+  min-height: 0;
+  padding: 0;
+  border-radius: 50%;
+  line-height: 1;
+}

@@ -19,7 +19,7 @@ import { mapPictureFrame } from '../play/map-picture';
 import { mapGuide } from '../theme/map-guide';
 import { center, corners, HEX_HEIGHT, HEX_VIEWBOX, HEX_WIDTH, points, SIZE, type Point } from '../play/geometry';
 import type { Icon } from '../play/icons';
-import { addHexPicture, boardLook, clearPicture, hexPictures, removeHexPicture, DEFAULT_COLORS, DEFAULT_THEME, DEFAULT_UI_COLORS, FONTS, parseThemeFile, setColor, setPicture, SLOTS, TERRAINS, UI_COLORS, uiStyle, type FontId, type SlotId, type Theme, type UiColor } from '../theme/theme';
+import { addHexPicture, boardLook, cardIdForFile, cardSlot, clearPicture, hexPictures, removeHexPicture, DEFAULT_COLORS, DEFAULT_THEME, DEFAULT_UI_COLORS, FONTS, parseThemeFile, setColor, setPicture, SLOTS, TERRAINS, UI_COLORS, uiStyle, type FontId, type SlotId, type Theme, type UiColor } from '../theme/theme';
 import { pictureFor, sizeKb } from '../theme/pictures';
 
 const store = new SaveStore();
@@ -60,6 +60,62 @@ const icon = (i: Icon | undefined, x: number, y: number, size: number, faded = f
   }
   return `<text x="${x}" y="${y}" font-size="${size}" text-anchor="middle" dominant-baseline="central" ${faded ? 'opacity="0.45"' : ''}>${esc(i.text)}</text>`;
 };
+
+// ---- encounter card pictures (by card ID, in this skin) ---------------------------
+
+/** The encounter cards a picture can be for: the base game's, then the player's own. */
+let encounterCards: { id: string; name: string }[] = (BUILT_IN.encounters ?? []).map((c) => ({ id: c.id, name: c.name }));
+
+function cardPictures(): string {
+  const count = encounterCards.filter((c) => theme.pictures[cardSlot(c.id)]).length;
+  return `<section class="card-pictures"><h3>Encounter card pictures</h3>
+    <p class="hint">A picture for each encounter card in this skin, shown above the card's story on any card without a picture of its own. Pick many at once: each file goes to the card its name matches (encounter-1.png is the first base-game card; your own cards go by their ID). Best at 768 × 512 (3:2); bigger pictures are shrunk.</p>
+    <div class="card-buttons">
+      <button data-act="cards-add">Add pictures…</button>
+      ${count ? `<button data-act="cards-clear">Clear all (${count})</button>` : ''}
+    </div>
+    <div class="card-grid">
+      ${encounterCards
+        .map((c) => {
+          const url = theme.pictures[cardSlot(c.id)];
+          return `<div class="card-pic">
+            <div class="thumb card">${url ? `<img src="${esc(url)}" alt="">` : '<span>None</span>'}</div>
+            <small title="${esc(c.id)}">${esc(c.name)}</small>
+            ${url ? `<button class="remove" data-act="card-remove" data-card="${esc(c.id)}" aria-label="Remove this picture" title="Remove this picture">×</button>` : ''}
+          </div>`;
+        })
+        .join('')}
+    </div>
+  </section>`;
+}
+
+/** Puts each picture on the card its file name matches; says how many went in and which files matched no card. */
+async function addCardPictures(files: File[]) {
+  show(`Shrinking ${files.length} picture${files.length === 1 ? '' : 's'}…`);
+  const ids = encounterCards.map((c) => c.id);
+  let next = theme;
+  let added = 0;
+  const unmatched: string[] = [];
+  const unreadable: string[] = [];
+  for (const f of files) {
+    const id = cardIdForFile(f.name, ids);
+    if (!id) {
+      unmatched.push(f.name);
+      continue;
+    }
+    try {
+      next = setPicture(next, cardSlot(id), await pictureFor(cardSlot(id), f));
+      added++;
+    } catch {
+      unreadable.push(f.name);
+    }
+  }
+  const parts = [`Added ${added} card picture${added === 1 ? '' : 's'}.`];
+  if (unmatched.length) parts.push(`No card for: ${unmatched.join(', ')} (name a file by its card's ID, like encounter-3.png).`);
+  if (unreadable.length) parts.push(`Couldn't read: ${unreadable.join(', ')}.`);
+  if (added) await keep(next, `${parts.join(' ')} Saved on this device.`);
+  show(parts.join(' '), added === 0 || unmatched.length + unreadable.length > 0);
+}
 
 /** The map the guide and preview use: the default one. */
 const MAP = BUILT_IN.maps[0]!.board;
@@ -220,6 +276,7 @@ function render() {
             </section>`,
           )
           .join('')}
+        ${cardPictures()}
       </div>
       <div class="side">
         <h3>Preview</h3>
@@ -231,6 +288,7 @@ function render() {
       </div>
     </div>
     <input type="file" accept="image/*" data-picture hidden>
+    <input type="file" accept="image/*" multiple data-cardpics hidden>
     <input type="file" accept=".json,application/json" data-themefile hidden>
     <div class="status">${esc(status)}</div>`;
 }
@@ -255,6 +313,17 @@ root.addEventListener('click', async (e) => {
     case 'clear': {
       const count = slot!.startsWith('hex.') ? hexPictures(theme, slot!.slice(4) as Terrain).length : 1;
       if (count < 2 || (await ask(`Remove all ${count} pictures for this terrain? (Save the theme to a file first to keep them.)`))) await keep(clearPicture(theme, slot!));
+      break;
+    }
+    case 'cards-add':
+      root.querySelector<HTMLInputElement>('[data-cardpics]')!.click();
+      break;
+    case 'card-remove':
+      await keep(clearPicture(theme, cardSlot(btn.dataset.card!)));
+      break;
+    case 'cards-clear': {
+      const slots = encounterCards.map((c) => cardSlot(c.id)).filter((slot) => theme.pictures[slot]);
+      if (await ask(`Remove all ${slots.length} encounter card pictures from this skin? (Save the skin to a file first to keep them.)`)) await keep(slots.reduce((t, slot) => clearPicture(t, slot), theme));
       break;
     }
     case 'remove-hex':
@@ -288,7 +357,11 @@ root.addEventListener('click', async (e) => {
 
 root.addEventListener('change', async (e) => {
   const el = e.target as HTMLInputElement;
-  if (el.dataset.picture !== undefined) {
+  if (el.dataset.cardpics !== undefined) {
+    const files = [...(el.files ?? [])];
+    el.value = '';
+    if (files.length) await addCardPictures(files);
+  } else if (el.dataset.picture !== undefined) {
     const files = [...(el.files ?? [])];
     const file = files[0];
     el.value = '';
@@ -345,6 +418,15 @@ root.addEventListener('change', async (e) => {
 });
 
 render();
+// The player's own encounter cards can have pictures here too, after the base game's.
+store.library().then(
+  (library) => {
+    const known = new Set(encounterCards.map((c) => c.id));
+    encounterCards = [...encounterCards, ...library.encounters.filter((c) => !known.has(c.id)).map((c) => ({ id: c.id, name: c.name }))];
+    render();
+  },
+  () => {},
+);
 store.activeSkin().then(
   (s) => {
     theme = s.theme;

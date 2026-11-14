@@ -14,7 +14,7 @@
   import type { BoardLook } from '../theme/theme';
   import { CODEX_TABS, codexList, codexScene, mapFacts, mapStart, encounterFacts, factionFacts, factoryFacts, matFacts, objectiveFacts, tileFacts, type CodexKind } from './codex';
   import { cardLook } from '../content/card-pictures';
-  import { backdropPictures, cardPicture, factionPicture } from '../theme/current.svelte';
+  import { backdropPictures, encounterPicture, factionPicture } from '../theme/current.svelte';
   import FactionEmblem from '../play/FactionEmblem.svelte';
   import FightBackdrop from '../play/FightBackdrop.svelte';
   import FighterArt from '../play/FighterArt.svelte';
@@ -254,7 +254,7 @@
             </div>
           {:else if encounter}
             {@const e = encounterFacts(encounter)}
-            {@const shown = cardLook(encounter, cardPicture(encounter.picture))}
+            {@const shown = cardLook(encounter, encounterPicture(encounter))}
             <div class="encounter">
               <h2>⭐ {encounter.name}</h2>
               {#if shown.picture}

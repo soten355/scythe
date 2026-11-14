@@ -9,6 +9,7 @@
 // set keeps the usual look. Pictures are kept as data URLs, already shrunk
 // (see pictures.ts), so a theme is plain data: kept on the device and saved
 // to or opened from a .scythe-theme.json file.
+import { CARD_PICTURE } from '../content/card-pictures';
 import type { Resource, Structure, Terrain } from '@scythe/engine';
 import { ENCOUNTER_ICON, TERRAIN_ICONS, TUNNEL_ICON, type Icon } from '../play/icons';
 import { inkOn } from '../play/ink';
@@ -23,7 +24,7 @@ const TOKENS: Resource[] = ['oil', 'metal', 'wood', 'food'];
  */
 export type FactionPart = 'crest' | 'portrait' | 'character' | 'mech' | 'characterMap' | 'mechMap' | 'scene' | 'worker' | Structure;
 
-export type SlotId = 'background' | `hex.${Terrain}` | `symbol.${Terrain | 'tunnel' | 'encounter'}` | `token.${Resource}` | `backdrop.${Terrain}` | 'ui.menu' | 'ui.panel' | `faction.${string}.${FactionPart}`;
+export type SlotId = 'background' | `hex.${Terrain}` | `symbol.${Terrain | 'tunnel' | 'encounter'}` | `token.${Resource}` | `backdrop.${Terrain}` | 'ui.menu' | 'ui.panel' | `faction.${string}.${FactionPart}` | `card.${string}`;
 
 export interface Slot {
   id: SlotId;
@@ -82,6 +83,21 @@ function readFactionSlot(slot: string): { id: string; part: FactionPart } | null
   return m && FACTION_PART_NAMES.has(m[2]!) ? { id: m[1]!, part: m[2] as FactionPart } : null;
 }
 
+/**
+ * An encounter card's picture in this skin, by the card's ID: shown on any card
+ * with that ID that has no picture of its own (the base game's cards have none).
+ */
+export const cardSlot = (cardId: string): SlotId => `card.${cardId}`;
+const CARD_SLOT = /^card\.[A-Za-z0-9_-]{1,64}$/;
+
+/** The card a picture file is for, by its name: the card's ID (any case) and a picture's extension, e.g. "encounter-3.png". */
+export function cardIdForFile(fileName: string, ids: string[]): string | undefined {
+  const m = /^(.+)\.(png|jpe?g|webp|gif)$/i.exec(fileName.trim());
+  if (!m) return undefined;
+  const base = m[1]!.toLowerCase();
+  return ids.find((id) => id.toLowerCase() === base);
+}
+
 /** Every slot, in the order the editor lists them. */
 export const SLOTS: Slot[] = [
   { id: 'background', group: 'Map', label: 'Map picture', hint: `The whole map in one painting, made from the map guide so it lines up with the hexes; it zooms and pans with them. ${sizeText(BEST.background)}.` },
@@ -113,6 +129,7 @@ export function pictureSpec(slot: SlotId): { best: { width: number; height: numb
   if (slot === 'background' || slot === 'ui.menu' || slot.startsWith('backdrop.')) return spec(BEST.background, 'image/jpeg');
   if (slot === 'ui.panel') return spec(BEST.panel, 'image/jpeg');
   if (slot.startsWith('hex.')) return spec(BEST.hex, 'image/png');
+  if (CARD_SLOT.test(slot)) return { best: { ...CARD_PICTURE.best }, max: CARD_PICTURE.max, type: CARD_PICTURE.type };
   const part = readFactionSlot(slot)?.part;
   if (part === 'character' || part === 'mech' || part === 'characterMap' || part === 'mechMap') return spec(BEST.figure, 'image/png');
   if (part === 'portrait') return spec(BEST.portrait, 'image/png');
@@ -352,7 +369,7 @@ export function parseThemeFile(text: string): Theme {
 export function readTheme(data: Record<string, unknown>): Theme {
   const pictures: Theme['pictures'] = {};
   for (const [slot, url] of Object.entries((data.pictures as Record<string, unknown>) ?? {})) {
-    if ((SLOT_IDS.has(slot) || readFactionSlot(slot)) && typeof url === 'string' && PICTURE.test(url)) pictures[slot as SlotId] = url;
+    if ((SLOT_IDS.has(slot) || readFactionSlot(slot) || CARD_SLOT.test(slot)) && typeof url === 'string' && PICTURE.test(url)) pictures[slot as SlotId] = url;
   }
   const moreHexArt: Theme['moreHexArt'] = {};
   for (const [terrain, urls] of Object.entries((data.moreHexArt as Record<string, unknown>) ?? {})) {

@@ -37,7 +37,7 @@
   import { botName, isBot, needsPass, people } from './seats';
   import { botTurnsSince, paceOf } from './narrate';
   import type { BoardLook } from '../theme/theme';
-  import { cardPicture, uiPicture } from '../theme/current.svelte';
+  import { encounterPicture, uiPicture } from '../theme/current.svelte';
   import { cardLook } from '../content/card-pictures';
 
   let {
@@ -637,7 +637,7 @@
 
   {#if prompt.encounter && !handoff && !battle && !revealed && !botNow}
     {@const e = prompt.encounter}
-    {@const shown = cardLook(e, cardPicture(e.picture))}
+    {@const shown = cardLook(e, encounterPicture(e))}
     {#if peeking}
       <button class="primary back-to-card" onclick={() => (peeking = false)}>⭐ Back to the encounter</button>
     {:else}

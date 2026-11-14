@@ -145,6 +145,8 @@ export interface Prompt {
   };
   /** At an encounter: the card, shown in a pop-up, with an action for each option that can be taken now. */
   encounter?: {
+    /** The card's ID (a skin can have a picture for it). */
+    id: string;
     name: string;
     story: string;
     /** The card's picture (a reference to one kept on the device) and what it shows; see content/card-pictures.ts. */
@@ -1213,6 +1215,7 @@ function encounterPrompt(state: GameState, actions: Action[], selection: Selecti
     ...base,
     buttons: [],
     encounter: {
+      id: card.id,
       name: card.name,
       story: card.story,
       ...(card.picture && { picture: card.picture }),
