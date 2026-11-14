@@ -502,8 +502,8 @@
         {#if tile}
           <!-- The structure bonus tile, for all to see: what it counts; tap for the coins it pays at the end. -->
           <button class="tile" class:open={tileOpen} onclick={() => (tileOpen = !tileOpen)} aria-expanded={tileOpen}>
-            <small>🏛️ Structure bonus</small>
-            <span>{countText(tile.count)}</span>
+            <small>🏛️<span class="words"> Structure bonus</span></small>
+            <span class="count">{countText(tile.count)}</span>
             {#if tileOpen}<span class="pays">{paysText(tile.pays)}<br /><i>at the end of the game</i></span>{/if}
           </button>
         {/if}
@@ -1133,6 +1133,62 @@
   .round b {
     font-size: 24px;
     margin-top: 2px;
+  }
+  /* A phone held sideways has little map to spare: the round and the bonus
+     tile shrink to two small chips side by side, and the tile shows only its
+     🏛️ until tapped. Kept clear of the zoom buttons along the bottom. */
+  @media (pointer: coarse) {
+    @container screen (max-height: 500px) {
+      .corner {
+        top: 4px;
+        right: 4px;
+        flex-direction: row;
+        align-items: flex-start;
+        gap: 4px;
+      }
+      .round {
+        flex-direction: row;
+        align-items: baseline;
+        gap: 3px;
+        min-width: 0;
+        padding: 3px 6px;
+      }
+      .round small {
+        font-size: 8px;
+        letter-spacing: 0.06em;
+      }
+      .round b {
+        font-size: 14px;
+        margin-top: 0;
+      }
+      .tile {
+        padding: 3px 6px;
+        max-width: 190px;
+        font-size: 10px;
+      }
+      .tile small {
+        font-size: 12px;
+        letter-spacing: 0;
+        text-transform: none;
+      }
+      .tile:not(.open) {
+        min-height: 0;
+        line-height: 1;
+        padding: 4px 6px;
+      }
+      .tile:not(.open) small {
+        font-size: 13px;
+      }
+      .tile:not(.open) .words,
+      .tile:not(.open) .count {
+        display: none;
+      }
+      .tile.open small {
+        font-size: 8px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+    }
   }
   .options {
     display: grid;

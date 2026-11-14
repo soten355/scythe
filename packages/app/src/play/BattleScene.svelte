@@ -92,13 +92,12 @@
 
   {#if from('verdict')}
     <div class="verdict" style:--c={winner.color}>
-      <p class="label">Victory</p>
-      <p class="who">{winner.name} wins!</p>
-      <p class="how">
-        {battle.attacker.total} to {battle.defender.total}{battle.winner === 'attacker' && battle.attacker.total === battle.defender.total ? ' (ties go to the attacker)' : ''}
-        <button class="go" onclick={(e) => (e.stopPropagation(), onDone())}>Continue</button>
+      <p class="label">
+        Victory · {battle.attacker.total} to {battle.defender.total}{battle.winner === 'attacker' && battle.attacker.total === battle.defender.total ? ', ties go to the attacker' : ''}
       </p>
+      <p class="who">{winner.name} wins!</p>
     </div>
+    <button class="go" onclick={(e) => (e.stopPropagation(), onDone())}>Continue</button>
   {:else}
     <p class="skip">Tap to skip</p>
   {/if}
@@ -369,12 +368,13 @@
     100% { opacity: 0; transform: scale(1.5) translateY(-8%); }
   }
 
-  /* The verdict: a broad band across the middle in the winner's colour. */
+  /* The verdict: a broad band across the top in the winner's colour, clear of
+     the two tallies at the bottom (which it used to sit on top of). */
   .verdict {
     position: absolute;
     left: 0;
     right: 0;
-    bottom: calc(var(--safe-bottom) + 10px);
+    top: calc(var(--safe-top) + 6px);
     z-index: 5;
     padding: 6px 0 8px;
     text-align: center;
@@ -395,7 +395,7 @@
     color: var(--glow);
   }
   .who {
-    font-size: clamp(28px, 8cqh, 60px);
+    font-size: clamp(22px, 6.5cqh, 48px);
     font-weight: 900;
     line-height: 1.05;
     color: #fff;
@@ -405,12 +405,13 @@
   @keyframes slam {
     from { opacity: 0; transform: scale(2.4); }
   }
-  .how {
-    font-size: 13px;
-    opacity: 0.85;
-  }
+  /* Continue sits at the bottom, between the two tallies. */
   .go {
-    margin-left: 10px;
+    position: absolute;
+    left: 50%;
+    bottom: calc(var(--safe-bottom) + 30px);
+    transform: translateX(-50%);
+    z-index: 7;
     font: inherit;
     font-weight: 700;
     padding: 3px 16px;

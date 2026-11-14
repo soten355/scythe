@@ -12,7 +12,7 @@
   import { slide } from 'svelte/transition';
   import { cubicInOut, cubicOut } from 'svelte/easing';
   import { bottomCost, FACTORY, heldFactoryCard, shortfall, topValue, upgradeables, type Action, type GameState, type Section, type SectionIndex } from '@scythe/engine';
-  import { BONUS_ICONS, STRUCTURE_ICONS } from './icons';
+  import { BONUS_ICONS, RESOURCE_ICONS, STRUCTURE_ICONS } from './icons';
   import InlineIcon from './InlineIcon.svelte';
   import { costText, gainText, moveText, needText, type Prompt, type Selection } from './prompt';
   import { objectiveStatus } from './objective-text';
@@ -57,9 +57,17 @@
     armory: 'Armory: +1 power when you trade',
     monument: 'Monument: +1 popularity when you bolster',
   };
-  const FIELDS: Record<string, string> = {
-    units: 'units', coins: 'coins', popularity: 'popularity', hexes: 'hexes', power: 'power', combatCards: 'cards',
+  /** A top-row value in a few characters: "2⚡", "1◉", "2 hexes". */
+  const FIELDS: Record<string, (n: number) => string> = {
+    units: (n) => `${n} unit${n === 1 ? '' : 's'}`,
+    hexes: (n) => `${n} hex${n === 1 ? '' : 'es'}`,
+    coins: (n) => `${n}◉`,
+    popularity: (n) => `${n}❤️`,
+    power: (n) => `${n}⚡`,
+    combatCards: (n) => `${n}🃏`,
   };
+  /** Objectives open in a pop-up from their button, as not everyone goes for them. */
+  let objectivesOpen = $state(false);
 
   const seat = $derived(game.currentPlayer);
   const { mat } = $derived(game.setup.players[seat]!);
@@ -108,10 +116,12 @@
     </div>
     {#if shown}
       <div class="info" in:slide={opening} out:slide={closing}>
-        {#if x.need.top.length}<span class="need">need {needText(x.need.top)}</span>{/if}
-        {#if 'cost' in x.s.top}<span class="dim">pay {x.s.top.cost}◉</span>{/if}
-        {#each x.values as v (v.f)}
-          {@const text = `${v.value} ${FIELDS[v.f]}${v.value < v.max ? '' : '★'}`}
+        <!-- One short line: what it costs (red if you can't pay), then what you get, "or" between the choices. -->
+        {#if 'cost' in x.s.top}<span class:dim={!x.need.top.length} class:need={x.need.top.length} title={x.need.top.length ? `need ${needText(x.need.top)}` : ''}>{x.s.top.cost}◉ →</span>
+        {:else if x.need.top.length}<span class="need">need {needText(x.need.top)}</span>{/if}
+        {#each x.values as v, i (v.f)}
+          {@const text = `${FIELDS[v.f]!(v.value)}${v.value < v.max ? '' : '★'}`}
+          {#if i > 0}<span class="dim">or</span>{/if}
           {#if v.pick}
             {@const pick = v.pick}
             <button class="chip" class:chosen={pick.chosen} onclick={() => onSelect(pick.select)}>{text}</button>
@@ -131,12 +141,12 @@
     </div>
     {#if shown}
       <div class="info" in:slide={opening} out:slide={closing}>
-        {#if x.need.bottom.length}<span class="need">need {needText(x.need.bottom)}</span>{/if}
+        <!-- The cost, red (with what's missing on hover) if you can't pay it; then the coins it pays. -->
         {#if x.pick}
           {@const pick = x.pick}
-          <button class="chip" class:chosen={pick.chosen} onclick={() => onSelect(pick.select)}>{x.cost.amount} {x.cost.resource}</button>
+          <button class="chip" class:chosen={pick.chosen} onclick={() => onSelect(pick.select)}>{x.cost.amount}<InlineIcon icon={RESOURCE_ICONS[x.cost.resource]} /></button>
         {:else}
-          <span>{x.cost.amount} {x.cost.resource}</span>
+          <span class:need={x.need.bottom.length} title={x.need.bottom.length ? `need ${needText(x.need.bottom)}` : ''}>{x.cost.amount}<InlineIcon icon={RESOURCE_ICONS[x.cost.resource]} /></span>
         {/if}
         <span class="dim">+{x.s.bottom.coins}◉</span>
       </div>
@@ -187,19 +197,37 @@
       {/if}
     {/if}
     {#if objectives.length && !secret}
-      <!-- Your objectives: hidden from the others, so only on your own mat. -->
-      <div class="section objectives">
-        <div class="head"><b>🎯 Objectives</b></div>
-        {#each objectives as o (o.name)}
-          <div class="objective {o.status}" title={o.story ?? ''}>
-            <b>{OBJECTIVE_MARK[o.status]} {o.name}</b>
-            {#if shown}<span in:slide={opening} out:slide={closing}>{o.text}{o.status === 'closed' ? ' (one objective a game)' : ''}</span>{/if}
-          </div>
-        {/each}
-      </div>
+      <!-- Your objectives: hidden from the others, so only on your own mat. A button, as they're optional: tap for the cards. -->
+      {@const ready = objectives.some((o) => o.status === 'ready')}
+      {@const done = objectives.some((o) => o.status === 'done')}
+      <button class="toggle objectives-button" class:ready aria-haspopup="dialog" onclick={() => (objectivesOpen = true)} title="Your objectives"
+        >🎯{#if done}<span class="mark done">★</span>{:else if ready}<span class="mark">✓</span>{/if}</button
+      >
     {/if}
   </div>
 </div>
+
+{#if objectivesOpen && objectives.length && !secret}
+  <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+  <div class="backdrop" onclick={() => (objectivesOpen = false)}>
+    <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+    <div class="popup" role="dialog" aria-label="Your objectives" tabindex="-1" onclick={(e) => e.stopPropagation()}>
+      <div class="popup-head">
+        <h2>🎯 Your objectives</h2>
+        <button class="close" aria-label="Close" onclick={() => (objectivesOpen = false)}>✕</button>
+      </div>
+      <p class="hint">Optional: complete one for a star. Keep them hidden from the other players.</p>
+      {#each objectives as o (o.name)}
+        <div class="objective {o.status}">
+          <b>{OBJECTIVE_MARK[o.status]} {o.name}</b>
+          <span>{o.text}</span>
+          {#if o.story}<i>{o.story}</i>{/if}
+          <small>{{ done: 'Done', ready: 'Ready: you can claim it now', notYet: 'Not yet', closed: 'Closed: one objective a game' }[o.status]}</small>
+        </div>
+      {/each}
+    </div>
+  </div>
+{/if}
 
 <style>
   .drawer {
@@ -254,15 +282,82 @@
   .section.factory {
     background: #241e28;
   }
-  .section.objectives {
+  .objectives-button {
+    min-width: 40px;
+    font-size: 16px;
     background: #1e2622;
+    position: relative;
+  }
+  .objectives-button.ready {
+    border-color: #9be08a;
+  }
+  .mark {
+    position: absolute;
+    top: 2px;
+    right: 3px;
+    font-size: 10px;
+    color: #9be08a;
+  }
+  .mark.done {
+    color: var(--glow);
+  }
+  .backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    display: grid;
+    place-items: center;
+    background: rgb(0 0 0 / 0.55);
+  }
+  .popup {
+    width: min(460px, calc(100vw - 40px));
+    max-height: calc(100dvh - 40px);
+    overflow-y: auto;
+    padding: 12px 16px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    background: #1e2622;
+    font-size: 14px;
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 10px;
+  }
+  .popup-head {
+    display: flex;
+    align-items: center;
+  }
+  .popup h2 {
+    margin: 0;
+    font-size: 17px;
+  }
+  .close {
+    margin-left: auto;
+    background: none;
+    border: none;
+    font-size: 18px;
+    cursor: pointer;
+  }
+  .hint {
+    margin: 0;
+    font-size: 12px;
+    opacity: 0.7;
   }
   .objective {
     display: flex;
     flex-direction: column;
+    gap: 2px;
+  }
+  .objective i {
+    font-size: 12px;
+    opacity: 0.7;
+  }
+  .objective small {
+    font-size: 11px;
+    opacity: 0.75;
+  }
+  .objective.ready small {
+    color: #9be08a;
+    opacity: 1;
   }
   .objective.ready b {
     color: #9be08a;
