@@ -12,6 +12,7 @@
   import PlayerBar from './PlayerBar.svelte';
   import InlineIcon from './InlineIcon.svelte';
   import FactionEmblem from './FactionEmblem.svelte';
+  import BotFace, { botFace } from './BotFace.svelte';
   import FactionDossier from './FactionDossier.svelte';
   import FightScreen from './FightScreen.svelte';
   import MapScreen from './MapScreen.svelte';
@@ -170,6 +171,8 @@
   /** A bot acts now: nothing to choose for whoever watches. */
   const botNow = $derived(isBot(bots, seatNow) && !isGameOver(game));
   /** Changes each time play passes to a seat (once the pass screen is gone): the side panel's crest and text play in again. */
+  /** A bot's face to watch while it plays (instead of its moves), if its faction has a picture for one. */
+  const face = $derived(botNow ? botFace(game.setup.players[seatNow]!.faction.id) : undefined);
   const intro = $derived(handoff ? -1 : `${seatNow}|${game.turnsTaken}`);
   const prompt = $derived(buildPrompt(game, botNow ? [] : actions, botNow ? {} : selection));
   /** What the board and top bar draw: the game, with resources picked to pay with already taken off. */
@@ -516,10 +519,12 @@
         <div class="emblem"><FactionEmblem faction={game.setup.players[seatNow]!.faction} /></div>
       {/key}
       <div class="panel" bind:this={panel}>
-        {#key intro}<div class="intro">
+        {#key intro}<div class="intro" class:watching={face}>
         {#if botNow}
           <p class="title">{botLabel(seatNow)} is playing…</p>
-          {#if playing && playing.seat === seatNow}
+          {#if face}
+            <!-- After the crest glows, the bot's face fades in: we watch it think rather than read its moves (📜 Bots' turns has them). -->
+          {:else if playing && playing.seat === seatNow}
             <ul class="story">{#each playing.lines as line, i (i)}<li>{line}</li>{/each}</ul>
           {/if}
           {#if !skipping}
@@ -529,6 +534,7 @@
             <p class="hint">Something went wrong while it was thinking: {botTrouble}</p>
             <button class="primary" onclick={() => (botTrouble = null)}>Try again</button>
           {/if}
+          {#if face}<BotFace {face} color={color(seatNow)} />{/if}
         {:else if over}
           <p class="title">Game over: a sixth star has been placed.</p>
           <button class="primary" onclick={() => (viewingBoard = false)}>Final scores</button>
@@ -877,6 +883,19 @@
   }
   .intro {
     animation: text-in 1.6s ease-out;
+  }
+  /* Watching a bot: its face fills the panel below the words. */
+  .intro.watching {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    height: 100%;
+  }
+  .intro.watching > :global(*) {
+    flex: none;
+  }
+  .intro.watching > :global(.face) {
+    flex: 1;
   }
   .panel {
     position: relative;
