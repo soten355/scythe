@@ -19,7 +19,7 @@ import { mapPictureFrame } from '../play/map-picture';
 import { mapGuide } from '../theme/map-guide';
 import { center, corners, HEX_HEIGHT, HEX_VIEWBOX, HEX_WIDTH, points, SIZE, type Point } from '../play/geometry';
 import type { Icon } from '../play/icons';
-import { addHexPicture, boardLook, cardIdForFile, cardSlot, clearPicture, hexPictures, removeHexPicture, DEFAULT_COLORS, DEFAULT_THEME, DEFAULT_UI_COLORS, FONTS, parseThemeFile, setColor, setPicture, SLOTS, TERRAINS, UI_COLORS, uiStyle, type FontId, type SlotId, type Theme, type UiColor } from '../theme/theme';
+import { addHexPicture, boardLook, cardIdForFile, cardSlot, clearPicture, hexPictures, removeHexPicture, BORDER_WIDTH_RANGE, DEFAULT_BORDER_WIDTHS, DEFAULT_COLORS, DEFAULT_THEME, DEFAULT_UI_COLORS, FONTS, parseThemeFile, setColor, setPicture, SLOTS, TERRAINS, UI_COLORS, uiStyle, type BorderWidths, type FontId, type SlotId, type Theme, type UiColor } from '../theme/theme';
 import { pictureFor, sizeKb } from '../theme/pictures';
 
 const store = new SaveStore();
@@ -228,6 +228,16 @@ function mapSettings(): string {
     <label class="check"><input type="checkbox" data-edges ${theme.hexEdges ? 'checked' : ''} ${theme.paintedMap ? '' : 'disabled'}> Faint hex edges over the map picture</label>`;
 }
 
+/** How wide the road, the river's water and its banks are drawn. */
+function borderSettings(): string {
+  const w = theme.borderWidths ?? DEFAULT_BORDER_WIDTHS;
+  const slider = (k: keyof BorderWidths, label: string) =>
+    `<label class="width">${label}<input type="range" data-border-width="${k}" min="${BORDER_WIDTH_RANGE.min * 100}" max="${BORDER_WIDTH_RANGE.max * 100}" step="1" value="${Math.round(w[k] * 100)}"><span>${Math.round(w[k] * 100)}%</span></label>`;
+  return `<p class="hint">Shown on the map in games and the Codex, over the hex art. Widths are a share of a hex's size (its centre to a corner).</p>
+    <div class="widths">${slider('road', 'Road and shore')}${slider('river', 'River water')}${slider('bank', 'River with its banks')}</div>
+    ${JSON.stringify(w) !== JSON.stringify(DEFAULT_BORDER_WIDTHS) ? '<button data-act="border-widths-reset">Usual widths</button>' : ''}`;
+}
+
 /** The menus' and panels' colours and fonts. */
 function lookAndFeel(): string {
   const fontPick = (key: 'bodyFont' | 'headingFont', label: string) =>
@@ -285,6 +295,7 @@ function render() {
           .map(
             (g) => `<section><h3>${esc(g)}</h3>
               ${g === 'Map' ? mapSettings() : ''}
+              ${g === 'Map borders' ? borderSettings() : ''}
               ${g === 'Menus and panels' ? lookAndFeel() : ''}
               ${g === 'Hex symbols' ? `<label class="check"><input type="checkbox" data-over ${theme.symbolsOverArt ? 'checked' : ''}> Show symbols over hex art and the map picture too</label>` : ''}
               ${SLOTS.filter((s) => s.group === g).map((s) => slotRow(s.id, s.label, s.hint)).join('')}
@@ -331,6 +342,9 @@ root.addEventListener('click', async (e) => {
       if (count < 2 || (await ask(`Remove all ${count} pictures for this terrain? (Save the theme to a file first to keep them.)`))) await keep(clearPicture(theme, slot!));
       break;
     }
+    case 'border-widths-reset':
+      await keep({ ...theme, borderWidths: DEFAULT_BORDER_WIDTHS });
+      break;
     case 'cards-add':
       root.querySelector<HTMLInputElement>('[data-cardpics]')!.click();
       break;
@@ -423,6 +437,8 @@ root.addEventListener('change', async (e) => {
     await keep({ ...theme, [el.dataset.font]: el.value as FontId });
   } else if (el.dataset.color) {
     await keep(setColor(theme, el.dataset.color as Terrain, el.value));
+  } else if (el.dataset.borderWidth) {
+    await keep({ ...theme, borderWidths: { ...(theme.borderWidths ?? DEFAULT_BORDER_WIDTHS), [el.dataset.borderWidth]: Number(el.value) / 100 } });
   } else if (el.dataset.painted !== undefined) {
     await keep({ ...theme, paintedMap: el.checked });
   } else if (el.dataset.edges !== undefined) {

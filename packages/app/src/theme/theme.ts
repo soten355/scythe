@@ -24,7 +24,7 @@ const TOKENS: Resource[] = ['oil', 'metal', 'wood', 'food'];
  */
 export type FactionPart = 'crest' | 'portrait' | 'character' | 'mech' | 'characterMap' | 'mechMap' | 'scene' | 'worker' | Structure;
 
-export type SlotId = 'background' | `hex.${Terrain}` | `symbol.${Terrain | 'tunnel' | 'encounter'}` | `token.${Resource}` | `backdrop.${Terrain}` | 'ui.menu' | 'ui.panel' | `faction.${string}.${FactionPart}` | `card.${string}`;
+export type SlotId = 'background' | `hex.${Terrain}` | `border.${'road' | 'river'}` | `symbol.${Terrain | 'tunnel' | 'encounter'}` | `token.${Resource}` | `backdrop.${Terrain}` | 'ui.menu' | 'ui.panel' | `faction.${string}.${FactionPart}` | `card.${string}`;
 
 export interface Slot {
   id: SlotId;
@@ -51,6 +51,8 @@ const BEST = {
   figure: { width: 384, height: 512 },
   /** Behind a faction's figures on its Codex page: taller than wide. */
   scene: { width: 768, height: 1024 },
+  /** A strip of road or river seen from above, running left to right, repeated along each hex edge. */
+  strip: { width: 1536, height: 640 },
 } as const;
 const sizeText = (b: { width: number; height: number }) => `Best at ${b.width} × ${b.height} pixels`;
 
@@ -102,6 +104,8 @@ export function cardIdForFile(fileName: string, ids: string[]): string | undefin
 export const SLOTS: Slot[] = [
   { id: 'background', group: 'Map', label: 'Map picture', hint: `The whole map in one painting, made from the map guide so it lines up with the hexes; it zooms and pans with them. ${sizeText(BEST.background)}.` },
   ...TERRAINS.map((t): Slot => ({ id: `hex.${t}`, group: 'Hex art', label: TERRAIN_NAMES[t], hint: `Fills each hex, cropped to the hex shape; see-through parts show the map picture, or else the hex's colour. Add several and each hex picks one at random, a new mix each game. ${sizeText(BEST.hex)}.` })),
+  { id: 'border.road', group: 'Map borders', label: 'Road', hint: `Drawn along every edge between two land hexes, over the hex art, like the roads on Carcassonne tiles: a strip of road seen from straight above, running level from the left edge to the right, with its verges along the top and bottom. It's repeated (mirrored) along each edge, so keep it the same all the way along. Needs hex art. ${sizeText(BEST.strip)}.` },
+  { id: 'border.river', group: 'Map borders', label: 'River', hint: `Drawn along the map's rivers, with its banks, round bends and a round pool where a river ends; its bank also makes the shore around lakes. A strip seen from straight above, running level from the left edge to the right: a bank along the top (about the top fifth), water through the middle, a bank along the bottom. Needs hex art. ${sizeText(BEST.strip)}.` },
   ...TERRAINS.map((t): Slot => ({ id: `symbol.${t}`, group: 'Hex symbols', label: TERRAIN_NAMES[t], hint: `In the middle of the hex, on a see-through background. ${sizeText(BEST.small)}.` })),
   { id: 'symbol.tunnel', group: 'Markers', label: 'Tunnel', hint: `At the top of tunnel hexes, on a see-through background. ${sizeText(BEST.small)}.` },
   { id: 'symbol.encounter', group: 'Markers', label: 'Encounter', hint: `At the bottom of hexes with an encounter, on a see-through background. ${sizeText(BEST.small)}.` },
@@ -129,6 +133,7 @@ export function pictureSpec(slot: SlotId): { best: { width: number; height: numb
   if (slot === 'background' || slot === 'ui.menu' || slot.startsWith('backdrop.')) return spec(BEST.background, 'image/jpeg');
   if (slot === 'ui.panel') return spec(BEST.panel, 'image/jpeg');
   if (slot.startsWith('hex.')) return spec(BEST.hex, 'image/png');
+  if (slot.startsWith('border.')) return spec(BEST.strip, 'image/jpeg');
   if (CARD_SLOT.test(slot)) return { best: { ...CARD_PICTURE.best }, max: CARD_PICTURE.max, type: CARD_PICTURE.type };
   const part = readFactionSlot(slot)?.part;
   if (part === 'character' || part === 'mech' || part === 'characterMap' || part === 'mechMap') return spec(BEST.figure, 'image/png');
@@ -195,6 +200,8 @@ export interface Theme {
   paintedMap: boolean;
   /** Over a map picture: faint hex edges, so the hexes can be told apart. */
   hexEdges: boolean;
+  /** How wide the drawn road, river water and river banks are, as a share of a hex's size (its centre to a corner). */
+  borderWidths: BorderWidths;
   /** The menus' and panels' colours (anything not set keeps the usual one). */
   uiColors: Partial<Record<UiColor, string>>;
   /** Words on the menus and panels. */
@@ -203,7 +210,16 @@ export interface Theme {
   headingFont: FontId;
 }
 
-export const DEFAULT_THEME: Theme = { name: 'My theme', pictures: {}, moreHexArt: {}, colors: {}, symbolsOverArt: false, paintedMap: true, hexEdges: true, uiColors: {}, bodyFont: 'system', headingFont: 'georgia' };
+export interface BorderWidths {
+  road: number;
+  river: number;
+  bank: number;
+}
+export const DEFAULT_BORDER_WIDTHS: BorderWidths = { road: 0.3, river: 0.22, bank: 0.4 };
+/** The narrowest and widest a border can be set, as a share of a hex's size. */
+export const BORDER_WIDTH_RANGE = { min: 0.05, max: 0.8 } as const;
+
+export const DEFAULT_THEME: Theme = { name: 'My theme', pictures: {}, moreHexArt: {}, colors: {}, symbolsOverArt: false, paintedMap: true, hexEdges: true, borderWidths: DEFAULT_BORDER_WIDTHS, uiColors: {}, bodyFont: 'system', headingFont: 'georgia' };
 
 export const DEFAULT_COLORS: Record<Terrain, string> = {
   farm: '#d9c46a',
@@ -306,6 +322,8 @@ export interface BoardLook {
   tunnel: Icon;
   encounter: Icon;
   token: (resource: Resource) => string | undefined;
+  /** Road, river and shore drawn along the hex edges over the hex art (see borders.ts), if the theme has their pictures. */
+  borders?: { road?: string; river?: string; widths: BorderWidths };
   /** A faction's own picture for one of its pieces (by faction ID), if it has one. */
   piece: (factionId: string, part: FactionPart) => string | undefined;
 }
@@ -317,7 +335,10 @@ export function boardLook(theme: Theme): BoardLook {
     return url ? { image: url } : usual;
   };
   const painted = !!picture('background') && theme.paintedMap;
+  const road = picture('border.road');
+  const river = picture('border.river');
   return {
+    ...(!painted && (road || river) && { borders: { ...(road && { road }), ...(river && { river }), widths: theme.borderWidths ?? DEFAULT_BORDER_WIDTHS } }),
     ...(picture('background') && { background: picture('background') }),
     painted,
     edges: theme.hexEdges,
@@ -385,6 +406,11 @@ export function readTheme(data: Record<string, unknown>): Theme {
   for (const [id, color] of Object.entries((data.uiColors as Record<string, unknown>) ?? {})) {
     if (id in DEFAULT_UI_COLORS && typeof color === 'string' && COLOR.test(color)) uiColors[id as UiColor] = color;
   }
+  const widths = (data.borderWidths ?? {}) as Record<string, unknown>;
+  const width = (k: keyof BorderWidths) => {
+    const v = widths[k];
+    return typeof v === 'number' && Number.isFinite(v) ? Math.min(BORDER_WIDTH_RANGE.max, Math.max(BORDER_WIDTH_RANGE.min, v)) : DEFAULT_BORDER_WIDTHS[k];
+  };
   const font = (v: unknown, usual: FontId): FontId => (typeof v === 'string' && FONT_IDS.has(v) ? (v as FontId) : usual);
   return {
     name: typeof data.name === 'string' && data.name.trim() ? data.name.trim().slice(0, 60) : DEFAULT_THEME.name,
@@ -394,6 +420,7 @@ export function readTheme(data: Record<string, unknown>): Theme {
     symbolsOverArt: data.symbolsOverArt === true,
     paintedMap: data.paintedMap !== false,
     hexEdges: data.hexEdges !== false,
+    borderWidths: { road: width('road'), river: width('river'), bank: width('bank') },
     uiColors,
     bodyFont: font(data.bodyFont, DEFAULT_THEME.bodyFont),
     headingFont: font(data.headingFont, DEFAULT_THEME.headingFont),

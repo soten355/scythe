@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addHexPicture, backdropPicture, cardIdForFile, cardSlot, hexArtIndex, hexPictures, readTheme, removeHexPicture, DEFAULT_UI_COLORS, FONTS, uiStyle, UI_COLORS, boardLook, clearPicture, copyFactionPictures, DEFAULT_THEME, FACTION_PARTS, factionSlot, parseThemeFile, pictureSpec, setColor, setPicture, SLOTS, themeFileText, type Theme } from './theme';
+import { addHexPicture, backdropPicture, cardIdForFile, cardSlot, hexArtIndex, hexPictures, readTheme, removeHexPicture, DEFAULT_UI_COLORS, FONTS, uiStyle, UI_COLORS, boardLook, clearPicture, copyFactionPictures, DEFAULT_BORDER_WIDTHS, DEFAULT_THEME, FACTION_PARTS, factionSlot, parseThemeFile, pictureSpec, setColor, setPicture, SLOTS, themeFileText, type Theme } from './theme';
 import { baseBoard } from '@scythe/content';
 import { ENCOUNTER_ICON, TERRAIN_ICONS, TUNNEL_ICON } from '../play/icons';
 
@@ -153,8 +153,27 @@ describe('the board theme', () => {
     expect(boardLook(DEFAULT_THEME).painted).toBe(false);
   });
 
+  it('draws road, river and shore along the hex edges when the theme has their pictures (not over a painted map)', () => {
+    expect(boardLook(DEFAULT_THEME).borders).toBeUndefined();
+    const road = setPicture(DEFAULT_THEME, 'border.road', JPEG);
+    expect(boardLook(road).borders).toEqual({ road: JPEG, widths: DEFAULT_BORDER_WIDTHS });
+    const both = setPicture(road, 'border.river', JPEG);
+    expect(boardLook(both).borders).toEqual({ road: JPEG, river: JPEG, widths: DEFAULT_BORDER_WIDTHS });
+    expect(boardLook({ ...both, borderWidths: { road: 0.5, river: 0.2, bank: 0.3 } }).borders?.widths.road).toBe(0.5);
+    // The map picture is the hexes' art: there are no hex edges to draw along.
+    expect(boardLook(setPicture(both, 'background', JPEG)).borders).toBeUndefined();
+    // Their pictures are kept as JPEG strips.
+    expect(pictureSpec('border.road')).toMatchObject({ type: 'image/jpeg', best: { width: 1536, height: 640 } });
+  });
+
+  it('reads border widths from a file, keeping them in range', () => {
+    expect(readTheme({}).borderWidths).toEqual(DEFAULT_BORDER_WIDTHS);
+    expect(readTheme({ borderWidths: { road: 0.4, river: 5, bank: 'wide' } }).borderWidths).toEqual({ road: 0.4, river: 0.8, bank: DEFAULT_BORDER_WIDTHS.bank });
+    expect(readTheme({ pictures: { 'border.river': JPEG } }).pictures['border.river']).toBe(JPEG);
+  });
+
   it('goes to a file and back', () => {
-    const theme = { ...setColor(setPicture(DEFAULT_THEME, 'hex.lake', JPEG), 'lake', '#123456'), name: 'Misty', symbolsOverArt: true, paintedMap: false, hexEdges: false };
+    const theme = { ...setColor(setPicture(DEFAULT_THEME, 'hex.lake', JPEG), 'lake', '#123456'), name: 'Misty', symbolsOverArt: true, paintedMap: false, hexEdges: false, borderWidths: { road: 0.25, river: 0.2, bank: 0.35 } };
     expect(parseThemeFile(themeFileText(theme))).toEqual(theme);
   });
 

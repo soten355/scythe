@@ -17,6 +17,7 @@
   import type { Travel } from './travel';
   import { between, fitView, panBy, worldOf, zoomAt, type Limits, type View } from './camera';
   import { bakeMap, type BakedMap } from './baked-map';
+  import { mapBorders } from './borders';
   import { framePoint, frameRect } from './frame';
   import { boardArea, center, corners, HEX_HEIGHT, HEX_VIEWBOX, HEX_WIDTH, points, sharedEdge, SIZE, spotsArea, type Point } from './geometry';
   import HexIcon from './HexIcon.svelte';
@@ -87,11 +88,14 @@
   /** The hex art painted into one picture, which is far quicker to move (see baked-map.ts). Until it's ready, or if it can't be made, the hexes draw their own. */
   let baked = $state.raw<BakedMap | null>(null);
   /** What the painted picture shows, as text: the board can be rebuilt after every action, and only a real change repaints it. */
-  const bakeKey = $derived(`${game.setup.seed}|${Object.values(game.setup.board.hexes).map((h) => `${h.id},${h.q},${h.r},${h.terrain}`).join(';')}`);
+  const bakeKey = $derived(`${game.setup.seed}|${Object.values(game.setup.board.hexes).map((h) => `${h.id},${h.q},${h.r},${h.terrain}`).join(';')}|${game.setup.board.rivers.join(';')}`);
+  /** The skin's road, river and shore along the hex edges, if it has their pictures: painted into the baked picture. */
+  const borderEdges = $derived(look.borders ? mapBorders(game.setup.board) : []);
   $effect(() => {
     void bakeKey;
     if (!arts.length) return;
     const behind = !look.background;
+    const borders = look.borders ? { ...look.borders, edges: borderEdges } : undefined;
     let gone = false;
     let made: BakedMap | null = null;
     untrack(() =>
@@ -102,6 +106,7 @@
             const art = look.arts(h.terrain);
             return { corners: corners(center(h)), url: art[hexArtIndex(game.setup.seed, h.id, art.length)]!, fill: behind ? look.fill(h.terrain) : undefined };
           }),
+        { borders },
       ),
     ).then(
       (picture) => {
@@ -619,6 +624,7 @@
       class="hex"
       class:painted={look.painted}
       class:edges={look.painted && look.edges}
+      class:bordered={!!(baked && look.borders)}
       class:tappable
       onclick={() => (tappable || tapAny) && onTap(h.id)}
       role="button"
@@ -632,10 +638,13 @@
     {#if !clear}<text x={c[0] - SIZE * 0.5} y={c[1] - SIZE * 0.45} class="id">{h.id}</text>{/if}
   {/each}
 
-  {#each board.rivers as [a, b] (a + b)}
-    {@const [p, q] = sharedEdge(board, a, b)}
-    <line x1={p[0]} y1={p[1]} x2={q[0]} y2={q[1]} class="river" />
-  {/each}
+  <!-- Rivers as blue lines, unless the skin paints them into the map picture (then they're there once it's ready). -->
+  {#if !(baked && look.borders?.river)}
+    {#each board.rivers as [a, b] (a + b)}
+      {@const [p, q] = sharedEdge(board, a, b)}
+      <line x1={p[0]} y1={p[1]} x2={q[0]} y2={q[1]} class="river" />
+    {/each}
+  {/if}
 
   <!-- Outlines of tappable and selected hexes go over the rivers so they show in full. -->
   {#each hexes as h (h.id)}
@@ -894,6 +903,10 @@
   }
   /* Over the map picture: see-through (still tappable), with faint edges or none. */
   .hex.painted {
+    stroke: none;
+  }
+  /* The skin's roads and rivers are the edges. */
+  .hex.bordered {
     stroke: none;
   }
   .hex.painted.edges {

@@ -1,8 +1,12 @@
 // The hex art, painted once into one picture. Drawn as an SVG pattern, every
 // hex's picture is worked out again each time the map moves, which on a phone
 // makes dragging crawl. One finished picture is far quicker to move. It's only
-// how the art is drawn: the hexes stay on the board to be tapped.
+// how the art is drawn: the hexes stay on the board to be tapped. A skin's
+// road, river and shore (see borders.ts) are painted into it too.
+import type { BorderWidths } from '../theme/theme';
+import type { BorderEdge } from './borders';
 import { HEX_WIDTH, type Point } from './geometry';
+import { paintBorders } from './paint-borders';
 
 export interface Box {
   x: number;
@@ -59,7 +63,15 @@ async function loadImage(url: string): Promise<HTMLImageElement> {
 }
 
 /** Paints the hexes into one picture. Rejects if it can't, and the board then keeps drawing them itself. */
-export async function bakeMap(hexes: BakeHex[], maxSide = BAKE_MAX_SIDE): Promise<BakedMap> {
+/** The borders to paint over the hexes, and the skin's pictures for them. */
+export interface BakeBorders {
+  edges: BorderEdge[];
+  road?: string;
+  river?: string;
+  widths: BorderWidths;
+}
+
+export async function bakeMap(hexes: BakeHex[], { maxSide = BAKE_MAX_SIDE, borders }: { maxSide?: number; borders?: BakeBorders } = {}): Promise<BakedMap> {
   const urls = [...new Set(hexes.map((h) => h.url))];
   const images = new Map(await Promise.all(urls.map(async (url) => [url, await loadImage(url)] as const)));
   const area = bakeArea(hexes.map((h) => h.corners));
@@ -88,6 +100,12 @@ export async function bakeMap(hexes: BakeHex[], maxSide = BAKE_MAX_SIDE): Promis
     const to = coverRect(box, image.naturalWidth, image.naturalHeight);
     paint.drawImage(image, to.x, to.y, to.width, to.height);
     paint.restore();
+  }
+
+  if (borders && (borders.road || borders.river)) {
+    const [road, river] = await Promise.all([borders.road, borders.river].map((url) => (url ? loadImage(url) : Promise.resolve(undefined))));
+    paint.setTransform(1, 0, 0, 1, 0, 0);
+    paintBorders(paint, { edges: borders.edges, road, river, widths: borders.widths }, ([x, y]) => [(x - area.x) * scale, (y - area.y) * scale], scale);
   }
 
   const blob = await new Promise<Blob | null>((done) => canvas.toBlob(done, 'image/png'));

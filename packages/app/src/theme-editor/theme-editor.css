@@ -279,3 +279,21 @@ label.check {
   border-radius: 50%;
   line-height: 1;
 }
+
+/* Map borders: a slider for each width. */
+.widths {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 6px 0 10px;
+}
+label.width {
+  display: grid;
+  grid-template-columns: 11em 1fr 3em;
+  align-items: center;
+  gap: 8px;
+}
+label.width span {
+  text-align: right;
+  opacity: 0.8;
+}
