@@ -112,3 +112,38 @@ export async function bakeMap(hexes: BakeHex[], { maxSide = BAKE_MAX_SIDE, borde
   if (!blob) throw new Error('The picture could not be made');
   return { ...area, url: URL.createObjectURL(blob) };
 }
+
+/**
+ * Painted maps, kept so each is painted only once: the game rebuilds its
+ * state after every action, and the board comes and goes (the map screen,
+ * fights), but the picture only changes with the look or the map. Kept per
+ * look (by the object itself) and map (by `key`); the oldest are let go.
+ */
+export function bakedStore(max = 4, release: (url: string) => void = (url) => URL.revokeObjectURL(url)) {
+  const looks = new WeakMap<object, Map<string, Promise<BakedMap>>>();
+  let order: { look: object; key: string; picture: Promise<BakedMap> }[] = [];
+  return {
+    get(look: object, key: string, paint: () => Promise<BakedMap>): Promise<BakedMap> {
+      let kept = looks.get(look);
+      if (!kept) looks.set(look, (kept = new Map()));
+      const had = kept.get(key);
+      if (had) return had;
+      const picture = paint();
+      kept.set(key, picture);
+      order.push({ look, key, picture });
+      picture.catch(() => {
+        if (kept.get(key) === picture) kept.delete(key);
+        order = order.filter((o) => o.picture !== picture);
+      });
+      while (order.length > max) {
+        const old = order.shift()!;
+        if (looks.get(old.look)?.get(old.key) === old.picture) looks.get(old.look)!.delete(old.key);
+        old.picture.then((p) => release(p.url), () => {});
+      }
+      return picture;
+    },
+  };
+}
+
+/** The app's one store of painted maps. */
+export const bakedMaps = bakedStore();

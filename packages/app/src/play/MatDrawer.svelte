@@ -330,12 +330,18 @@
     margin: 0;
     font-size: 17px;
   }
+  /* A finger-sized target (44px, as phones ask), pulled into the corner so the header stays slim. */
   .close {
-    margin-left: auto;
+    margin: -10px -12px -10px auto;
+    min-width: 44px;
+    min-height: 44px;
+    display: grid;
+    place-items: center;
     background: none;
     border: none;
-    font-size: 18px;
+    font-size: 20px;
     cursor: pointer;
+    touch-action: manipulation;
   }
   .hint {
     margin: 0;

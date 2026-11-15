@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { bakeArea, bakeScale, coverRect } from './baked-map';
+import { describe, expect, it, vi } from 'vitest';
+import { bakeArea, bakedStore, bakeScale, coverRect } from './baked-map';
 import { corners, HEX_WIDTH } from './geometry';
 
 describe('a picture cropped to a hex', () => {
@@ -37,5 +37,44 @@ describe('the one picture all the hexes are painted into', () => {
     const area = { x: 0, y: 0, width: HEX_WIDTH * 20, height: HEX_WIDTH * 10 };
     const scale = bakeScale(area, 452, 4096);
     expect(area.width * scale).toBeCloseTo(4096);
+  });
+});
+
+describe('a painted map, kept for reuse', () => {
+  const picture = (url: string) => ({ x: 0, y: 0, width: 1, height: 1, url });
+
+  it('is painted once for the same look and map, however often it is asked for', async () => {
+    const store = bakedStore();
+    const look = {};
+    const paint = vi.fn(async () => picture('a'));
+    const first = store.get(look, 'map-1', paint);
+    const again = store.get(look, 'map-1', paint);
+    expect(await first).toBe(await again);
+    expect(paint).toHaveBeenCalledTimes(1);
+  });
+
+  it('is painted again for another map or another look', async () => {
+    const store = bakedStore();
+    const look = {};
+    const paint = vi.fn(async () => picture('a'));
+    await store.get(look, 'map-1', paint);
+    await store.get(look, 'map-2', paint);
+    await store.get({}, 'map-1', paint);
+    expect(paint).toHaveBeenCalledTimes(3);
+  });
+
+  it('lets go of the oldest pictures once it holds enough', async () => {
+    const released: string[] = [];
+    const store = bakedStore(2, (url) => released.push(url));
+    const look = {};
+    for (const key of ['1', '2', '3']) await store.get(look, key, async () => picture(key));
+    expect(released).toEqual(['1']);
+  });
+
+  it('tries again next time if painting failed', async () => {
+    const store = bakedStore();
+    const look = {};
+    await expect(store.get(look, 'm', async () => Promise.reject(new Error('no')))).rejects.toThrow();
+    expect(await store.get(look, 'm', async () => picture('b'))).toEqual(picture('b'));
   });
 });

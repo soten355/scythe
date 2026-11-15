@@ -16,7 +16,7 @@
   import { tick, untrack } from 'svelte';
   import type { Travel } from './travel';
   import { between, fitView, panBy, worldOf, zoomAt, type Limits, type View } from './camera';
-  import { bakeMap, type BakedMap } from './baked-map';
+  import { bakedMaps, bakeMap, type BakedMap } from './baked-map';
   import { mapBorders } from './borders';
   import { framePoint, frameRect } from './frame';
   import { boardArea, center, corners, HEX_HEIGHT, HEX_VIEWBOX, HEX_WIDTH, points, sharedEdge, SIZE, spotsArea, type Point } from './geometry';
@@ -89,36 +89,37 @@
   let baked = $state.raw<BakedMap | null>(null);
   /** What the painted picture shows, as text: the board can be rebuilt after every action, and only a real change repaints it. */
   const bakeKey = $derived(`${game.setup.seed}|${Object.values(game.setup.board.hexes).map((h) => `${h.id},${h.q},${h.r},${h.terrain}`).join(';')}|${game.setup.board.rivers.join(';')}`);
-  /** The skin's road, river and shore along the hex edges, if it has their pictures: painted into the baked picture. */
-  const borderEdges = $derived(look.borders ? mapBorders(game.setup.board) : []);
   $effect(() => {
-    void bakeKey;
-    if (!arts.length) return;
-    const behind = !look.background;
-    const borders = look.borders ? { ...look.borders, edges: borderEdges } : undefined;
+    // Only the map (bakeKey) and the look decide the picture; the rest is read untracked, so moves never repaint it.
+    const key = bakeKey;
+    const l = look;
+    if (!arts.length) {
+      baked = null;
+      return;
+    }
     let gone = false;
-    let made: BakedMap | null = null;
     untrack(() =>
-      bakeMap(
-        hexes
-          .filter((h) => look.arts(h.terrain).length)
-          .map((h) => {
-            const art = look.arts(h.terrain);
-            return { corners: corners(center(h)), url: art[hexArtIndex(game.setup.seed, h.id, art.length)]!, fill: behind ? look.fill(h.terrain) : undefined };
-          }),
-        { borders },
-      ),
+      bakedMaps.get(l, key, () => {
+        const behind = !l.background;
+        const board = game.setup.board;
+        return bakeMap(
+          Object.values(board.hexes)
+            .filter((h) => l.arts(h.terrain).length)
+            .map((h) => {
+              const art = l.arts(h.terrain);
+              return { corners: corners(center(h)), url: art[hexArtIndex(game.setup.seed, h.id, art.length)]!, fill: behind ? l.fill(h.terrain) : undefined };
+            }),
+          // The skin's road, river and shore along the hex edges, if it has their pictures.
+          { borders: l.borders ? { ...l.borders, edges: mapBorders(board) } : undefined },
+        );
+      }),
     ).then(
-      (picture) => {
-        if (gone) URL.revokeObjectURL(picture.url);
-        else baked = made = picture;
-      },
-      () => {},
+      (picture) => !gone && (baked = picture),
+      () => !gone && (baked = null),
     );
+    // The old picture stays up until the new one is ready (the store lets go of it later).
     return () => {
       gone = true;
-      baked = null;
-      if (made) URL.revokeObjectURL(made.url);
     };
   });
   const RESOURCE_COLOR: Record<Resource, string> = { oil: '#1b1b1b', metal: '#9aa3ad', wood: '#7a4a24', food: '#f0d54a' };
