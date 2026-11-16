@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addHexPicture, backdropPicture, cardIdForFile, cardSlot, hexArtIndex, hexPictures, readTheme, removeHexPicture, DEFAULT_UI_COLORS, FONTS, uiStyle, UI_COLORS, boardLook, clearPicture, copyFactionPictures, DEFAULT_BORDER_WIDTHS, DEFAULT_THEME, FACTION_PARTS, factionSlot, parseThemeFile, pictureSpec, setColor, setPicture, SLOTS, themeFileText, type Theme } from './theme';
+import { addHexPicture, backdropPicture, cardIdForFile, cardSlot, hexArtIndex, hexPictures, readTheme, removeHexPicture, upgradeTheme, DEFAULT_UI_COLORS, FONTS, uiStyle, UI_COLORS, boardLook, clearPicture, copyFactionPictures, DEFAULT_BORDER_WIDTHS, DEFAULT_THEME, FACTION_PARTS, factionSlot, parseThemeFile, pictureSpec, setColor, setPicture, SLOTS, themeFileText, type Theme } from './theme';
 import { baseBoard } from '@scythe/content';
 import { ENCOUNTER_ICON, TERRAIN_ICONS, TUNNEL_ICON } from '../play/icons';
 
@@ -42,6 +42,7 @@ describe('the board theme', () => {
       expect(look.art('farm')).toBe(A);
       expect(look.arts('forest')).toEqual([]);
       expect(look.symbol('farm')).toBeUndefined();
+      expect(look.mark('farm')).toBe('drawn');
       expect(boardLook(setPicture(three(), 'background', JPEG)).arts('farm')).toEqual([]);
     });
 
@@ -109,12 +110,14 @@ describe('the board theme', () => {
     expect(look.art('forest')).toBeUndefined();
     expect(look.fill('forest')).toBe('#4f7f48');
     expect(look.symbol('forest')).toEqual(TERRAIN_ICONS.forest);
+    // No hex art: no terrain marks at the top of the hexes.
+    expect(look.mark('forest')).toBeUndefined();
     expect(look.tunnel).toEqual(TUNNEL_ICON);
     expect(look.encounter).toEqual(ENCOUNTER_ICON);
     expect(look.token('oil')).toBeUndefined();
   });
 
-  it('uses the pictures and colours set, and hides a terrain symbol over its art unless asked', () => {
+  it('uses the pictures and colours set, and over hex art marks the terrain at the top of the hex instead', () => {
     let theme: Theme = setPicture(DEFAULT_THEME, 'hex.forest', JPEG);
     theme = setPicture(theme, 'symbol.mountain', PNG);
     theme = setPicture(theme, 'token.oil', PNG);
@@ -125,11 +128,18 @@ describe('the board theme', () => {
     const look = boardLook(theme);
     expect(look.art('forest')).toBe(JPEG);
     expect(look.symbol('forest')).toBeUndefined();
+    // The drawn mark, as the skin has no picture of its own for forests.
+    expect(look.mark('forest')).toBe('drawn');
+    // No art for mountains: their symbol in the middle, as usual (their own picture).
     expect(look.symbol('mountain')).toEqual({ image: PNG });
+    expect(look.mark('mountain')).toBeUndefined();
+    // Its own picture for a terrain with art: in the mark.
+    const own = boardLook(setPicture(theme, 'symbol.forest', PNG));
+    expect(own.mark('forest')).toEqual({ image: PNG });
+    expect(own.symbol('forest')).toBeUndefined();
     expect(look.token('oil')).toBe(PNG);
     expect(look.background).toBe(JPEG);
     expect(look.fill('farm')).toBe('#aabbcc');
-    expect(boardLook({ ...theme, symbolsOverArt: true }).symbol('forest')).toEqual(TERRAIN_ICONS.forest);
     expect(boardLook(clearPicture(theme, 'hex.forest')).art('forest')).toBeUndefined();
   });
 
@@ -141,7 +151,7 @@ describe('the board theme', () => {
     // The picture replaces the hex art and, unless asked, the symbols.
     expect(look.art('forest')).toBeUndefined();
     expect(look.symbol('farm')).toBeUndefined();
-    expect(boardLook({ ...theme, symbolsOverArt: true }).symbol('farm')).toEqual(TERRAIN_ICONS.farm);
+    expect(look.mark('farm')).toBe('drawn');
     expect(boardLook({ ...theme, hexEdges: false }).edges).toBe(false);
     // Turned off: the picture sits behind hexes drawn as usual.
     theme = { ...theme, paintedMap: false };
@@ -149,8 +159,17 @@ describe('the board theme', () => {
     expect(look.painted).toBe(false);
     expect(look.art('forest')).toBe(JPEG);
     expect(look.symbol('farm')).toEqual(TERRAIN_ICONS.farm);
+    expect(look.mark('farm')).toBeUndefined();
     // No map picture: hexes as usual whatever the setting.
     expect(boardLook(DEFAULT_THEME).painted).toBe(false);
+  });
+
+  it('reads a road kept at the old usual width (0.3) as the new, thinner usual width', () => {
+    expect(DEFAULT_BORDER_WIDTHS.road).toBeLessThanOrEqual(0.15);
+    expect(readTheme({ borderWidths: { road: 0.3, river: 0.22, bank: 0.4 } }).borderWidths.road).toBe(DEFAULT_BORDER_WIDTHS.road);
+    expect(upgradeTheme({ ...DEFAULT_THEME, borderWidths: { road: 0.3, river: 0.3, bank: 0.4 } }).borderWidths).toEqual({ road: DEFAULT_BORDER_WIDTHS.road, river: 0.3, bank: 0.4 });
+    // Any other width was set on purpose and stays.
+    expect(readTheme({ borderWidths: { road: 0.25, river: 0.22, bank: 0.4 } }).borderWidths.road).toBe(0.25);
   });
 
   it('draws road, river and shore along the hex edges when the theme has their pictures (not over a painted map)', () => {

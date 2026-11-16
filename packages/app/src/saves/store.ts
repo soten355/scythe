@@ -4,7 +4,7 @@
 // storage). One record per game, by id; the library is a single record.
 import { EMPTY_LIBRARY, type Library } from '../content/library';
 import type { SavedGame } from './save';
-import { DEFAULT_THEME, type Theme } from '../theme/theme';
+import { DEFAULT_THEME, upgradeTheme, type Theme } from '../theme/theme';
 import { newSkin, ORIGINAL, type Skin } from '../skins/skin';
 
 const DB = 'scythe';
@@ -135,7 +135,7 @@ export class SaveStore {
   async skin(id: string): Promise<Skin> {
     if (id === ORIGINAL.id) return ORIGINAL;
     const saved = await this.run('readonly', (s) => s.get(SKIN + id) as IDBRequest<Skin | undefined>, LIBRARY);
-    return saved ? { ...saved, theme: { ...DEFAULT_THEME, ...saved.theme } } : ORIGINAL;
+    return saved ? { ...saved, theme: upgradeTheme({ ...DEFAULT_THEME, ...saved.theme }) } : ORIGINAL;
   }
 
   /** The skin in use. */

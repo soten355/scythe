@@ -297,7 +297,6 @@ function render() {
               ${g === 'Map' ? mapSettings() : ''}
               ${g === 'Map borders' ? borderSettings() : ''}
               ${g === 'Menus and panels' ? lookAndFeel() : ''}
-              ${g === 'Hex symbols' ? `<label class="check"><input type="checkbox" data-over ${theme.symbolsOverArt ? 'checked' : ''}> Show symbols over hex art and the map picture too</label>` : ''}
               ${SLOTS.filter((s) => s.group === g).map((s) => slotRow(s.id, s.label, s.hint)).join('')}
             </section>`,
           )
@@ -443,8 +442,6 @@ root.addEventListener('change', async (e) => {
     await keep({ ...theme, paintedMap: el.checked });
   } else if (el.dataset.edges !== undefined) {
     await keep({ ...theme, hexEdges: el.checked });
-  } else if (el.dataset.over !== undefined) {
-    await keep({ ...theme, symbolsOverArt: el.checked });
   } else if (el.dataset.name !== undefined) {
     await keep({ ...theme, name: el.value.trim() || DEFAULT_THEME.name });
   }

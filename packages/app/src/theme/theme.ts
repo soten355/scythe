@@ -106,7 +106,7 @@ export const SLOTS: Slot[] = [
   ...TERRAINS.map((t): Slot => ({ id: `hex.${t}`, group: 'Hex art', label: TERRAIN_NAMES[t], hint: `Fills each hex, cropped to the hex shape; see-through parts show the map picture, or else the hex's colour. Add several and each hex picks one at random, a new mix each game. ${sizeText(BEST.hex)}.` })),
   { id: 'border.road', group: 'Map borders', label: 'Road', hint: `Drawn along every edge between two land hexes, over the hex art, like the roads on Carcassonne tiles: a strip of road seen from straight above, running level from the left edge to the right, with its verges along the top and bottom. It's repeated (mirrored) along each edge, so keep it the same all the way along. Needs hex art. ${sizeText(BEST.strip)}.` },
   { id: 'border.river', group: 'Map borders', label: 'River', hint: `Drawn along the map's rivers, with its banks, round bends and a round pool where a river ends; its bank also makes the shore around lakes. A strip seen from straight above, running level from the left edge to the right: a bank along the top (about the top fifth), water through the middle, a bank along the bottom. Needs hex art. ${sizeText(BEST.strip)}.` },
-  ...TERRAINS.map((t): Slot => ({ id: `symbol.${t}`, group: 'Hex symbols', label: TERRAIN_NAMES[t], hint: `In the middle of the hex, on a see-through background. ${sizeText(BEST.small)}.` })),
+  ...TERRAINS.map((t): Slot => ({ id: `symbol.${t}`, group: 'Hex symbols', label: TERRAIN_NAMES[t], hint: `In the middle of the hex, on a see-through background; over hex art, in the round mark at the top of the hex instead (without one, a simple drawn symbol shows there). ${sizeText(BEST.small)}.` })),
   { id: 'symbol.tunnel', group: 'Markers', label: 'Tunnel', hint: `At the top of tunnel hexes, on a see-through background. ${sizeText(BEST.small)}.` },
   { id: 'symbol.encounter', group: 'Markers', label: 'Encounter', hint: `At the bottom of hexes with an encounter, on a see-through background. ${sizeText(BEST.small)}.` },
   ...TOKENS.map((r): Slot => ({ id: `token.${r}`, group: 'Resource tokens', label: r[0]!.toUpperCase() + r.slice(1), hint: `A resource on the map, on a see-through background. ${sizeText(BEST.small)}.` })),
@@ -194,7 +194,7 @@ export interface Theme {
   moreHexArt: Partial<Record<Terrain, string[]>>;
   /** Hex colours (where there's no hex art, and while it loads). */
   colors: Partial<Record<Terrain, string>>;
-  /** Draw the terrain symbols over hex art (or the map picture) too (off: the art says what the hex is). */
+  /** No longer used: over hex art (or the map picture) each hex now has its terrain mark at the top (see BoardLook.mark). Kept so older files still read. */
   symbolsOverArt: boolean;
   /** With a map picture: it is the hexes' art, under see-through hexes (off: it sits behind hexes drawn as usual). */
   paintedMap: boolean;
@@ -215,7 +215,15 @@ export interface BorderWidths {
   river: number;
   bank: number;
 }
-export const DEFAULT_BORDER_WIDTHS: BorderWidths = { road: 0.3, river: 0.22, bank: 0.4 };
+export const DEFAULT_BORDER_WIDTHS: BorderWidths = { road: 0.13, river: 0.22, bank: 0.4 };
+/** The usual road width before it was made thinner (owner's play-test): a skin still at it gets the new one. */
+const OLD_ROAD_WIDTH = 0.3;
+
+/** A kept theme brought up to date: a road at the old usual width takes the new, thinner one. */
+export function upgradeTheme(theme: Theme): Theme {
+  const w = theme.borderWidths;
+  return w && w.road === OLD_ROAD_WIDTH ? { ...theme, borderWidths: { ...w, road: DEFAULT_BORDER_WIDTHS.road } } : theme;
+}
 /** The narrowest and widest a border can be set, as a share of a hex's size. */
 export const BORDER_WIDTH_RANGE = { min: 0.05, max: 0.8 } as const;
 
@@ -318,7 +326,10 @@ export interface BoardLook {
   art: (terrain: Terrain) => string | undefined;
   /** All of a terrain's hex pictures: each hex shows one (see hexArtIndex). */
   arts: (terrain: Terrain) => string[];
+  /** The terrain's symbol in the middle of the hex: only on hexes drawn without art (see mark). */
   symbol: (terrain: Terrain) => Icon | undefined;
+  /** Over hex art (or a painted map): a clear mark of the terrain at the top of each hex, the skin's own symbol picture or else the drawn one ('drawn'). */
+  mark: (terrain: Terrain) => { image: string } | 'drawn' | undefined;
   tunnel: Icon;
   encounter: Icon;
   token: (resource: Resource) => string | undefined;
@@ -347,10 +358,14 @@ export function boardLook(theme: Theme): BoardLook {
     art: (t) => (painted ? undefined : hexPictures(theme, t)[0]),
     arts: (t) => (painted ? [] : hexPictures(theme, t)),
     symbol: (t) => {
+      if (painted || hexPictures(theme, t).length) return undefined;
       const own = picture(`symbol.${t}`);
-      if (own) return { image: own };
-      if ((painted || hexPictures(theme, t).length) && !theme.symbolsOverArt) return undefined;
-      return TERRAIN_ICONS[t];
+      return own ? { image: own } : TERRAIN_ICONS[t];
+    },
+    mark: (t) => {
+      if (!painted && !hexPictures(theme, t).length) return undefined;
+      const own = picture(`symbol.${t}`);
+      return own ? { image: own } : 'drawn';
     },
     tunnel: asIcon('symbol.tunnel', TUNNEL_ICON),
     encounter: asIcon('symbol.encounter', ENCOUNTER_ICON),
@@ -420,7 +435,7 @@ export function readTheme(data: Record<string, unknown>): Theme {
     symbolsOverArt: data.symbolsOverArt === true,
     paintedMap: data.paintedMap !== false,
     hexEdges: data.hexEdges !== false,
-    borderWidths: { road: width('road'), river: width('river'), bank: width('bank') },
+    borderWidths: upgradeTheme({ ...DEFAULT_THEME, borderWidths: { road: width('road'), river: width('river'), bank: width('bank') } }).borderWidths,
     uiColors,
     bodyFont: font(data.bodyFont, DEFAULT_THEME.bodyFont),
     headingFont: font(data.headingFont, DEFAULT_THEME.headingFont),

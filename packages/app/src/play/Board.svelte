@@ -1,7 +1,8 @@
 <script lang="ts">
   // The 2D board: terrain, rivers, home bases, everyone's pieces and the
   // resources on each hex. Hexes the player can tap are outlined.
-  // Each hex shows its terrain icon in the middle, a tunnel icon at the top
+  // Each hex shows its terrain icon in the middle (over hex art, a clear mark
+  // of its terrain at the top instead: TerrainMark), a tunnel icon at the top
   // and an encounter icon at the bottom while its token is there (see icons.ts); its ID sits at the upper left.
   //
   // The camera (see camera.ts): pinch or use the mouse wheel to zoom (around
@@ -21,6 +22,7 @@
   import { framePoint, frameRect } from './frame';
   import { boardArea, center, corners, HEX_HEIGHT, HEX_VIEWBOX, HEX_WIDTH, points, sharedEdge, SIZE, spotsArea, type Point } from './geometry';
   import HexIcon from './HexIcon.svelte';
+  import TerrainMark from './TerrainMark.svelte';
   import CrestDrawn from './CrestDrawn.svelte';
   import { MAP_PICTURE, mapPictureFrame } from './map-picture';
   import { LABEL_Y, MECH, MEEPLE, STRUCTURE_LETTER } from './shapes';
@@ -107,10 +109,11 @@
             .filter((h) => l.arts(h.terrain).length)
             .map((h) => {
               const art = l.arts(h.terrain);
-              return { corners: corners(center(h)), url: art[hexArtIndex(game.setup.seed, h.id, art.length)]!, fill: behind ? l.fill(h.terrain) : undefined };
+              const water = h.terrain === 'lake' ? l.fill('lake') : undefined;
+              return { corners: corners(center(h)), url: art[hexArtIndex(game.setup.seed, h.id, art.length)]!, fill: behind ? l.fill(h.terrain) : undefined, water };
             }),
-          // The skin's road, river and shore along the hex edges, if it has their pictures.
-          { borders: l.borders ? { ...l.borders, edges: mapBorders(board) } : undefined },
+          // The skin's road, river and shore along the hex edges, if it has their pictures; the river's water washed like the lakes.
+          { borders: l.borders ? { ...l.borders, edges: mapBorders(board), water: l.fill('lake') } : undefined },
         );
       }),
     ).then(
@@ -633,8 +636,11 @@
       onkeydown={() => {}}
     />
     {@const icon = look.symbol(h.terrain)}
+    {@const mark = clear ? undefined : look.mark(h.terrain)}
     {#if icon && !clear}<HexIcon {icon} x={c[0]} y={c[1]} size={SIZE * 0.65} faded />{/if}
-    {#if h.tunnel}<HexIcon icon={look.tunnel} x={c[0]} y={c[1] - SIZE * 0.62} size={SIZE * 0.36} />{/if}
+    <!-- Over hex art, the terrain's mark at the top; a tunnel then sits beside it. -->
+    {#if mark}<TerrainMark terrain={h.terrain} {mark} x={c[0] - (h.tunnel ? SIZE * 0.2 : 0)} y={c[1] - SIZE * 0.6} size={SIZE * 0.34} color={look.fill(h.terrain)} />{/if}
+    {#if h.tunnel}<HexIcon icon={look.tunnel} x={c[0] + (mark ? SIZE * 0.2 : 0)} y={c[1] - SIZE * 0.62} size={SIZE * 0.36} />{/if}
     {#if game.encounterTokens.includes(h.id)}<HexIcon icon={look.encounter} x={c[0]} y={c[1] + SIZE * 0.62} size={SIZE * 0.36} />{/if}
     {#if !clear}<text x={c[0] - SIZE * 0.5} y={c[1] - SIZE * 0.45} class="id">{h.id}</text>{/if}
   {/each}

@@ -6,7 +6,9 @@
 // strip, mirrored to make both sides) and the shore (its top half: bank,
 // then water). Edges are softened by drawing each band a few times, a little
 // narrower each time; rounded ends make the bends and the pool where a river
-// stops.
+// stops. Roads are drawn a little see-through with wide soft edges, so the
+// tile shows through at their verges; river water (and lake hexes, in
+// baked-map.ts) gets a wash of the skin's lake colour, so it reads as water.
 import type { BorderWidths } from '../theme/theme';
 import { riverSpan, type BorderEdge } from './borders';
 import { SIZE, type Point } from './geometry';
@@ -16,6 +18,44 @@ export interface BorderPictures {
   road?: HTMLImageElement;
   river?: HTMLImageElement;
   widths: BorderWidths;
+  /** The skin's water colour: a wash of it makes river water bluer. */
+  water?: string;
+}
+
+/** How a band's edge fades: [share of its width, opacity] from the faint outside in. Banks and shores melt into the tiles; water fades into its banks. */
+type Feather = readonly (readonly [number, number])[];
+const MELT: Feather = [[1, 0.1], [0.92, 0.2], [0.84, 0.34], [0.76, 0.55], [0.68, 1]];
+const WATER: Feather = [[1, 0.3], [0.9, 0.55], [0.8, 1]];
+/** Roads: as soft as the banks, and never quite solid, so the ground shows through. */
+const ROAD_ALPHA = 0.82;
+
+/** How strongly water is washed with the water colour: its hue (`color`), then a touch deeper (`multiply`). */
+export const WATER_WASH = { color: 0.5, deepen: 0.2 } as const;
+
+/** Washes a picture (or a part of one, already clipped) with the water colour, keeping its light and shade. */
+export function washWater(g: CanvasRenderingContext2D, color: string, x: number, y: number, w: number, h: number) {
+  g.save();
+  g.fillStyle = color;
+  g.globalCompositeOperation = 'color';
+  g.globalAlpha = WATER_WASH.color;
+  g.fillRect(x, y, w, h);
+  g.globalCompositeOperation = 'multiply';
+  g.globalAlpha = WATER_WASH.deepen;
+  g.fillRect(x, y, w, h);
+  g.restore();
+}
+
+/** A copy of a strip washed with the water colour (its see-through parts kept). */
+function washed(tex: HTMLCanvasElement, color: string): HTMLCanvasElement {
+  const c = document.createElement('canvas');
+  c.width = tex.width;
+  c.height = tex.height;
+  const g = c.getContext('2d')!;
+  g.drawImage(tex, 0, 0);
+  washWater(g, color, 0, 0, c.width, c.height);
+  g.globalCompositeOperation = 'destination-in';
+  g.drawImage(tex, 0, 0);
+  return c;
 }
 
 /** Part of a strip picture (rows `from` to `to`, as shares of its height), `height` pixels tall, with a mirrored copy after it so it repeats without a seam. With `mirrorBelow`, the part fills the top half and its upside-down copy the bottom (a bank on both sides). */
@@ -58,7 +98,7 @@ function facing(a: Point, b: Point, side?: Point): [Point, Point] {
  * One band of texture from a to b, `width` pixels wide, centred on the line
  * (or, with `half`, only its top half), with soft sides and round ends.
  */
-function band(g: CanvasRenderingContext2D, tex: HTMLCanvasElement, a: Point, b: Point, width: number, half = false) {
+function band(g: CanvasRenderingContext2D, tex: HTMLCanvasElement, a: Point, b: Point, width: number, { half = false, feather = MELT, alpha = 1 }: { half?: boolean; feather?: Feather; alpha?: number } = {}) {
   const angle = Math.atan2(b[1] - a[1], b[0] - a[0]);
   const pattern = g.createPattern(tex, 'repeat');
   if (!pattern) return;
@@ -70,8 +110,8 @@ function band(g: CanvasRenderingContext2D, tex: HTMLCanvasElement, a: Point, b: 
   g.save();
   g.strokeStyle = pattern;
   g.lineCap = 'round';
-  for (const [k, alpha] of [[1, 0.35], [0.9, 0.55], [0.8, 1]] as const) {
-    g.globalAlpha = alpha;
+  for (const [k, opacity] of feather) {
+    g.globalAlpha = opacity * alpha;
     g.lineWidth = w * k;
     g.beginPath();
     g.moveTo(a[0] + nx, a[1] + ny);
@@ -82,14 +122,14 @@ function band(g: CanvasRenderingContext2D, tex: HTMLCanvasElement, a: Point, b: 
 }
 
 /** A round patch of texture (a river's end pool), soft at its rim. */
-function pool(g: CanvasRenderingContext2D, tex: HTMLCanvasElement, at: Point, radius: number) {
+function pool(g: CanvasRenderingContext2D, tex: HTMLCanvasElement, at: Point, radius: number, feather: Feather = MELT) {
   const pattern = g.createPattern(tex, 'repeat');
   if (!pattern) return;
   pattern.setTransform(new DOMMatrix().translateSelf(at[0], at[1] - tex.height / 2));
   g.save();
   g.fillStyle = pattern;
-  for (const [k, alpha] of [[1, 0.35], [0.9, 0.55], [0.8, 1]] as const) {
-    g.globalAlpha = alpha;
+  for (const [k, opacity] of feather) {
+    g.globalAlpha = opacity;
     g.beginPath();
     g.arc(at[0], at[1], radius * k, 0, Math.PI * 2);
     g.fill();
@@ -107,27 +147,30 @@ export function paintBorders(g: CanvasRenderingContext2D, borders: BorderPicture
 
   if (borders.road) {
     const tex = strip(borders.road, 0, 1, road);
-    for (const e of of('road')) band(g, tex, toPixel(e.a), toPixel(e.b), road);
+    for (const e of of('road')) band(g, tex, toPixel(e.a), toPixel(e.b), road, { alpha: ROAD_ALPHA });
   }
   if (!borders.river) return;
   const img = borders.river;
   // The shore: the river picture's top half (bank, then water), the bank on the land side.
-  const shoreTex = strip(img, 0, 0.55, road);
-  for (const e of of('shore')) band(g, shoreTex, ...facing(toPixel(e.a), toPixel(e.b), toPixel(e.land!)), road);
+  // As wide as the road used to be (three quarters of a bank's width), however thin the road is now.
+  const shore = bank * 0.75;
+  const shoreTex = strip(img, 0, 0.55, shore);
+  for (const e of of('shore')) band(g, shoreTex, ...facing(toPixel(e.a), toPixel(e.b), toPixel(e.land!)), shore);
 
   const rivers = of('river');
   const bankTex = strip(img, 0, 0.22, bank, true);
-  const waterTex = strip(img, 0.3, 0.7, water);
+  const plainWater = strip(img, 0.3, 0.7, water);
+  const waterTex = borders.water ? washed(plainWater, borders.water) : plainWater;
   const spans = rivers.map((e) => riverSpan(e).map(toPixel) as [Point, Point]);
   // Banks: both sides, or only the land side where a lake is alongside (the water opens into the lake).
   rivers.forEach((e, i) => {
     const [a, b] = spans[i]!;
-    if (e.land) band(g, bankTex, ...facing(a, b, toPixel(e.land)), bank, true);
+    if (e.land) band(g, bankTex, ...facing(a, b, toPixel(e.land)), bank, { half: true });
     else band(g, bankTex, a, b, bank);
   });
   // Where a river stops among land, a round pool ringed by bank.
   const ends = rivers.flatMap((e, i) => [...(e.endA ? [spans[i]![0]] : []), ...(e.endB ? [spans[i]![1]] : [])]);
   for (const at of ends) pool(g, bankTex, at, (bank * 1.35) / 2);
-  for (const [a, b] of spans) band(g, waterTex, a, b, water);
-  for (const at of ends) pool(g, waterTex, at, (water * 1.45) / 2);
+  for (const [a, b] of spans) band(g, waterTex, a, b, water, { feather: WATER });
+  for (const at of ends) pool(g, waterTex, at, (water * 1.45) / 2, WATER);
 }
