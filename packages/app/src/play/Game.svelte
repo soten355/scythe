@@ -28,7 +28,9 @@
   import { gainsBetween, recruitPayoutsIn, type GainKind } from './gains';
   import { buildPrompt, combatSummary, sectionHeadings, type Button, type Prompt, type RowStatus, type Selection } from './prompt';
   import { canSwitchSection, phase, previousSection, sectionChoices } from './turn';
-  import { loadSettings } from './settings';
+  import { botPause } from './settings';
+  import { settings } from './settings-store.svelte';
+  import Settings from './Settings.svelte';
   import { travelOf, type Travel } from './travel';
   import { countText, paysText } from './structure-bonus-text';
   import { restore, updateSave, type SavedGame } from '../saves/save';
@@ -36,7 +38,7 @@
   import { startBots } from '../bots/client';
   import { personalityFor, type RemoteSeat } from '@scythe/bots';
   import { botName, isBot, needsPass, people } from './seats';
-  import { botTurnsSince, paceOf } from './narrate';
+  import { botTurnsSince } from './narrate';
   import type { BoardLook } from '../theme/theme';
   import { encounterPicture, factoryPicture, uiPicture } from '../theme/current.svelte';
   import { cardLook } from '../content/card-pictures';
@@ -107,7 +109,6 @@
   );
   onDestroy(() => botThread?.stop());
   /** How long a bot's move stays on screen before the next: the ones worth watching, and the small steps between. */
-  const BOT_PACE = { watch: 900, quick: 200 };
   let botBusy = $state(false);
   /** Skip was tapped: bots play on at once, without showing their moves, until it's a person's turn (or, with no people, the next turn). */
   let skipping = $state(false);
@@ -120,7 +121,6 @@
     record = updateSave(record, steps, turnStart, history[history.length - 1]!, new Date());
     onSave(record);
   });
-  const settings = loadSettings();
   const GAIN_ICONS: Record<GainKind, Icon> = { ...BONUS_ICONS, ...RESOURCE_ICONS };
   /** Which top bar number each gain flies to. */
   const GAIN_STAT: Record<GainKind, string> = {
@@ -381,7 +381,8 @@
     botBusy = true;
     botSeats[seat]!.chooseAction(playerView(state, seat), legalActions(state, seat)).then(
       async (action) => {
-        const wait = skipping ? 0 : BOT_PACE[paceOf(action)] - (performance.now() - started);
+        // Held on screen for the chosen bot speed (Settings), counting the time it took to think.
+        const wait = skipping ? 0 : botPause(action, settings.botSpeed) - (performance.now() - started);
         if (wait > 0) await new Promise((done) => setTimeout(done, wait));
         botBusy = false;
         // Only if the game is still where the bot was asked (nothing else has moved it on).
@@ -399,6 +400,7 @@
   const playing = $derived(botNow ? stories.findLast((t) => t.seat === game.currentPlayer) : undefined);
 
   let menuOpen = $state(false);
+  let settingsOpen = $state(false);
 
   function restart() {
     ask('Start a new game? This one stays in Saved games.', onNewGame);
@@ -602,12 +604,15 @@
     />
   {/if}
 
+  {#if settingsOpen}<Settings onClose={() => (settingsOpen = false)} />{/if}
+
   {#if menuOpen}
     <!-- Tapping anywhere outside the menu closes it. -->
     <button class="menu-backdrop" aria-label="Close menu" onclick={() => (menuOpen = false)}></button>
     <nav class="menu-list" transition:fade={{ duration: 120 }}>
       <button onclick={() => ((menuOpen = false), restart())}>New game</button>
       <button onclick={() => ((menuOpen = false), exportSave(record))} disabled={!saving}>Save to a file</button>
+      <button onclick={() => ((menuOpen = false), (settingsOpen = true))}>⚙️ Settings</button>
       <button onclick={() => ((menuOpen = false), onMenu())}>Main menu</button>
     </nav>
   {/if}

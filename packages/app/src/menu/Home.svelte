@@ -1,8 +1,12 @@
 <script lang="ts">
   // The opening menu: continue the last game, start a new one, pick a saved
   // game, browse the codex (factions, mats, cards), pick a skin (the game's
-  // whole look and names), or open the workshop (the editors and tools).
+  // whole look and names), open the workshop (the editors and tools), or
+  // change the settings.
   import { ENGINE_VERSION } from '@scythe/engine';
+  import Settings from '../play/Settings.svelte';
+
+  let settingsOpen = $state(false);
 
   let {
     canContinue,
@@ -32,9 +36,13 @@
       <button onclick={onCodex}>📖 Codex</button>
       <button onclick={onSkins} title={unsavedSkins ? 'A skin is not saved to a file' : undefined}>🎨 Skins{#if unsavedSkins}<span class="warn" aria-label="not saved to a file"> ⚠️</span>{/if}</button>
     </div>
-    <button onclick={onWorkshop}>🛠️ Workshop</button>
+    <div class="pair">
+      <button onclick={onWorkshop}>🛠️ Workshop</button>
+      <button onclick={() => (settingsOpen = true)}>⚙️ Settings</button>
+    </div>
   </nav>
   {#if unsavedSkins}<p class="unsaved">⚠️ {unsavedSkins === 1 ? 'A skin is' : `${unsavedSkins} skins are`} not saved to a file. Save from 🎨 Skins to keep a copy.</p>{/if}
+  {#if settingsOpen}<Settings onClose={() => (settingsOpen = false)} />{/if}
   <p class="meta">Skin: {skinName} · engine v{ENGINE_VERSION}</p>
 </div>
 

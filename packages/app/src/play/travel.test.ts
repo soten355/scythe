@@ -61,7 +61,7 @@ describe('settings', () => {
   it('remembers the movement speed, with a default', () => {
     const storage = memory();
     expect(loadSettings(storage)).toEqual(DEFAULT_SETTINGS);
-    saveSettings({ moveMs: 200 }, storage);
+    saveSettings({ ...DEFAULT_SETTINGS, moveMs: 200 }, storage);
     expect(loadSettings(storage).moveMs).toBe(200);
   });
 });
