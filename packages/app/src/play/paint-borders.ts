@@ -28,6 +28,12 @@ export interface BorderPictures {
 type Feather = readonly (readonly [number, number])[];
 const MELT: Feather = [[1, 0.1], [0.92, 0.2], [0.84, 0.34], [0.76, 0.55], [0.68, 1]];
 const WATER: Feather = [[1, 0.3], [0.9, 0.55], [0.8, 1]];
+/** The rows of the river picture a shore shows (from its top, the grass), where in them its bank meets the water, and where across the shore band the hex edge falls (shares of its height, from the land side). */
+const SHORE_ROWS = 0.32;
+const SHORE_EDGE = 0.2;
+const SHORE_LINE = 0.6;
+/** The shore's strength across it, from the land side (0) to the lake side (1); the hex edge is at SHORE_LINE. */
+const SHORE_FADE: [number, number][] = [[0, 0], [0.3, 0.9], [0.62, 1], [0.8, 0.35], [1, 0]];
 /** How far the shallows reach into a lake, as a share of a bank's width. */
 const SHALLOWS_DEPTH = 0.6;
 
@@ -57,8 +63,9 @@ function shallowsAlong(g: CanvasRenderingContext2D, a: Point, b: Point, lake: Po
   const toward = (p: Point): Point => [p[0] + (lake[0] - p[0]) * t, p[1] + (lake[1] - p[1]) * t];
   const inner = toward(mid);
   const fade = g.createLinearGradient(mid[0], mid[1], inner[0], inner[1]);
-  fade.addColorStop(0, `rgb(${mud} / 0.85)`);
-  fade.addColorStop(0.3, `rgb(${water} / 0.55)`);
+  // Murky at the very edge (a touch of the mud, never a stripe of it: that read as the hex's outline), then shallow water, then the lake's own.
+  fade.addColorStop(0, `rgb(${mud} / 0.3)`);
+  fade.addColorStop(0.15, `rgb(${water} / 0.55)`);
   fade.addColorStop(1, `rgb(${water} / 0)`);
   g.save();
   g.fillStyle = fade;
@@ -147,14 +154,14 @@ function band(
   a: Point,
   b: Point,
   width: number,
-  { half = false, feather = MELT, alpha = 1 }: { half?: boolean; feather?: Feather; alpha?: number } = {},
+  { half = false, feather = MELT, alpha = 1, offset = 0 }: { half?: boolean; feather?: Feather; alpha?: number; /** Moves the band toward its top by this many pixels (toward its bottom if negative). */ offset?: number } = {},
 ) {
   const angle = Math.atan2(b[1] - a[1], b[0] - a[0]);
   const pattern = g.createPattern(tex, 'repeat');
   if (!pattern) return;
   pattern.setTransform(new DOMMatrix().translateSelf(a[0], a[1]).rotateSelf((angle * 180) / Math.PI).translateSelf(0, -tex.height / 2));
   // The top half only: a narrower band moved toward the top (along (dy, -dx)).
-  const shift = half ? width / 4 : 0;
+  const shift = (half ? width / 4 : 0) + offset;
   const [nx, ny] = [Math.sin(angle) * shift, -Math.cos(angle) * shift];
   const w = half ? width / 2 : width;
   g.save();
@@ -187,6 +194,67 @@ function pool(g: CanvasRenderingContext2D, tex: HTMLCanvasElement, at: Point, ra
   g.restore();
 }
 
+/**
+ * A band of texture from a to b whose strength changes across it (not
+ * evenly at both sides): `fade` gives [place across the band from its top
+ * (0) to its bottom (1), strength] stops. Painted on a small canvas of its
+ * own, then faded with a gradient, so one side can stay solid while the
+ * other melts away.
+ */
+function fadedBand(g: CanvasRenderingContext2D, tex: HTMLCanvasElement, a: Point, b: Point, width: number, offset: number, fade: [number, number][]) {
+  const angle = Math.atan2(b[1] - a[1], b[0] - a[0]);
+  // Toward the band's top.
+  const n: Point = [Math.sin(angle), -Math.cos(angle)];
+  const pad = width + Math.abs(offset);
+  const [x0, y0] = [Math.min(a[0], b[0]) - pad, Math.min(a[1], b[1]) - pad];
+  const c = document.createElement('canvas');
+  c.width = Math.ceil(Math.abs(a[0] - b[0]) + pad * 2);
+  c.height = Math.ceil(Math.abs(a[1] - b[1]) + pad * 2);
+  const o = c.getContext('2d')!;
+  o.translate(-x0, -y0);
+  band(o, tex, a, b, width, { feather: [[1, 1]], offset });
+  o.setTransform(1, 0, 0, 1, 0, 0);
+  o.globalCompositeOperation = 'destination-in';
+  const mid: Point = [(a[0] + b[0]) / 2 - x0, (a[1] + b[1]) / 2 - y0];
+  const top: Point = [mid[0] + n[0] * (width / 2 + offset), mid[1] + n[1] * (width / 2 + offset)];
+  const bottom: Point = [mid[0] - n[0] * (width / 2 - offset), mid[1] - n[1] * (width / 2 - offset)];
+  const gradient = o.createLinearGradient(top[0], top[1], bottom[0], bottom[1]);
+  for (const [at, strength] of fade) gradient.addColorStop(at, `rgb(0 0 0 / ${strength})`);
+  o.fillStyle = gradient;
+  o.fillRect(0, 0, c.width, c.height);
+  g.drawImage(c, x0, y0);
+}
+
+/**
+ * A river's water running on past `at` (its mouth) into a lake, a little
+ * wider than the river and fading smoothly to nothing over `reach`: painted
+ * on a small canvas of its own, then faded along its length with a gradient,
+ * so it has neither steps nor a hard end.
+ */
+function riverIntoLake(g: CanvasRenderingContext2D, tex: HTMLCanvasElement, from: Point, at: Point, water: number, reach: number) {
+  const len = Math.hypot(at[0] - from[0], at[1] - from[1]) || 1;
+  const dir: Point = [(at[0] - from[0]) / len, (at[1] - from[1]) / len];
+  const start: Point = [at[0] - dir[0] * water * 0.5, at[1] - dir[1] * water * 0.5];
+  const tip: Point = [at[0] + dir[0] * reach, at[1] + dir[1] * reach];
+  const size = Math.ceil(reach * 2 + water * 3);
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const o = c.getContext('2d')!;
+  // Board pixels, moved so the mouth is in the middle of the small canvas.
+  const [ox, oy] = [at[0] - size / 2, at[1] - size / 2];
+  o.translate(-ox, -oy);
+  band(o, tex, start, tip, water * 1.3, { feather: MELT });
+  o.setTransform(1, 0, 0, 1, 0, 0);
+  o.globalCompositeOperation = 'destination-in';
+  const fade = o.createLinearGradient(start[0] - ox, start[1] - oy, tip[0] - ox, tip[1] - oy);
+  fade.addColorStop(0, 'rgb(0 0 0 / 0.85)');
+  fade.addColorStop(0.3, 'rgb(0 0 0 / 0.55)');
+  fade.addColorStop(1, 'rgb(0 0 0 / 0)');
+  o.fillStyle = fade;
+  o.fillRect(0, 0, size, size);
+  g.drawImage(c, ox, oy);
+}
+
 /** Paints the borders. `toPixel` turns a board point into the picture's pixels; `scale` is pixels per board unit. */
 export function paintBorders(g: CanvasRenderingContext2D, borders: BorderPictures, toPixel: (p: Point) => Point, scale: number) {
   const px = (share: number) => share * SIZE * scale;
@@ -217,22 +285,37 @@ export function paintBorders(g: CanvasRenderingContext2D, borders: BorderPicture
         const k = `${Math.round(p[0])},${Math.round(p[1])}`;
         meets.set(k, { at: p, n: (meets.get(k)?.n ?? 0) + 1 });
       }
-    for (const { at, n } of meets.values()) if (n >= 3) pool(g, tex, at, road * 0.85, ROAD, ROAD_ALPHA);
+    // Only the road's surface (the middle of its picture, no verges): the whole strip laid flat looked like a little road across the crossing (owner's play-test).
+    const surface = strip(borders.road, 0.3, 0.7, road);
+    for (const { at, n } of meets.values()) if (n >= 3) pool(g, surface, at, road * 0.7, ROAD, ROAD_ALPHA);
     g.restore();
   }
   if (!borders.river) return;
   const img = borders.river;
   // The river picture's top strip (grass, then the bank's edge), mirrored to make both sides.
   const bankTex = strip(img, 0, 0.22, bank, true);
-  // The shore: a bank on the land side, and shallows on the lake side fading from the bank's mud into the lake's own water (owner's play-tests: neither a band of water framing every lake nor a hard edge). Their colours come from the river picture: the bank's edge and its water.
+  // The shore: one strip of the river picture across the edge, from the land
+  // (its grass and reeds, fading into the land's tile) over the bank's mud
+  // into its water (washed with the lake's colour, fading into the lake's
+  // own), with the hex edge falling between the reeds and the mud; under it,
+  // shallows fading from the edge into the lake (owner's play-tests: neither
+  // a band of water framing every lake, nor a hard edge, nor a double frame).
   const mud = averageColor(img, 0.16, 0.24);
   const shallow = averageColor(img, 0.26, 0.45, borders.water);
+  const shoreTex = strip(img, 0, SHORE_ROWS, bank);
+  // The water part (below the bank's edge) washed like the lakes.
+  if (borders.water) {
+    const sg = shoreTex.getContext('2d')!;
+    const top = Math.round(shoreTex.height * (SHORE_EDGE / SHORE_ROWS));
+    washWater(sg, borders.water, 0, top, shoreTex.width, shoreTex.height - top);
+  }
   for (const e of of('shore')) {
     const [a, b, land] = [toPixel(e.a), toPixel(e.b), toPixel(e.land!)];
     // The lake's middle: the land's, mirrored across the edge.
     const lake: Point = [a[0] + b[0] - land[0], a[1] + b[1] - land[1]];
     shallowsAlong(g, a, b, lake, bank * SHALLOWS_DEPTH, mud, shallow);
-    band(g, bankTex, ...facing(a, b, land), bank, { half: true });
+    // Land on the strip's top; moved toward the lake so the edge sits at the reeds' foot. Faint where it meets the land's tile, solid through the reeds and mud, then fading out fast into the lake, so its water never frames it.
+    fadedBand(g, shoreTex, ...facing(a, b, land), bank, -bank * (0.5 - SHORE_LINE), SHORE_FADE);
   }
 
   const rivers = of('river');
@@ -251,12 +334,17 @@ export function paintBorders(g: CanvasRenderingContext2D, borders: BorderPicture
   for (const [a, b] of spans) band(g, waterTex, a, b, water, { feather: WATER });
   for (const at of ends) pool(g, waterTex, at, (water * 1.45) / 2, WATER);
 
-  // Where a river reaches a lake's corner, its mouth: the river's water spreads into a soft pool, and shallows fan out into the lake (owner's play-test: it stopped against the lake like a pipe).
+  // Where a river reaches a lake's corner, its mouth: the river's water runs
+  // on into the lake, fading smoothly to nothing, over shallows fanning out
+  // inside the lake (owner's play-tests: it stopped against the lake like a
+  // pipe, then blurred onto the land, then showed hard-edged steps).
   const lakes = borders.keepClear ?? [];
   const lakeCorners = lakes.flat();
-  const mouths = spans.flat().filter((p) => lakeCorners.some((c) => Math.hypot(c[0] - p[0], c[1] - p[1]) < 2));
-  for (const at of mouths) pool(g, waterTex, at, water * 0.8, MELT);
-  if (mouths.length && lakes.length) {
+  const atLake = (p: Point) => lakeCorners.some((c) => Math.hypot(c[0] - p[0], c[1] - p[1]) < 2);
+  const mouths = spans.flatMap(([a, b]) => [...(atLake(b) ? [[a, b]] : []), ...(atLake(a) ? [[b, a]] : [])] as [Point, Point][]);
+  const reach = water * 2.4;
+  if (mouths.length) {
+    // The shallows' fan, kept inside the lake (a soft gradient, so no hard edge).
     g.save();
     g.beginPath();
     for (const outline of lakes) {
@@ -264,13 +352,14 @@ export function paintBorders(g: CanvasRenderingContext2D, borders: BorderPicture
       g.closePath();
     }
     g.clip();
-    for (const at of mouths) {
-      const fan = g.createRadialGradient(at[0], at[1], water * 0.3, at[0], at[1], water * 1.9);
-      fan.addColorStop(0, `rgb(${shallow} / 0.6)`);
+    for (const [, at] of mouths) {
+      const fan = g.createRadialGradient(at[0], at[1], water * 0.2, at[0], at[1], reach);
+      fan.addColorStop(0, `rgb(${shallow} / 0.45)`);
       fan.addColorStop(1, `rgb(${shallow} / 0)`);
       g.fillStyle = fan;
-      g.fillRect(at[0] - water * 2, at[1] - water * 2, water * 4, water * 4);
+      g.fillRect(at[0] - reach, at[1] - reach, reach * 2, reach * 2);
     }
     g.restore();
   }
+  for (const [from, at] of mouths) riverIntoLake(g, waterTex, from, at, water, reach);
 }
