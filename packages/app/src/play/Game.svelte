@@ -517,11 +517,14 @@
       <!-- Whoever acts now: their crest shows, then fades behind the text as it appears (again each time play passes, once the pass screen is gone). -->
       {#key intro}
         <div class="emblem"><FactionEmblem faction={game.setup.players[seatNow]!.faction} /></div>
+        <!-- Watching a bot with a portrait: after its crest glows, its face fills the panel, under the words. -->
+        {#if face?.full}<div class="portrait-layer"><BotFace {face} color={color(seatNow)} /></div>{/if}
       {/key}
       <div class="panel" bind:this={panel}>
-        {#key intro}<div class="intro" class:watching={face}>
+        {#key intro}<div class="intro" class:watching={face} class:over-portrait={face?.full}>
         {#if botNow}
-          <p class="title">{botLabel(seatNow)} is playing…</p>
+          <!-- The dots pulse in turn: it's thinking. -->
+          <p class="title">{botLabel(seatNow)} is playing<span class="dots" aria-hidden="true"><i>.</i><i>.</i><i>.</i></span></p>
           {#if face}
             <!-- After the crest glows, the bot's face fades in: we watch it think rather than read its moves (📜 Bots' turns has them). -->
           {:else if playing && playing.seat === seatNow}
@@ -534,7 +537,7 @@
             <p class="hint">Something went wrong while it was thinking: {botTrouble}</p>
             <button class="primary" onclick={() => (botTrouble = null)}>Try again</button>
           {/if}
-          {#if face}<BotFace {face} color={color(seatNow)} />{/if}
+          {#if face && !face.full}<BotFace {face} color={color(seatNow)} />{/if}
         {:else if over}
           <p class="title">Game over: a sixth star has been placed.</p>
           <button class="primary" onclick={() => (viewingBoard = false)}>Final scores</button>
@@ -879,7 +882,13 @@
     inset: 0;
     background: color-mix(in srgb, var(--panel) 72%, transparent);
   }
-  aside > :not(.emblem, .panel-picture) {
+  .portrait-layer {
+    position: absolute;
+    z-index: 0;
+    inset: 0;
+    pointer-events: none;
+  }
+  aside > :not(.emblem, .panel-picture, .portrait-layer) {
     position: relative;
     z-index: 1;
   }
@@ -898,6 +907,40 @@
   }
   .intro.watching > :global(.face) {
     flex: 1;
+  }
+  /* Words over the portrait: light, with a shadow, so they read over any face. */
+  .intro.over-portrait {
+    color: #fff;
+    text-shadow: 0 1px 3px rgb(0 0 0 / 0.9);
+  }
+  .intro.over-portrait .skip {
+    margin-top: auto;
+    align-self: flex-start;
+  }
+  .dots i {
+    font-style: normal;
+    animation: think 1.4s ease-in-out infinite both;
+  }
+  .dots i:nth-child(2) {
+    animation-delay: 0.2s;
+  }
+  .dots i:nth-child(3) {
+    animation-delay: 0.4s;
+  }
+  @keyframes think {
+    0%,
+    80%,
+    100% {
+      opacity: 0.25;
+    }
+    40% {
+      opacity: 1;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .dots i {
+      animation: none;
+    }
   }
   .panel {
     position: relative;

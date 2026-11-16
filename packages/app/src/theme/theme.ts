@@ -63,7 +63,7 @@ const MAP_PIECE = (what: string) => `Its piece on the map, in place of the ${wha
 /** A faction's picture slots, in the order the faction editor lists them. */
 export const FACTION_PARTS: { part: FactionPart; label: string; hint: string }[] = [
   { part: 'crest', label: 'Crest', hint: `The faction's emblem: on the side panel, the new game screen, its own screen and the final scores. On a see-through background. ${sizeText(BEST.small)}.` },
-  { part: 'portrait', label: 'Portrait', hint: `The character's face, shown in a circle ringed in the faction's colour: on the new game screen, the faction's own screen, fights and the final scores. Keep the face in the middle; the corners are cut off. ${sizeText(BEST.portrait)}.` },
+  { part: 'portrait', label: 'Portrait', hint: `The character's face, shown in a circle ringed in the faction's colour: on the new game screen, the faction's own screen, fights and the final scores. While a bot plays, it also fills the side panel, cropped to a tall shape. Keep the face in the middle, a little above centre; the corners and sides are cut off. ${sizeText(BEST.portrait)}.` },
   { part: 'character', label: 'Character', hint: FIGURE },
   { part: 'mech', label: 'Mech', hint: FIGURE },
   { part: 'characterMap', label: 'Character on the map', hint: MAP_PIECE('character') },
