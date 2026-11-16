@@ -31,9 +31,11 @@ const WATER: Feather = [[1, 0.3], [0.9, 0.55], [0.8, 1]];
 /** The rows of the river picture a shore shows (from its top, the grass), where in them its bank meets the water, and where across the shore band the hex edge falls (shares of its height, from the land side). */
 const SHORE_ROWS = 0.32;
 const SHORE_EDGE = 0.2;
-const SHORE_LINE = 0.6;
-/** The shore's strength across it, from the land side (0) to the lake side (1); the hex edge is at SHORE_LINE. */
-const SHORE_FADE: [number, number][] = [[0, 0], [0.3, 0.9], [0.62, 1], [0.8, 0.35], [1, 0]];
+const SHORE_LINE = 0.22;
+/** The shore's width, as a share of a bank's. */
+const SHORE_WIDTH = 0.8;
+/** The shore's strength across it, from the land side (0) to the lake side (1); the hex edge is at SHORE_LINE, so most of it lies on the lake (owner's play-test: it spread too far onto the land and its roads). */
+const SHORE_FADE: [number, number][] = [[0, 0], [0.16, 0.85], [0.3, 1], [0.62, 1], [0.84, 0.35], [1, 0]];
 /** How far the shallows reach into a lake, as a share of a bank's width. */
 const SHALLOWS_DEPTH = 0.6;
 
@@ -154,19 +156,20 @@ function band(
   a: Point,
   b: Point,
   width: number,
-  { half = false, feather = MELT, alpha = 1, offset = 0 }: { half?: boolean; feather?: Feather; alpha?: number; /** Moves the band toward its top by this many pixels (toward its bottom if negative). */ offset?: number } = {},
+  { half = false, feather = MELT, alpha = 1, offset = 0, cap = 'round' }: { half?: boolean; feather?: Feather; alpha?: number; /** Moves the band toward its top by this many pixels (toward its bottom if negative). */ offset?: number; cap?: CanvasLineCap } = {},
 ) {
   const angle = Math.atan2(b[1] - a[1], b[0] - a[0]);
   const pattern = g.createPattern(tex, 'repeat');
   if (!pattern) return;
-  pattern.setTransform(new DOMMatrix().translateSelf(a[0], a[1]).rotateSelf((angle * 180) / Math.PI).translateSelf(0, -tex.height / 2));
+  // The picture runs along the line, centred on it (moved with the band by `offset`; a half band shows its top half).
+  pattern.setTransform(new DOMMatrix().translateSelf(a[0], a[1]).rotateSelf((angle * 180) / Math.PI).translateSelf(0, -tex.height / 2 - offset));
   // The top half only: a narrower band moved toward the top (along (dy, -dx)).
   const shift = (half ? width / 4 : 0) + offset;
   const [nx, ny] = [Math.sin(angle) * shift, -Math.cos(angle) * shift];
   const w = half ? width / 2 : width;
   g.save();
   g.strokeStyle = pattern;
-  g.lineCap = 'round';
+  g.lineCap = cap;
   for (const [k, opacity] of feather) {
     g.globalAlpha = opacity * alpha;
     g.lineWidth = w * k;
@@ -212,7 +215,8 @@ function fadedBand(g: CanvasRenderingContext2D, tex: HTMLCanvasElement, a: Point
   c.height = Math.ceil(Math.abs(a[1] - b[1]) + pad * 2);
   const o = c.getContext('2d')!;
   o.translate(-x0, -y0);
-  band(o, tex, a, b, width, { feather: [[1, 1]], offset });
+  // Square ends: a round one would spill past the corner (onto a road there).
+  band(o, tex, a, b, width, { feather: [[1, 1]], offset, cap: 'butt' });
   o.setTransform(1, 0, 0, 1, 0, 0);
   o.globalCompositeOperation = 'destination-in';
   const mid: Point = [(a[0] + b[0]) / 2 - x0, (a[1] + b[1]) / 2 - y0];
@@ -314,8 +318,9 @@ export function paintBorders(g: CanvasRenderingContext2D, borders: BorderPicture
     // The lake's middle: the land's, mirrored across the edge.
     const lake: Point = [a[0] + b[0] - land[0], a[1] + b[1] - land[1]];
     shallowsAlong(g, a, b, lake, bank * SHALLOWS_DEPTH, mud, shallow);
-    // Land on the strip's top; moved toward the lake so the edge sits at the reeds' foot. Faint where it meets the land's tile, solid through the reeds and mud, then fading out fast into the lake, so its water never frames it.
-    fadedBand(g, shoreTex, ...facing(a, b, land), bank, -bank * (0.5 - SHORE_LINE), SHORE_FADE);
+    // Land on the strip's top, moved toward the lake so most of it lies on the lake: a thin fade on the land side, then reeds standing in the shallows and the bank's mud, then its water fading out fast, so it never frames the lake.
+    const width = bank * SHORE_WIDTH;
+    fadedBand(g, shoreTex, ...facing(a, b, land), width, -width * (0.5 - SHORE_LINE), SHORE_FADE);
   }
 
   const rivers = of('river');
