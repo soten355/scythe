@@ -3,7 +3,7 @@
   // art alone can be hard to read): a small dark disc ringed in the terrain's
   // colour, holding the skin's own symbol picture or else a simple drawn one.
   // The drawn ones are this app's own: wheat, a pine, peaks, a snowflake, a
-  // house, waves and a factory roof.
+  // meeple (the village's people), waves and a factory roof.
   import type { Terrain } from '@scythe/engine';
 
   let { terrain, mark, x, y, size, color }: { terrain: Terrain; mark: { image: string } | 'drawn'; x: number; y: number; size: number; color: string } = $props();
@@ -30,9 +30,9 @@
     <path d="M0 -7V7M-6.1 -3.5L6.1 3.5M-6.1 3.5L6.1 -3.5" />
     <path d="M-1.6 -5.6L0 -4.2L1.6 -5.6M-1.6 5.6L0 4.2L1.6 5.6M-5.6 -1.4L-3.6 -2.1L-4 -4.2M5.6 1.4L3.6 2.1L4 4.2M-5.6 1.4L-3.6 2.1L-4 4.2M5.6 -1.4L3.6 -2.1L4 -4.2" />
   {:else if terrain === 'village'}
-    <!-- A house with a door. -->
-    <path d="M-6 0L0 -6L6 0V6.5H-6Z" class="solid" />
-    <path d="M-1.4 6.5V2.6H1.4V6.5Z" class="cut" />
+    <!-- A meeple: the village's people. -->
+    <circle cx="0" cy="-4.6" r="2.4" class="solid-fill" />
+    <path d="M-1.6 -1.9H1.6Q5.8 -1.6 6.6 0.4Q6.8 1.6 5.4 1.6L2.6 1.2L4.6 6.4Q4.8 7.4 3.8 7.4H1.4L0 4.2L-1.4 7.4H-3.8Q-4.8 7.4 -4.6 6.4L-2.6 1.2L-5.4 1.6Q-6.8 1.6 -6.6 0.4Q-5.8 -1.6 -1.6 -1.9Z" class="solid" />
   {:else if terrain === 'lake'}
     <!-- Waves. -->
     <path d="M-6.5 -2.2q1.6-1.8 3.2 0t3.3 0t3.3 0t3.2 0M-6.5 2.4q1.6-1.8 3.2 0t3.3 0t3.3 0t3.2 0" />
@@ -61,8 +61,7 @@
     fill: #fff;
     stroke-width: 0.6;
   }
-  path.cut {
-    fill: rgb(22 18 14 / 0.9);
-    stroke: none;
+  .solid-fill {
+    fill: #fff;
   }
 </style>

@@ -20,14 +20,57 @@ export interface BorderPictures {
   widths: BorderWidths;
   /** The skin's water colour: a wash of it makes river water bluer. */
   water?: string;
+  /** The lakes, as outlines in the picture's pixels: roads never cross them, and rivers open into them at their corners. */
+  keepClear?: Point[][];
 }
 
 /** How a band's edge fades: [share of its width, opacity] from the faint outside in. Banks and shores melt into the tiles; water fades into its banks. */
 type Feather = readonly (readonly [number, number])[];
 const MELT: Feather = [[1, 0.1], [0.92, 0.2], [0.84, 0.34], [0.76, 0.55], [0.68, 1]];
 const WATER: Feather = [[1, 0.3], [0.9, 0.55], [0.8, 1]];
-/** Roads: as soft as the banks, and never quite solid, so the ground shows through. */
-const ROAD_ALPHA = 0.82;
+/** How far the shallows reach into a lake, as a share of a bank's width. */
+const SHALLOWS_DEPTH = 0.6;
+
+/** The average colour of some rows of a picture (shares of its height), washed with a water colour if given. */
+function averageColor(img: HTMLImageElement, from: number, to: number, wash?: string): string {
+  const c = document.createElement('canvas');
+  c.width = c.height = 4;
+  const g = c.getContext('2d', { willReadFrequently: true })!;
+  g.drawImage(img, 0, img.naturalHeight * from, img.naturalWidth, img.naturalHeight * (to - from), 0, 0, 4, 4);
+  if (wash) washWater(g, wash, 0, 0, 4, 4);
+  const d = g.getImageData(0, 0, 4, 4).data;
+  const sum = [0, 0, 0];
+  for (let i = 0; i < d.length; i += 4) for (let k = 0; k < 3; k++) sum[k]! += d[i + k]!;
+  return sum.map((v) => Math.round(v / 16)).join(' ');
+}
+
+/**
+ * Shallows along a shore, inside the lake: a smooth fade from the bank's mud
+ * into shallow water and then the lake's own, over the strip of the lake
+ * along that edge (cut square to the lake's middle, so neighbouring edges
+ * meet without overlapping).
+ */
+function shallowsAlong(g: CanvasRenderingContext2D, a: Point, b: Point, lake: Point, depth: number, mud: string, water: string) {
+  const mid: Point = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+  // From the edge to the lake's middle is the hex's apothem; the inner edge is the hex shrunk by `depth`.
+  const t = Math.min(0.9, depth / Math.hypot(lake[0] - mid[0], lake[1] - mid[1]));
+  const toward = (p: Point): Point => [p[0] + (lake[0] - p[0]) * t, p[1] + (lake[1] - p[1]) * t];
+  const inner = toward(mid);
+  const fade = g.createLinearGradient(mid[0], mid[1], inner[0], inner[1]);
+  fade.addColorStop(0, `rgb(${mud} / 0.85)`);
+  fade.addColorStop(0.3, `rgb(${water} / 0.55)`);
+  fade.addColorStop(1, `rgb(${water} / 0)`);
+  g.save();
+  g.fillStyle = fade;
+  g.beginPath();
+  for (const [i, p] of [a, b, toward(b), toward(a)].entries()) (i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1]));
+  g.closePath();
+  g.fill();
+  g.restore();
+}
+/** Roads: a thin core with a wide, faint, dusty verge fading into the ground (wider than the road itself), and never quite solid, so the tile shows through. */
+const ROAD: Feather = [[1.7, 0.1], [1.4, 0.18], [1.15, 0.32], [0.95, 0.55], [0.8, 1]];
+const ROAD_ALPHA = 0.85;
 
 /** How strongly water is washed with the water colour: its hue (`color`), then a touch deeper (`multiply`). */
 export const WATER_WASH = { color: 0.5, deepen: 0.2 } as const;
@@ -98,7 +141,14 @@ function facing(a: Point, b: Point, side?: Point): [Point, Point] {
  * One band of texture from a to b, `width` pixels wide, centred on the line
  * (or, with `half`, only its top half), with soft sides and round ends.
  */
-function band(g: CanvasRenderingContext2D, tex: HTMLCanvasElement, a: Point, b: Point, width: number, { half = false, feather = MELT, alpha = 1 }: { half?: boolean; feather?: Feather; alpha?: number } = {}) {
+function band(
+  g: CanvasRenderingContext2D,
+  tex: HTMLCanvasElement,
+  a: Point,
+  b: Point,
+  width: number,
+  { half = false, feather = MELT, alpha = 1 }: { half?: boolean; feather?: Feather; alpha?: number } = {},
+) {
   const angle = Math.atan2(b[1] - a[1], b[0] - a[0]);
   const pattern = g.createPattern(tex, 'repeat');
   if (!pattern) return;
@@ -122,14 +172,14 @@ function band(g: CanvasRenderingContext2D, tex: HTMLCanvasElement, a: Point, b: 
 }
 
 /** A round patch of texture (a river's end pool), soft at its rim. */
-function pool(g: CanvasRenderingContext2D, tex: HTMLCanvasElement, at: Point, radius: number, feather: Feather = MELT) {
+function pool(g: CanvasRenderingContext2D, tex: HTMLCanvasElement, at: Point, radius: number, feather: Feather = MELT, alpha = 1) {
   const pattern = g.createPattern(tex, 'repeat');
   if (!pattern) return;
   pattern.setTransform(new DOMMatrix().translateSelf(at[0], at[1] - tex.height / 2));
   g.save();
   g.fillStyle = pattern;
   for (const [k, opacity] of feather) {
-    g.globalAlpha = opacity;
+    g.globalAlpha = opacity * alpha;
     g.beginPath();
     g.arc(at[0], at[1], radius * k, 0, Math.PI * 2);
     g.fill();
@@ -147,14 +197,43 @@ export function paintBorders(g: CanvasRenderingContext2D, borders: BorderPicture
 
   if (borders.road) {
     const tex = strip(borders.road, 0, 1, road);
-    for (const e of of('road')) band(g, tex, toPixel(e.a), toPixel(e.b), road, { alpha: ROAD_ALPHA });
+    const roads = of('road');
+    g.save();
+    // Roads stay out of the lakes (a round end at a lake's corner would poke into it).
+    if (borders.keepClear?.length) {
+      g.beginPath();
+      g.rect(0, 0, g.canvas.width, g.canvas.height);
+      for (const outline of borders.keepClear) {
+        outline.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y)));
+        g.closePath();
+      }
+      g.clip('evenodd');
+    }
+    for (const e of roads) band(g, tex, toPixel(e.a), toPixel(e.b), road, { alpha: ROAD_ALPHA, feather: ROAD });
+    // Where three roads meet, a soft patch of road over the joins, so they blend into one crossing.
+    const meets = new Map<string, { at: Point; n: number }>();
+    for (const e of roads)
+      for (const p of [toPixel(e.a), toPixel(e.b)]) {
+        const k = `${Math.round(p[0])},${Math.round(p[1])}`;
+        meets.set(k, { at: p, n: (meets.get(k)?.n ?? 0) + 1 });
+      }
+    for (const { at, n } of meets.values()) if (n >= 3) pool(g, tex, at, road * 0.85, ROAD, ROAD_ALPHA);
+    g.restore();
   }
   if (!borders.river) return;
   const img = borders.river;
   // The river picture's top strip (grass, then the bank's edge), mirrored to make both sides.
   const bankTex = strip(img, 0, 0.22, bank, true);
-  // The shore: a bank on the land side only, as where a river runs along a lake, so the lake's own water reaches it (owner's play-test: a band of the river's water framed every lake).
-  for (const e of of('shore')) band(g, bankTex, ...facing(toPixel(e.a), toPixel(e.b), toPixel(e.land!)), bank, { half: true });
+  // The shore: a bank on the land side, and shallows on the lake side fading from the bank's mud into the lake's own water (owner's play-tests: neither a band of water framing every lake nor a hard edge). Their colours come from the river picture: the bank's edge and its water.
+  const mud = averageColor(img, 0.16, 0.24);
+  const shallow = averageColor(img, 0.26, 0.45, borders.water);
+  for (const e of of('shore')) {
+    const [a, b, land] = [toPixel(e.a), toPixel(e.b), toPixel(e.land!)];
+    // The lake's middle: the land's, mirrored across the edge.
+    const lake: Point = [a[0] + b[0] - land[0], a[1] + b[1] - land[1]];
+    shallowsAlong(g, a, b, lake, bank * SHALLOWS_DEPTH, mud, shallow);
+    band(g, bankTex, ...facing(a, b, land), bank, { half: true });
+  }
 
   const rivers = of('river');
   const plainWater = strip(img, 0.3, 0.7, water);
@@ -171,4 +250,27 @@ export function paintBorders(g: CanvasRenderingContext2D, borders: BorderPicture
   for (const at of ends) pool(g, bankTex, at, (bank * 1.35) / 2);
   for (const [a, b] of spans) band(g, waterTex, a, b, water, { feather: WATER });
   for (const at of ends) pool(g, waterTex, at, (water * 1.45) / 2, WATER);
+
+  // Where a river reaches a lake's corner, its mouth: the river's water spreads into a soft pool, and shallows fan out into the lake (owner's play-test: it stopped against the lake like a pipe).
+  const lakes = borders.keepClear ?? [];
+  const lakeCorners = lakes.flat();
+  const mouths = spans.flat().filter((p) => lakeCorners.some((c) => Math.hypot(c[0] - p[0], c[1] - p[1]) < 2));
+  for (const at of mouths) pool(g, waterTex, at, water * 0.8, MELT);
+  if (mouths.length && lakes.length) {
+    g.save();
+    g.beginPath();
+    for (const outline of lakes) {
+      outline.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y)));
+      g.closePath();
+    }
+    g.clip();
+    for (const at of mouths) {
+      const fan = g.createRadialGradient(at[0], at[1], water * 0.3, at[0], at[1], water * 1.9);
+      fan.addColorStop(0, `rgb(${shallow} / 0.6)`);
+      fan.addColorStop(1, `rgb(${shallow} / 0)`);
+      g.fillStyle = fan;
+      g.fillRect(at[0] - water * 2, at[1] - water * 2, water * 4, water * 4);
+    }
+    g.restore();
+  }
 }

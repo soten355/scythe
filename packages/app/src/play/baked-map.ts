@@ -111,22 +111,14 @@ export async function bakeMap(hexes: BakeHex[], { maxSide = BAKE_MAX_SIDE, borde
   if (borders && (borders.road || borders.river)) {
     const [road, river] = await Promise.all([borders.road, borders.river].map((url) => (url ? loadImage(url) : Promise.resolve(undefined))));
     paint.setTransform(1, 0, 0, 1, 0, 0);
-    // Nothing is painted over a lake (a road's round end could poke into one): the lake's own water stays whole.
-    const lakes = hexes.filter((h) => h.water);
-    if (lakes.length) {
-      paint.beginPath();
-      paint.rect(0, 0, canvas.width, canvas.height);
-      for (const h of lakes) {
-        h.corners.forEach(([x, y], i) => {
-          const [px, py] = [(x - area.x) * scale, (y - area.y) * scale];
-          if (i) paint.lineTo(px, py);
-          else paint.moveTo(px, py);
-        });
-        paint.closePath();
-      }
-      paint.clip('evenodd');
-    }
-    paintBorders(paint, { edges: borders.edges, road, river, widths: borders.widths, water: borders.water }, ([x, y]) => [(x - area.x) * scale, (y - area.y) * scale], scale);
+    paintBorders(paint, {
+        edges: borders.edges,
+        road,
+        river,
+        widths: borders.widths,
+        water: borders.water,
+        keepClear: hexes.filter((h) => h.water).map((h) => h.corners.map(([x, y]) => [(x - area.x) * scale, (y - area.y) * scale] as Point)),
+      }, ([x, y]) => [(x - area.x) * scale, (y - area.y) * scale], scale);
   }
 
   const blob = await new Promise<Blob | null>((done) => canvas.toBlob(done, 'image/png'));
