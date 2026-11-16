@@ -3,8 +3,8 @@
 // their water, so the water runs on unbroken where edges meet), each a strip
 // of the skin's picture turned to run along its edge. The road picture is the
 // road; the river picture gives the water (its middle), the banks (its top
-// strip, mirrored to make both sides) and the shore (its top half: bank,
-// then water). Edges are softened by drawing each band a few times, a little
+// strip, mirrored to make both sides) and the shore (that bank, on the land
+// side only). Edges are softened by drawing each band a few times, a little
 // narrower each time; rounded ends make the bends and the pool where a river
 // stops. Roads are drawn a little see-through with wide soft edges, so the
 // tile shows through at their verges; river water (and lake hexes, in
@@ -151,14 +151,12 @@ export function paintBorders(g: CanvasRenderingContext2D, borders: BorderPicture
   }
   if (!borders.river) return;
   const img = borders.river;
-  // The shore: the river picture's top half (bank, then water), the bank on the land side.
-  // As wide as the road used to be (three quarters of a bank's width), however thin the road is now.
-  const shore = bank * 0.75;
-  const shoreTex = strip(img, 0, 0.55, shore);
-  for (const e of of('shore')) band(g, shoreTex, ...facing(toPixel(e.a), toPixel(e.b), toPixel(e.land!)), shore);
+  // The river picture's top strip (grass, then the bank's edge), mirrored to make both sides.
+  const bankTex = strip(img, 0, 0.22, bank, true);
+  // The shore: a bank on the land side only, as where a river runs along a lake, so the lake's own water reaches it (owner's play-test: a band of the river's water framed every lake).
+  for (const e of of('shore')) band(g, bankTex, ...facing(toPixel(e.a), toPixel(e.b), toPixel(e.land!)), bank, { half: true });
 
   const rivers = of('river');
-  const bankTex = strip(img, 0, 0.22, bank, true);
   const plainWater = strip(img, 0.3, 0.7, water);
   const waterTex = borders.water ? washed(plainWater, borders.water) : plainWater;
   const spans = rivers.map((e) => riverSpan(e).map(toPixel) as [Point, Point]);
