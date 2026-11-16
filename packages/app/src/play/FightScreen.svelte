@@ -51,17 +51,19 @@
 {#if battle || view}
   {@const hex = battle?.hex ?? view!.hex}
   {@const terrain = game.setup.board.hexes[hex]?.terrain ?? ''}
+  {@const where = `${TERRAIN[terrain] ?? terrain} · ${hex}`}
   <div class="fight" transition:fade={{ duration: 300 }}>
     <!-- Scenery to match the hex: forest, tundra, mountain, farm or the Factory. -->
     <FightBackdrop {terrain} />
 
     <header>
       {#if canUndo && !battle}<button class="undo" onclick={onUndo}>↶ Undo</button>{/if}
-      <p class="where">{TERRAIN[terrain] ?? terrain} · {hex}</p>
+      <!-- During the battle the scene shows it, under the winner's banner. -->
+      {#if !battle}<p class="where">{where}</p>{/if}
     </header>
 
     {#if battle}
-      {#key battle}<BattleScene {battle} onDone={onBattleDone} />{/key}
+      {#key battle}<BattleScene {battle} {where} onDone={onBattleDone} />{/key}
     {:else if view}
     {@const v = view}
 

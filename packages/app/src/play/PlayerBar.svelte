@@ -2,18 +2,36 @@
   // Top bar: the current player's coins, power, popularity, combat cards,
   // mechs, workers, territories controlled (the Factory counts three) and the
   // resources on hexes they control. Everyone else shrinks to
-  // their name (just its first letter with four or more players, so all fit on
-  // a phone); everyone's stars always show. They're listed in turn order,
+  // their name (just its first letter with four or more players, or on a
+  // phone, so all fit); everyone's stars always show. They're listed in turn order,
   // whoever went first leading. Tapping a player opens their dossier
   // (FactionDossier); each is at least 44 points wide and 34 tall, to be easy
   // to tap on the iPhone, and on a phone the resource line is left out so all
-  // fit without scrolling.
+  // fit without scrolling. Should they still not fit, the bar scrolls to show
+  // the current player in full each time the turn passes.
   import { controlledHexes, RESOURCES, territories, type GameState } from '@scythe/engine';
   import { cubicInOut } from 'svelte/easing';
   import { slide } from 'svelte/transition';
   import { inTurnOrder } from './seats';
 
   let { game, onOpen }: { game: GameState; onOpen?: (seat: number) => void } = $props();
+
+  let bar: HTMLDivElement | undefined = $state();
+  /** Scrolls the bar (only the bar) so the current player shows in full, centred if there's room. */
+  function showCurrent() {
+    const el = bar?.querySelector<HTMLElement>('.player.current');
+    if (!bar || !el) return;
+    const [b, e] = [bar.getBoundingClientRect(), el.getBoundingClientRect()];
+    const left = bar.scrollLeft + e.left - b.left - (bar.clientWidth - e.width) / 2;
+    bar.scrollTo({ left: Math.max(0, left), behavior: 'smooth' });
+  }
+  $effect(() => {
+    void game.currentPlayer;
+    // Once their details have opened (they slide open over 450ms), and right away too.
+    queueMicrotask(showCurrent);
+    const later = setTimeout(showCurrent, 480);
+    return () => clearTimeout(later);
+  });
 
   const STAR_NAMES: Record<string, string> = {
     upgrades: 'all upgrades', mechs: 'all mechs', structures: 'all structures', recruits: 'all recruits',
@@ -33,11 +51,18 @@
   );
 </script>
 
-<div class="bar">
+<div class="bar" bind:this={bar}>
   {#each rows as { p, seat, faction, totals } (seat)}
     {@const current = seat === game.currentPlayer}
     <button class="player" class:current style:--c={faction.color} data-player={seat} onclick={() => onOpen?.(seat)} aria-label="{faction.name}: see how they're doing">
-      <span class="name" title={faction.name}>{compact && !current ? faction.name[0] : faction.name}</span>
+      {#if current}
+        <span class="name" title={faction.name}>{faction.name}</span>
+      {:else if compact}
+        <span class="name" title={faction.name}>{faction.name[0]}</span>
+      {:else}
+        <!-- The full name, or on a phone just its first letter (see the styles). -->
+        <span class="name" title={faction.name}><span class="long">{faction.name}</span><span class="short">{faction.name[0]}</span></span>
+      {/if}
       <span class="stars" data-stars={seat} title={p.stars.length ? `Stars: ${p.stars.map((k) => STAR_NAMES[k]).join(', ')}` : 'No stars yet'}>⭐ {p.stars.length}</span>
       {#if current}
         <span class="details" transition:slide={{ axis: 'x', duration: 450, easing: cubicInOut }}>
@@ -115,8 +140,19 @@
       }
     }
   }
-  /* A phone: drop the resource line, so every player fits without scrolling (their screen shows it). */
-  @container screen (max-width: 760px) {
+  .short {
+    display: none;
+  }
+  /* A phone, held either way: others show only their first letter and the
+     resource line goes (their screen shows it), so the current player's whole
+     status fits. */
+  @container screen (max-width: 1000px) {
+    .long {
+      display: none;
+    }
+    .short {
+      display: inline;
+    }
     .details,
     .player {
       gap: 6px;

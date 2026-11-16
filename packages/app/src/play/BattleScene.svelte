@@ -4,13 +4,14 @@
   // it clears the winner is standing and the loser lies wrecked on the ground.
   // Only then is what each side played revealed (owner's request: no numbers
   // before the dust clears), with a big banner naming the winner. Tap to
-  // skip ahead; tap again (or Continue) to go back to the map.
+  // skip ahead; tap again (or Continue) to go back to the map. Where it's
+  // fought shows at the top, then under the winner's name in the banner.
   import { onMount } from 'svelte';
   import { lineup, type Battle } from './fight';
   import FighterArt from './FighterArt.svelte';
   import FactionPortrait from './FactionPortrait.svelte';
 
-  let { battle, onDone }: { battle: Battle; onDone: () => void } = $props();
+  let { battle, where, onDone }: { battle: Battle; /** Where it's fought: "Forest · F3". */ where: string; onDone: () => void } = $props();
 
   /** The scene's beats, in order, and when each starts (ms). */
   const BEATS = ['faceoff', 'charge', 'impact', 'aftermath', 'clearing', 'verdict'] as const;
@@ -96,9 +97,11 @@
         Victory · {battle.attacker.total} to {battle.defender.total}{battle.winner === 'attacker' && battle.attacker.total === battle.defender.total ? ', ties go to the attacker' : ''}
       </p>
       <p class="who">{winner.name} wins!</p>
+      <p class="where">{where}</p>
     </div>
     <button class="go" onclick={(e) => (e.stopPropagation(), onDone())}>Continue</button>
   {:else}
+    <p class="where top">{where}</p>
     <p class="skip">Tap to skip</p>
   {/if}
 </div>
@@ -404,6 +407,27 @@
   }
   @keyframes slam {
     from { opacity: 0; transform: scale(2.4); }
+  }
+  /* Where it's fought: a pill at the top during the fight, then a quiet line under the winner's name. */
+  .where {
+    margin: 4px 0 0;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-size: 12px;
+    opacity: 0.85;
+  }
+  .where.top {
+    position: absolute;
+    top: calc(var(--safe-top) + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    margin: 0;
+    padding: 3px 14px;
+    border-radius: 20px;
+    background: rgb(0 0 0 / 0.45);
+    white-space: nowrap;
+    opacity: 1;
+    z-index: 5;
   }
   /* Continue sits at the bottom, between the two tallies. */
   .go {

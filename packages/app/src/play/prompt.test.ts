@@ -440,13 +440,13 @@ describe('trading', () => {
 
 describe('combat', () => {
   // Nordic's character leaves home for A4, where Rusviet's character stands.
-  const fight = () => {
+  const fight = (nordic: Partial<GameState['players'][number]> = {}) => {
     const state = start();
     const [n, r] = state.players;
     const ready: GameState = {
       ...state,
       players: [
-        { ...n!, workers: ['A5', 'A5'], power: 4, combatCards: [2, 5] },
+        { ...n!, workers: ['A5', 'A5'], power: 4, combatCards: [2, 5], ...nordic },
         { ...r!, character: 'A4', power: 3, combatCards: [3, 3] },
       ],
     };
@@ -490,6 +490,25 @@ describe('combat', () => {
     const after = play(state, ...p.buttons.find((b) => b.primary)!.actions!);
     expect(activeSeat(after)).toBe(1);
     expect(combatPrompt(after).combat?.role).toBe('defend');
+  });
+
+  it('can lock in power alone with no cards in hand', () => {
+    const ready = fight();
+    const state: GameState = { ...ready, players: [{ ...ready.players[0]!, combatCards: [] }, ready.players[1]!] };
+    let p = combatPrompt(state);
+    expect(p.combat!.hand).toEqual([]);
+    p = combatPrompt(state, p.combat!.powers[2]!.select);
+    const lock = p.buttons.find((b) => b.primary)!;
+    expect(lock.label).toBe('Lock in 2');
+    const after = play(state, ...lock.actions!);
+    expect(combatPrompt(after).combat?.role).toBe('defend');
+  });
+
+  it('with no power and no cards, is never asked: locked in at 0, on to the defender', () => {
+    // Set before the fight starts, as the skip happens when it does.
+    const state = fight({ power: 0, combatCards: [] });
+    expect(activeSeat(state)).toBe(1);
+    expect(combatPrompt(state).combat?.role).toBe('defend');
   });
 
   it('then asks the defender, with their own cards', () => {
