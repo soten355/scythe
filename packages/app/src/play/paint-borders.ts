@@ -204,7 +204,17 @@ function pool(g: CanvasRenderingContext2D, tex: HTMLCanvasElement, at: Point, ra
  * own, then faded with a gradient, so one side can stay solid while the
  * other melts away.
  */
-function fadedBand(g: CanvasRenderingContext2D, tex: HTMLCanvasElement, a: Point, b: Point, width: number, offset: number, fade: [number, number][]) {
+function fadedBand(
+  g: CanvasRenderingContext2D,
+  tex: HTMLCanvasElement,
+  a: Point,
+  b: Point,
+  width: number,
+  offset: number,
+  fade: [number, number][],
+  /** Fade out over this many pixels toward a and/or b (where it meets a river), rather than ending square. */
+  ends: { a?: number; b?: number } = {},
+) {
   const angle = Math.atan2(b[1] - a[1], b[0] - a[0]);
   // Toward the band's top.
   const n: Point = [Math.sin(angle), -Math.cos(angle)];
@@ -226,6 +236,16 @@ function fadedBand(g: CanvasRenderingContext2D, tex: HTMLCanvasElement, a: Point
   for (const [at, strength] of fade) gradient.addColorStop(at, `rgb(0 0 0 / ${strength})`);
   o.fillStyle = gradient;
   o.fillRect(0, 0, c.width, c.height);
+  if (ends.a || ends.b) {
+    const len = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+    const along = o.createLinearGradient(a[0] - x0, a[1] - y0, b[0] - x0, b[1] - y0);
+    along.addColorStop(0, `rgb(0 0 0 / ${ends.a ? 0 : 1})`);
+    if (ends.a) along.addColorStop(Math.min(0.45, ends.a / len), 'rgb(0 0 0 / 1)');
+    if (ends.b) along.addColorStop(Math.max(0.55, 1 - ends.b / len), 'rgb(0 0 0 / 1)');
+    along.addColorStop(1, `rgb(0 0 0 / ${ends.b ? 0 : 1})`);
+    o.fillStyle = along;
+    o.fillRect(0, 0, c.width, c.height);
+  }
   g.drawImage(c, x0, y0);
 }
 
@@ -313,6 +333,8 @@ export function paintBorders(g: CanvasRenderingContext2D, borders: BorderPicture
     const top = Math.round(shoreTex.height * (SHORE_EDGE / SHORE_ROWS));
     washWater(sg, borders.water, 0, top, shoreTex.width, shoreTex.height - top);
   }
+  // The corners the rivers reach.
+  const riverEnds = of('river').flatMap((e) => riverSpan(e).map(toPixel));
   for (const e of of('shore')) {
     const [a, b, land] = [toPixel(e.a), toPixel(e.b), toPixel(e.land!)];
     // The lake's middle: the land's, mirrored across the edge.
@@ -320,12 +342,19 @@ export function paintBorders(g: CanvasRenderingContext2D, borders: BorderPicture
     shallowsAlong(g, a, b, lake, bank * SHALLOWS_DEPTH, mud, shallow);
     // Land on the strip's top, moved toward the lake so most of it lies on the lake: a thin fade on the land side, then reeds standing in the shallows and the bank's mud, then its water fading out fast, so it never frames the lake.
     const width = bank * SHORE_WIDTH;
-    fadedBand(g, shoreTex, ...facing(a, b, land), width, -width * (0.5 - SHORE_LINE), SHORE_FADE);
+    const [p, q] = facing(a, b, land);
+    // Where it meets a river at a corner, it fades out into the river rather than ending square (owner's play-test).
+    const meetsRiver = (at: Point) => riverEnds.some((r) => Math.hypot(r[0] - at[0], r[1] - at[1]) < 2);
+    const fadeLength = bank * 0.6;
+    fadedBand(g, shoreTex, p, q, width, -width * (0.5 - SHORE_LINE), SHORE_FADE, { a: meetsRiver(p) ? fadeLength : 0, b: meetsRiver(q) ? fadeLength : 0 });
   }
 
   const rivers = of('river');
   const plainWater = strip(img, 0.3, 0.7, water);
   const waterTex = borders.water ? washed(plainWater, borders.water) : plainWater;
+  // The water's middle only (no edges), for the patches over joins.
+  const plainSurface = strip(img, 0.4, 0.6, water);
+  const waterSurface = borders.water ? washed(plainSurface, borders.water) : plainSurface;
   const spans = rivers.map((e) => riverSpan(e).map(toPixel) as [Point, Point]);
   // Banks: both sides, or only the land side where a lake is alongside (the water opens into the lake).
   rivers.forEach((e, i) => {
@@ -336,8 +365,17 @@ export function paintBorders(g: CanvasRenderingContext2D, borders: BorderPicture
   // Where a river stops among land, a round pool ringed by bank.
   const ends = rivers.flatMap((e, i) => [...(e.endA ? [spans[i]![0]] : []), ...(e.endB ? [spans[i]![1]] : [])]);
   for (const at of ends) pool(g, bankTex, at, (bank * 1.35) / 2);
+  // Where two or more stretches of river meet (a bend, a fork, or along a lake), soft patches over the joins, so they flow on as one river (owner's play-test, as for the roads: each stretch's picture runs its own way and met the next in a hard cut): bank under the water, then a little water over it.
+  const joins = new Map<string, { at: Point; n: number }>();
+  for (const p of spans.flat()) {
+    const k = `${Math.round(p[0])},${Math.round(p[1])}`;
+    joins.set(k, { at: p, n: (joins.get(k)?.n ?? 0) + 1 });
+  }
+  const joined = [...joins.values()].filter((j) => j.n >= 2).map((j) => j.at);
+  for (const at of joined) pool(g, bankTex, at, bank * 0.42, MELT, 0.8);
   for (const [a, b] of spans) band(g, waterTex, a, b, water, { feather: WATER });
   for (const at of ends) pool(g, waterTex, at, (water * 1.45) / 2, WATER);
+  for (const at of joined) pool(g, waterSurface, at, water * 0.5, MELT, 0.85);
 
   // Where a river reaches a lake's corner, its mouth: the river's water runs
   // on into the lake, fading smoothly to nothing, over shallows fanning out
@@ -346,7 +384,8 @@ export function paintBorders(g: CanvasRenderingContext2D, borders: BorderPicture
   const lakes = borders.keepClear ?? [];
   const lakeCorners = lakes.flat();
   const atLake = (p: Point) => lakeCorners.some((c) => Math.hypot(c[0] - p[0], c[1] - p[1]) < 2);
-  const mouths = spans.flatMap(([a, b]) => [...(atLake(b) ? [[a, b]] : []), ...(atLake(a) ? [[b, a]] : [])] as [Point, Point][]);
+  // Only a river between two land hexes flows into a lake; one running along a lake's edge is open to it all along (owner's play-test: its water shot on past the corner).
+  const mouths = spans.flatMap(([a, b], i) => (rivers[i]!.land ? [] : ([...(atLake(b) ? [[a, b]] : []), ...(atLake(a) ? [[b, a]] : [])] as [Point, Point][])));
   const reach = water * 2.4;
   if (mouths.length) {
     // The shallows' fan, kept inside the lake (a soft gradient, so no hard edge).
