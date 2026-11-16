@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "sim": "tsx src/simulate.ts",
-    "board-preview": "tsx src/board-preview.ts"
+    "board-preview": "tsx src/board-preview.ts",
+    "screenshots": "tsx src/screenshots.ts"
   },
   "dependencies": {
     "@scythe/engine": "*",
