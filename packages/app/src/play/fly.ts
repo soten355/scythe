@@ -3,6 +3,8 @@
 import { frameRect, gameFrame } from './frame';
 import type { Icon } from './icons';
 import { inkOn } from './ink';
+import type { Resource } from '@scythe/engine';
+import { goods, MAX_SHOWN, structureParts, type Part } from './build-art';
 import { MECH_PARTS } from './shapes';
 
 /** An icon (see icons.ts) as a standalone element. */
@@ -18,10 +20,12 @@ function iconElement(icon: Icon): HTMLElement {
   return span;
 }
 
-/** A big moment: an icon (with a smaller one under it, say a recruit's bonus), or a mech being put together. */
+/** A big moment: an icon (with a smaller one under it, say a recruit's bonus), a mech or a structure being put together, or a hex's goods being produced and stacked. */
 export type Moment =
   | { icon: Icon; below?: Icon; target: string; sides?: Side[] }
-  | { mech: { color: string; initial: string }; target: string };
+  | { mech: { color: string; initial: string }; target: string }
+  | { structure: { color: string }; target: string }
+  | { produce: { what: Resource | 'worker'; amount: number; color: string }; target: string };
 
 /**
  * A smaller gain beside the icon (a recruit's one-time bonus: "+2 ⚡"; an
@@ -60,6 +64,55 @@ function mechElement(color: string, initial: string): { el: SVGSVGElement; parts
   return { el, parts: [parts[0]!, parts[1]!, parts[2]!, label] };
 }
 
+/** A drawn part (see build-art.ts) as an SVG group. */
+function partElement(part: Part, at: [number, number] = [0, 0]): SVGGElement {
+  const g = document.createElementNS(SVG, 'g');
+  const place = document.createElementNS(SVG, 'g');
+  place.setAttribute('transform', `translate(${at[0]} ${at[1]})${part.scale ? ` scale(${part.scale})` : ''}`);
+  const path = document.createElementNS(SVG, 'path');
+  Object.entries({ d: part.d, fill: part.fill, stroke: '#1e1a16', 'stroke-width': String(0.6 / (part.scale ?? 1)), 'stroke-linejoin': 'round' }).forEach(([k, v]) => path.setAttribute(k, v));
+  place.append(path);
+  if (part.lines) {
+    const lines = document.createElementNS(SVG, 'path');
+    Object.entries({ d: part.lines.d, fill: 'none', stroke: part.lines.stroke, 'stroke-width': '0.45', 'stroke-linecap': 'round' }).forEach(([k, v]) => lines.setAttribute(k, v));
+    place.append(lines);
+  }
+  // The outer group is the one that drops in (its own transform stays free for that).
+  g.append(place);
+  return g;
+}
+
+/** A big drawing in the mech's box, holding `parts` (each its own group). */
+function drawing(parts: SVGElement[]): SVGSVGElement {
+  const el = document.createElementNS(SVG, 'svg');
+  el.setAttribute('viewBox', '-9 -8 18 16');
+  Object.assign(el.style, { width: '1.4em', height: '1.25em', overflow: 'visible' });
+  el.append(...parts);
+  return el;
+}
+
+/** A structure drawn big, its parts (footing, walls, roof, chimney, door) separate so it can go up one by one. */
+function structureElement(color: string): { el: SVGSVGElement; parts: SVGElement[] } {
+  const parts = structureParts(color).map((p) => partElement(p));
+  return { el: drawing(parts), parts };
+}
+
+/** A hex's goods drawn big, each separate so they can be stacked one by one; past MAX_SHOWN, a count goes on last. */
+function goodsElement(what: Resource | 'worker', amount: number, color: string): { el: SVGSVGElement; parts: SVGElement[] } {
+  const parts: SVGElement[] = goods(what, amount, color).map(({ at, parts: [first, ...rest] }) => {
+    const g = partElement(first!, at);
+    for (const p of rest) g.append(...partElement(p, at).childNodes);
+    return g;
+  });
+  if (amount > MAX_SHOWN) {
+    const count = document.createElementNS(SVG, 'text');
+    Object.entries({ x: '8.5', y: '-3', 'font-size': '4.5', 'font-weight': '700', 'text-anchor': 'start', fill: '#fff', stroke: '#1e1a16', 'stroke-width': '0.4', 'paint-order': 'stroke' }).forEach(([k, v]) => count.setAttribute(k, v));
+    count.textContent = `×${amount}`;
+    parts.push(count);
+  }
+  return { el: drawing(parts), parts };
+}
+
 /**
  * A big moment (a recruit placed, a star earned, a mech deployed): a large
  * icon fades in over the middle of `over`, settles as if pinned there and
@@ -71,7 +124,16 @@ export async function showMoment(moment: Moment, over: Element): Promise<void> {
   const target = document.querySelector(moment.target);
   if ('mech' in moment) {
     const { el, parts } = mechElement(moment.mech.color, moment.mech.initial);
-    return pin(el, over, target, parts);
+    return pin(el, over, target, { parts, labelLast: true });
+  }
+  if ('structure' in moment) {
+    const { el, parts } = structureElement(moment.structure.color);
+    return pin(el, over, target, { parts, labelLast: true });
+  }
+  if ('produce' in moment) {
+    const { what, amount, color } = moment.produce;
+    const { el, parts } = goodsElement(what, amount, color);
+    return pin(el, over, target, { parts, labelLast: amount > MAX_SHOWN, quick: true });
   }
   const main = pin(moment.below ? stacked(moment.icon, moment.below) : iconElement(moment.icon), over, target);
   if (!moment.sides?.length) return main;
@@ -98,8 +160,15 @@ const isShown = (el: Element | null) => {
 };
 const onScreen = (selectors: string[]) => selectors.map((s) => document.querySelector(s)).find(isShown) ?? null;
 
+/**
+ * Put together part by part (`build`): each drops into place, the last one
+ * just appearing when `labelLast` (a mech's letter, a structure's door, a
+ * count); `quick` for goods, which stack faster.
+ */
+type Build = { parts: Element[]; labelLast?: boolean; quick?: boolean };
+
 /** `right`, `down`: how far right of and below the middle to pin it, in the big icon's size. */
-async function pin(el: Element, over: Element, target: Element | null, parts?: Element[], right = 0, down = 0): Promise<void> {
+async function pin(el: Element, over: Element, target: Element | null, build?: Build, right = 0, down = 0): Promise<void> {
   const box = frameRect(over);
   const size = Math.min(110, box.height * 0.35);
   const [cx, cy] = [box.left + box.width / 2 + right * size, box.top + box.height / 2 + down * size];
@@ -125,20 +194,21 @@ async function pin(el: Element, over: Element, target: Element | null, parts?: E
   // The piece on the map waits under the big one until it lands.
   if (onMap) target.style.visibility = 'hidden';
 
-  if (parts) {
-    // Put together: each part drops into place with a little clunk, then the whole mech settles.
+  if (build) {
+    const { parts, labelLast, quick } = build;
+    // Put together: each part drops into place with a little clunk, then the whole thing settles.
     await el.animate([{ transform: at(0, 0, 1), opacity: 0 }, { transform: at(0, 0, 1), opacity: 1 }], { duration: 150, fill: 'forwards' }).finished;
     for (const p of parts) p.setAttribute('opacity', '0');
     for (const [i, p] of parts.entries()) {
       p.removeAttribute('opacity');
-      if (i === parts.length - 1) continue; // the label just appears
+      if (labelLast && i === parts.length - 1) continue; // the label just appears
       await p.animate(
         [
           { transform: 'translateY(-5px)', opacity: 0 },
           { transform: 'translateY(0.4px)', opacity: 1, offset: 0.75 },
           { transform: 'translateY(0)', opacity: 1 },
         ],
-        { duration: 300, easing: 'ease-in' },
+        { duration: quick ? 220 : 300, easing: 'ease-in' },
       ).finished;
     }
     await el.animate([{ transform: at(0, 0, 1) }, { transform: at(0, 0, 1.08) }, { transform: at(0, 0, 1) }], { duration: 220, fill: 'forwards' }).finished;

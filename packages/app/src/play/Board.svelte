@@ -528,8 +528,9 @@
     {@render pieceArt(url, g.color, x, y, kind === 'character' || kind === 'mechs')}
   {/if}
   {#if kind === 'structure'}
+    <!-- Kept (unseen under a picture): a newly built structure flies to it. -->
+    <rect x={x - 6} y={y - 6} width="12" height="12" fill={g.color} class="structure" class:light={isLight(g.color)} class:ghost={url} data-structure="{g.seat}|{at}" />
     {#if !url}
-      <rect x={x - 6} y={y - 6} width="12" height="12" fill={g.color} class="structure" class:light={isLight(g.color)} />
       <text {x} y={y + 2} class="piece-text small" class:dark={isLight(g.color)}>{STRUCTURE_LETTER[g.structure!]}</text>
     {/if}
   {:else if kind === 'character'}

@@ -6,7 +6,7 @@
   // moves one at a time; while they do, their cards, objectives and choices
   // stay hidden and the controls are off.
   import { onDestroy } from 'svelte';
-  import { activeSeat, applyAction, isGameOver, legalActions, playerView, structureBonusTile, type Action, type CombatResult, type GameState, type Location } from '@scythe/engine';
+  import { activeSeat, applyAction, isGameOver, legalActions, playerView, RESOURCES, structureBonusTile, type Action, type CombatResult, type GameState, type Location } from '@scythe/engine';
   import Board from './Board.svelte';
   import MatDrawer from './MatDrawer.svelte';
   import PlayerBar from './PlayerBar.svelte';
@@ -229,7 +229,21 @@
         });
       }
       if (a.type === 'deploy') added.push({ mech: { color: faction.color, initial: faction.name[0]! }, target: `[data-mech="${before.currentPlayer}|${a.hex}"]` });
+      if (a.type === 'build') added.push({ structure: { color: faction.color }, target: `[data-structure="${before.currentPlayer}|${a.hex}"]` });
     }
+    // Produced goods: stacked one by one, then shrunk onto the hex's pile (or its workers).
+    actions.forEach((a, i) => {
+      if (a.type !== 'produce') return;
+      const [was, now] = [states[i]!, states[i + 1]!];
+      const seat = was.currentPlayer;
+      const workers = (s: GameState) => s.players[seat]!.workers.filter((w) => w === a.hex).length;
+      const newWorkers = workers(now) - workers(was);
+      if (newWorkers > 0) added.push({ produce: { what: 'worker', amount: newWorkers, color: faction.color }, target: `[data-spot="worker|${a.hex}"]` });
+      for (const r of RESOURCES) {
+        const n = (now.resources[a.hex]?.[r] ?? 0) - (was.resources[a.hex]?.[r] ?? 0);
+        if (n > 0) added.push({ produce: { what: r, amount: n, color: faction.color }, target: `[data-spot="pile|${a.hex}|${r}"]` });
+      }
+    });
     // An encounter option (or a resource of your choice): what it gave flies to the top bar.
     if (actions.some((a) => a.type === 'encounterOption' || a.type === 'encounterResource')) {
       const seat = before.currentPlayer;
