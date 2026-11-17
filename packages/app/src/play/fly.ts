@@ -182,7 +182,11 @@ async function pin(el: Element, over: Element, target: Element | null, build?: B
     zIndex: '50',
     pointerEvents: 'none',
     filter: 'drop-shadow(0 6px 12px rgb(0 0 0 / 0.5))',
+    // Unseen until its animation starts (owner's play-test: the finished mech flashed up before being put together).
+    opacity: '0',
   });
+  // Its parts hidden before it's ever on screen, so they can appear one by one.
+  if (build) for (const p of build.parts) p.setAttribute('opacity', '0');
   (gameFrame() ?? document.body).append(el);
   // A target that isn't on screen (a closed drawer, say): just fade out in place.
   const to = target ? frameRect(target) : undefined;
@@ -199,7 +203,6 @@ async function pin(el: Element, over: Element, target: Element | null, build?: B
     const { parts, labelLast, quick } = build;
     // Put together: each part drops into place with a little clunk, then the whole thing settles.
     await el.animate([{ transform: at(0, 0, 1), opacity: 0 }, { transform: at(0, 0, 1), opacity: 1 }], { duration: 150, fill: 'forwards' }).finished;
-    for (const p of parts) p.setAttribute('opacity', '0');
     for (const [i, p] of parts.entries()) {
       p.removeAttribute('opacity');
       if (labelLast && i === parts.length - 1) continue; // the label just appears
