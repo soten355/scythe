@@ -1,7 +1,7 @@
 import { baseBoard, baseFactions, baseMats, sampleEncounters } from '@scythe/content';
 import { applyAction, legalActions, newGame, type GameState } from '@scythe/engine';
 import { describe, expect, it } from 'vitest';
-import { gainsBetween, recruitPayoutsIn } from './gains';
+import { gainsBetween, placedGoods, recruitPayoutsIn } from './gains';
 
 // Nordic at an encounter on A4 with sample-02: free: 2 power; 2 coins: 2 workers on A4.
 const atEncounter = (card: string) => {
@@ -28,6 +28,21 @@ describe('what an encounter gave', () => {
   it('includes resources put on the hex', () => {
     const before = atEncounter('sample-01');
     expect(gainsBetween(before, applyAction(before, { type: 'encounterOption', option: 0 }), 0)).toEqual([{ kind: 'food', amount: 2 }]);
+  });
+});
+
+describe('goods put on the map', () => {
+  it('finds resources and workers an encounter put on its hex', () => {
+    const before = atEncounter('sample-01');
+    expect(placedGoods(before, applyAction(before, { type: 'encounterOption', option: 0 }), 0)).toEqual([{ hex: 'A4', what: 'food', amount: 2 }]);
+    const paying = atEncounter('sample-02');
+    expect(placedGoods(paying, applyAction(paying, { type: 'encounterOption', option: 1 }), 0)).toEqual([{ hex: 'A4', what: 'worker', amount: 2 }]);
+  });
+
+  it('ignores goods only carried from one hex to another', () => {
+    const before = { ...atEncounter('sample-01'), resources: { A1: { wood: 2 } } } as GameState;
+    const after = { ...before, resources: { A1: {}, A2: { wood: 2 } } } as GameState;
+    expect(placedGoods(before, after, 0)).toEqual([]);
   });
 });
 

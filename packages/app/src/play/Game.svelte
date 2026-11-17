@@ -25,7 +25,7 @@
   import { showMoment, type Moment } from './fly';
   import { inkOn } from './ink';
   import { BONUS_ICONS, ENCOUNTER_CARD_ICON, RECRUIT_ICON, RESOURCE_ICONS, STAR_ICON, STAR_KIND_ICONS, type Icon } from './icons';
-  import { gainsBetween, recruitPayoutsIn, type GainKind } from './gains';
+  import { gainsBetween, placedGoods, recruitPayoutsIn, type GainKind } from './gains';
   import { buildPrompt, combatSummary, sectionHeadings, type Button, type Prompt, type RowStatus, type Selection } from './prompt';
   import { canSwitchSection, phase, previousSection, sectionChoices } from './turn';
   import { botPause } from './settings';
@@ -231,23 +231,18 @@
       if (a.type === 'deploy') added.push({ mech: { color: faction.color, initial: faction.name[0]! }, target: `[data-mech="${before.currentPlayer}|${a.hex}"]` });
       if (a.type === 'build') added.push({ structure: { color: faction.color }, target: `[data-structure="${before.currentPlayer}|${a.hex}"]` });
     }
-    // Produced goods: stacked one by one, then shrunk onto the hex's pile (or its workers).
-    actions.forEach((a, i) => {
-      if (a.type !== 'produce') return;
-      const [was, now] = [states[i]!, states[i + 1]!];
-      const seat = was.currentPlayer;
-      const workers = (s: GameState) => s.players[seat]!.workers.filter((w) => w === a.hex).length;
-      const newWorkers = workers(now) - workers(was);
-      if (newWorkers > 0) added.push({ produce: { what: 'worker', amount: newWorkers, color: faction.color }, target: `[data-spot="worker|${a.hex}"]` });
-      for (const r of RESOURCES) {
-        const n = (now.resources[a.hex]?.[r] ?? 0) - (was.resources[a.hex]?.[r] ?? 0);
-        if (n > 0) added.push({ produce: { what: r, amount: n, color: faction.color }, target: `[data-spot="pile|${a.hex}|${r}"]` });
-      }
-    });
+    // Goods put on the map (produced, or gained from an encounter or a Factory card): stacked one by one over the map, then shrunk onto the hex's pile (or its workers), after anything else this step shows.
+    const placed: Moment[] = actions.flatMap((_, i) =>
+      placedGoods(states[i]!, states[i + 1]!, states[i]!.currentPlayer).map(({ hex, what, amount }) => ({
+        produce: { what, amount, color: faction.color },
+        target: what === 'worker' ? `[data-spot="worker|${hex}"]` : `[data-spot="pile|${hex}|${what}"]`,
+      })),
+    );
     // An encounter option (or a resource of your choice): what it gave flies to the top bar.
     if (actions.some((a) => a.type === 'encounterOption' || a.type === 'encounterResource')) {
       const seat = before.currentPlayer;
-      const gains = gainsBetween(before, next, seat);
+      // Resources and workers go onto the map instead (see `placed`).
+      const gains = gainsBetween(before, next, seat).filter((g) => g.kind !== 'worker' && !(RESOURCES as string[]).includes(g.kind));
       if (gains.length) {
         added.push({
           icon: ENCOUNTER_CARD_ICON,
@@ -273,6 +268,7 @@
     next.players.forEach((p, seat) => {
       for (const kind of p.stars.slice(before.players[seat]!.stars.length)) added.push({ icon: STAR_ICON, below: STAR_KIND_ICONS[kind], target: `[data-stars="${seat}"]` });
     });
+    added.push(...placed);
     if (added.length && !unseen) moments = [...moments, ...added];
     selection = {};
     const nextSeat = activeSeat(next);
