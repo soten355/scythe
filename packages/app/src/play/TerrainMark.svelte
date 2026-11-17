@@ -26,9 +26,10 @@
     <!-- Two peaks. -->
     <path d="M-7.5 5.5L-2 -5L1.2 1L3 -1.8L7.5 5.5Z" class="solid" />
   {:else if terrain === 'tundra'}
-    <!-- An oil barrel: bulging sides, with hoops. -->
-    <path d="M-3.9 -6.4H3.9Q5.4 0 3.9 6.4H-3.9Q-5.4 0 -3.9 -6.4Z" class="solid" />
-    <path d="M-4.5 -2.6H4.5M-4.5 2.6H4.5" class="cut" />
+    <!-- An oil barrel: a straight cylinder seen a little from above (its rim showing), with hoops. -->
+    <path d="M-4.2 -5V5A4.2 1.5 0 0 0 4.2 5V-5A4.2 1.5 0 0 0 -4.2 -5Z" class="solid" />
+    <path d="M-4.2 -5A4.2 1.5 0 0 0 4.2 -5A4.2 1.5 0 0 0 -4.2 -5" class="cut" />
+    <path d="M-4.2 -0.6A4.2 1.5 0 0 0 4.2 -0.6M-4.2 3A4.2 1.5 0 0 0 4.2 3" class="cut thin" />
   {:else if terrain === 'village'}
     <!-- A meeple: the village's people. -->
     <circle cx="0" cy="-4.6" r="2.4" class="solid-fill" />
@@ -65,6 +66,9 @@
   path.cut {
     stroke: rgb(22 18 14 / 0.9);
     stroke-width: 1.3;
+  }
+  path.cut.thin {
+    stroke-width: 0.8;
   }
   .solid-fill {
     fill: #fff;

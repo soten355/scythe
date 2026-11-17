@@ -42,9 +42,15 @@ const ITEMS: Record<Resource | 'worker', (color: string) => Item> = {
     w: 5.4,
     h: 2.5,
   }),
-  // A barrel standing up, with hoops.
+  // A barrel standing up: a straight cylinder, its rim showing, with hoops.
   oil: () => ({
-    parts: [{ d: 'M-1.6 -2.3H1.6Q2.2 0 1.6 2.3H-1.6Q-2.2 0 -1.6 -2.3Z', fill: '#2c2c2c', lines: { d: 'M-1.95 -1.1H1.95M-1.95 1.1H1.95M-0.9 -1.8V1.8', stroke: '#8d8d8d' } }],
+    parts: [
+      {
+        d: 'M-1.8 -1.7V1.7A1.8 0.6 0 0 0 1.8 1.7V-1.7A1.8 0.6 0 0 0 -1.8 -1.7Z',
+        fill: '#2c2c2c',
+        lines: { d: 'M-1.8 -1.7A1.8 0.6 0 0 0 1.8 -1.7A1.8 0.6 0 0 0 -1.8 -1.7M-1.8 0A1.8 0.6 0 0 0 1.8 0M-1.8 1.3A1.8 0.6 0 0 0 1.8 1.3', stroke: '#8d8d8d' },
+      },
+    ],
     w: 4.1,
     h: 4.6,
   }),

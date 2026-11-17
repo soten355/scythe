@@ -170,7 +170,8 @@ type Build = { parts: Element[]; labelLast?: boolean; quick?: boolean };
 /** `right`, `down`: how far right of and below the middle to pin it, in the big icon's size. */
 async function pin(el: Element, over: Element, target: Element | null, build?: Build, right = 0, down = 0): Promise<void> {
   const box = frameRect(over);
-  const size = Math.min(110, box.height * 0.35);
+  // Things being put together (a mech, a structure, goods) grow with the screen: about as on a phone there, much bigger on a desktop (owner's play-test: too small on the Mac).
+  const size = build ? Math.max(90, Math.min(box.height * 0.34, box.width * 0.22)) : Math.min(110, box.height * 0.35);
   const [cx, cy] = [box.left + box.width / 2 + right * size, box.top + box.height / 2 + down * size];
   Object.assign((el as HTMLElement).style, {
     position: 'fixed',
