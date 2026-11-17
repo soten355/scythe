@@ -212,8 +212,8 @@ function fadedBand(
   width: number,
   offset: number,
   fade: [number, number][],
-  /** Fade out over this many pixels toward a and/or b (where it meets a river), rather than ending square; the band's own soft sides and ends. */
-  ends: { a?: number; b?: number; feather?: Feather; cap?: CanvasLineCap } = {},
+  /** Fade out over this many pixels toward a and/or b (where it meets a river), rather than ending square. */
+  ends: { a?: number; b?: number } = {},
 ) {
   const angle = Math.atan2(b[1] - a[1], b[0] - a[0]);
   // Toward the band's top.
@@ -226,7 +226,7 @@ function fadedBand(
   const o = c.getContext('2d')!;
   o.translate(-x0, -y0);
   // Square ends: a round one would spill past the corner (onto a road there).
-  band(o, tex, a, b, width, { feather: ends.feather ?? [[1, 1]], offset, cap: ends.cap ?? 'butt' });
+  band(o, tex, a, b, width, { feather: [[1, 1]], offset, cap: 'butt' });
   o.setTransform(1, 0, 0, 1, 0, 0);
   o.globalCompositeOperation = 'destination-in';
   const mid: Point = [(a[0] + b[0]) / 2 - x0, (a[1] + b[1]) / 2 - y0];
@@ -333,16 +333,8 @@ export function paintBorders(g: CanvasRenderingContext2D, borders: BorderPicture
     const top = Math.round(shoreTex.height * (SHORE_EDGE / SHORE_ROWS));
     washWater(sg, borders.water, 0, top, shoreTex.width, shoreTex.height - top);
   }
-  const rivers = of('river');
-  const spans = rivers.map((e) => riverSpan(e).map(toPixel) as [Point, Point]);
   // The corners the rivers reach.
-  const riverEnds = spans.flat();
-  // Where a river reaches a lake's corner, its mouth (only a river between two land hexes flows into a lake; one running along a lake's edge is open to it all along: owner's play-test, its water shot on past the corner).
-  const lakes = borders.keepClear ?? [];
-  const lakeCorners = lakes.flat();
-  const atLake = (p: Point) => lakeCorners.some((c) => Math.hypot(c[0] - p[0], c[1] - p[1]) < 2);
-  const mouths = spans.flatMap(([a, b], i) => (rivers[i]!.land ? [] : ([...(atLake(b) ? [[a, b]] : []), ...(atLake(a) ? [[b, a]] : [])] as [Point, Point][])));
-  const mouthCorners = mouths.map(([, at]) => at);
+  const riverEnds = of('river').flatMap((e) => riverSpan(e).map(toPixel));
   for (const e of of('shore')) {
     const [a, b, land] = [toPixel(e.a), toPixel(e.b), toPixel(e.land!)];
     // The lake's middle: the land's, mirrored across the edge.
@@ -352,24 +344,22 @@ export function paintBorders(g: CanvasRenderingContext2D, borders: BorderPicture
     const width = bank * SHORE_WIDTH;
     const [p, q] = facing(a, b, land);
     // Where it meets a river at a corner, it fades out into the river rather than ending square (owner's play-test).
-    // At a river's mouth it fades over a longer stretch, so its mud and reeds come out of the river's gradually (owner's play-test: the seams showed there).
     const meetsRiver = (at: Point) => riverEnds.some((r) => Math.hypot(r[0] - at[0], r[1] - at[1]) < 2);
-    const fadeAt = (at: Point) => (mouthCorners.some((m) => Math.hypot(m[0] - at[0], m[1] - at[1]) < 2) ? bank * 0.25 : meetsRiver(at) ? bank * 0.6 : 0);
-    fadedBand(g, shoreTex, p, q, width, -width * (0.5 - SHORE_LINE), SHORE_FADE, { a: fadeAt(p), b: fadeAt(q) });
+    const fadeLength = bank * 0.6;
+    fadedBand(g, shoreTex, p, q, width, -width * (0.5 - SHORE_LINE), SHORE_FADE, { a: meetsRiver(p) ? fadeLength : 0, b: meetsRiver(q) ? fadeLength : 0 });
   }
 
+  const rivers = of('river');
   const plainWater = strip(img, 0.3, 0.7, water);
   const waterTex = borders.water ? washed(plainWater, borders.water) : plainWater;
   // The water's middle only (no edges), for the patches over joins.
   const plainSurface = strip(img, 0.4, 0.6, water);
   const waterSurface = borders.water ? washed(plainSurface, borders.water) : plainSurface;
-  // Banks: both sides, or only the land side where a lake is alongside (the water opens into the lake). Toward a mouth they fade out along the last stretch, into the shores' own fading reeds and mud (owner's play-test: the brown banks met the shores in seams).
-  const mouthFade = bank * 0.9;
+  const spans = rivers.map((e) => riverSpan(e).map(toPixel) as [Point, Point]);
+  // Banks: both sides, or only the land side where a lake is alongside (the water opens into the lake).
   rivers.forEach((e, i) => {
     const [a, b] = spans[i]!;
-    const toMouth = (at: Point) => (!e.land && mouthCorners.some((m) => Math.hypot(m[0] - at[0], m[1] - at[1]) < 2) ? mouthFade : 0);
     if (e.land) band(g, bankTex, ...facing(a, b, toPixel(e.land)), bank, { half: true });
-    else if (toMouth(a) || toMouth(b)) fadedBand(g, bankTex, a, b, bank, 0, [[0, 1], [1, 1]], { a: toMouth(a), b: toMouth(b), feather: MELT, cap: 'round' });
     else band(g, bankTex, a, b, bank);
   });
   // Where a river stops among land, a round pool ringed by bank.
@@ -387,10 +377,15 @@ export function paintBorders(g: CanvasRenderingContext2D, borders: BorderPicture
   for (const at of ends) pool(g, waterTex, at, (water * 1.45) / 2, WATER);
   for (const at of joined) pool(g, waterSurface, at, water * 0.5, MELT, 0.85);
 
-  // At a mouth, the river's water runs on into the lake, fading smoothly to
-  // nothing, over shallows fanning out inside the lake (owner's play-tests:
-  // it stopped against the lake like a pipe, then blurred onto the land,
-  // then showed hard-edged steps).
+  // Where a river reaches a lake's corner, its mouth: the river's water runs
+  // on into the lake, fading smoothly to nothing, over shallows fanning out
+  // inside the lake (owner's play-tests: it stopped against the lake like a
+  // pipe, then blurred onto the land, then showed hard-edged steps).
+  const lakes = borders.keepClear ?? [];
+  const lakeCorners = lakes.flat();
+  const atLake = (p: Point) => lakeCorners.some((c) => Math.hypot(c[0] - p[0], c[1] - p[1]) < 2);
+  // Only a river between two land hexes flows into a lake; one running along a lake's edge is open to it all along (owner's play-test: its water shot on past the corner).
+  const mouths = spans.flatMap(([a, b], i) => (rivers[i]!.land ? [] : ([...(atLake(b) ? [[a, b]] : []), ...(atLake(a) ? [[b, a]] : [])] as [Point, Point][])));
   const reach = water * 2.4;
   if (mouths.length) {
     // The shallows' fan, kept inside the lake (a soft gradient, so no hard edge).
@@ -410,15 +405,7 @@ export function paintBorders(g: CanvasRenderingContext2D, borders: BorderPicture
     }
     g.restore();
   }
-  // Over the corner itself, a soft wash of the shallows' colour, reaching a little onto the land, so the hex edges and the fading banks and shores meet in one blur rather than seams.
-  for (const [, at] of mouths) {
-    const r = bank * 1.1;
-    const wash = g.createRadialGradient(at[0], at[1], 0, at[0], at[1], r);
-    wash.addColorStop(0, `rgb(${shallow} / 0.7)`);
-    wash.addColorStop(0.45, `rgb(${shallow} / 0.45)`);
-    wash.addColorStop(1, `rgb(${shallow} / 0)`);
-    g.fillStyle = wash;
-    g.fillRect(at[0] - r, at[1] - r, r * 2, r * 2);
-  }
+  // Over the mouth's corner, a soft round patch of the water's middle only, as at the road crossings (a ring of bank around it looked like a pond), so the river's banks, the lake's shores and the water meet in one blended pool rather than seams (owner's play-test).
+  for (const [, at] of mouths) pool(g, waterSurface, at, water * 0.85, MELT, 0.9);
   for (const [from, at] of mouths) riverIntoLake(g, waterTex, from, at, water, reach);
 }
