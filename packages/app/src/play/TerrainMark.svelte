@@ -2,8 +2,8 @@
   // A hex's terrain, marked clearly at its top when it's drawn with art (the
   // art alone can be hard to read): a small dark disc ringed in the terrain's
   // colour, holding the skin's own symbol picture or else a simple drawn one.
-  // The drawn ones are this app's own: wheat, a pine, peaks, a snowflake, a
-  // meeple (the village's people), waves and a factory roof.
+  // The drawn ones are this app's own: wheat, a pine, peaks, an oil barrel
+  // (tundra, where oil comes from), a meeple (the village's people), waves and a factory roof.
   import type { Terrain } from '@scythe/engine';
 
   let { terrain, mark, x, y, size, color }: { terrain: Terrain; mark: { image: string } | 'drawn'; x: number; y: number; size: number; color: string } = $props();
@@ -26,9 +26,9 @@
     <!-- Two peaks. -->
     <path d="M-7.5 5.5L-2 -5L1.2 1L3 -1.8L7.5 5.5Z" class="solid" />
   {:else if terrain === 'tundra'}
-    <!-- A snowflake: three crossing strokes with small barbs. -->
-    <path d="M0 -7V7M-6.1 -3.5L6.1 3.5M-6.1 3.5L6.1 -3.5" />
-    <path d="M-1.6 -5.6L0 -4.2L1.6 -5.6M-1.6 5.6L0 4.2L1.6 5.6M-5.6 -1.4L-3.6 -2.1L-4 -4.2M5.6 1.4L3.6 2.1L4 4.2M-5.6 1.4L-3.6 2.1L-4 4.2M5.6 -1.4L3.6 -2.1L4 -4.2" />
+    <!-- An oil barrel: bulging sides, with hoops. -->
+    <path d="M-3.9 -6.4H3.9Q5.4 0 3.9 6.4H-3.9Q-5.4 0 -3.9 -6.4Z" class="solid" />
+    <path d="M-4.5 -2.6H4.5M-4.5 2.6H4.5" class="cut" />
   {:else if terrain === 'village'}
     <!-- A meeple: the village's people. -->
     <circle cx="0" cy="-4.6" r="2.4" class="solid-fill" />
@@ -60,6 +60,11 @@
   path.solid {
     fill: #fff;
     stroke-width: 0.6;
+  }
+  /* Lines cut into a solid shape (a barrel's hoops), in the disc's colour. */
+  path.cut {
+    stroke: rgb(22 18 14 / 0.9);
+    stroke-width: 1.3;
   }
   .solid-fill {
     fill: #fff;
