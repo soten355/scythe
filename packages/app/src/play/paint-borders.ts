@@ -34,6 +34,8 @@ const SHORE_EDGE = 0.2;
 const SHORE_LINE = 0.22;
 /** The shore's width, as a share of a bank's. */
 const SHORE_WIDTH = 0.8;
+/** How far past a river's mouth (into the lake) its round patch sits, as a share of the river's width. */
+const MOUTH_SHIFT = 0.6;
 /** The shore's strength across it, from the land side (0) to the lake side (1); the hex edge is at SHORE_LINE, so most of it lies on the lake (owner's play-test: it spread too far onto the land and its roads). */
 const SHORE_FADE: [number, number][] = [[0, 0], [0.16, 0.85], [0.3, 1], [0.62, 1], [0.84, 0.35], [1, 0]];
 /** How far the shallows reach into a lake, as a share of a bank's width. */
@@ -406,6 +408,11 @@ export function paintBorders(g: CanvasRenderingContext2D, borders: BorderPicture
     g.restore();
   }
   // Over the mouth's corner, a soft round patch of the water's middle only, as at the road crossings (a ring of bank around it looked like a pond), so the river's banks, the lake's shores and the water meet in one blended pool rather than seams (owner's play-test).
-  for (const [, at] of mouths) pool(g, waterSurface, at, water * 0.85, MELT, 0.9);
+  // Centred a little past the corner, into the lake, so it sits on the joint itself (owner's play-test: on the corner it looked upstream of it).
+  for (const [from, at] of mouths) {
+    const len = Math.hypot(at[0] - from[0], at[1] - from[1]) || 1;
+    const shift = water * MOUTH_SHIFT;
+    pool(g, waterSurface, [at[0] + ((at[0] - from[0]) / len) * shift, at[1] + ((at[1] - from[1]) / len) * shift], water * 0.85, MELT, 0.9);
+  }
   for (const [from, at] of mouths) riverIntoLake(g, waterTex, from, at, water, reach);
 }
