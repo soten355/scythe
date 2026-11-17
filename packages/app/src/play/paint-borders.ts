@@ -32,8 +32,8 @@ const WATER: Feather = [[1, 0.3], [0.9, 0.55], [0.8, 1]];
 const SHORE_ROWS = 0.32;
 const SHORE_EDGE = 0.2;
 const SHORE_LINE = 0.22;
-/** The shore's width, as a share of a bank's. */
-const SHORE_WIDTH = 0.8;
+/** The shore's width, as a share of a bank's: about as slim as a river's bank (owner's play-test). */
+const SHORE_WIDTH = 0.45;
 /** How far past a river's mouth (into the lake) its round patch sits, as a share of the river's width. */
 const MOUTH_SHIFT = 0.6;
 /** The shore's strength across it, from the land side (0) to the lake side (1); the hex edge is at SHORE_LINE, so most of it lies on the lake (owner's play-test: it spread too far onto the land and its roads). */
@@ -337,6 +337,8 @@ export function paintBorders(g: CanvasRenderingContext2D, borders: BorderPicture
   }
   // The corners the rivers reach.
   const riverEnds = of('river').flatMap((e) => riverSpan(e).map(toPixel));
+  // Corners where shores meet: their place, the way into the lake, and how many shores end there.
+  const shoreCorners = new Map<string, { at: Point; toLake: Point; n: number }>();
   for (const e of of('shore')) {
     const [a, b, land] = [toPixel(e.a), toPixel(e.b), toPixel(e.land!)];
     // The lake's middle: the land's, mirrored across the edge.
@@ -349,6 +351,28 @@ export function paintBorders(g: CanvasRenderingContext2D, borders: BorderPicture
     const meetsRiver = (at: Point) => riverEnds.some((r) => Math.hypot(r[0] - at[0], r[1] - at[1]) < 2);
     const fadeLength = bank * 0.6;
     fadedBand(g, shoreTex, p, q, width, -width * (0.5 - SHORE_LINE), SHORE_FADE, { a: meetsRiver(p) ? fadeLength : 0, b: meetsRiver(q) ? fadeLength : 0 });
+    for (const at of [a, b]) {
+      if (meetsRiver(at)) continue;
+      const k = `${Math.round(at[0])},${Math.round(at[1])}`;
+      const c = shoreCorners.get(k) ?? { at, toLake: [0, 0] as Point, n: 0 };
+      c.n++;
+      c.toLake = [c.toLake[0] + lake[0] - at[0], c.toLake[1] + lake[1] - at[1]];
+      shoreCorners.set(k, c);
+    }
+  }
+  // Where two shores meet at a lake's corner, a soft round patch of the bank's mud colour filling the corner's point, a little into the lake (a patch of the shore's picture showed as a striped square), so it rounds the corner as at the road crossings and river mouths (owner's play-test).
+  for (const { at, toLake, n } of shoreCorners.values()) {
+    if (n < 2) continue;
+    const len = Math.hypot(toLake[0], toLake[1]) || 1;
+    const width = bank * SHORE_WIDTH;
+    const c: Point = [at[0] + (toLake[0] / len) * width * 0.6, at[1] + (toLake[1] / len) * width * 0.6];
+    const r = width * 1.1;
+    const fill = g.createRadialGradient(c[0], c[1], 0, c[0], c[1], r);
+    fill.addColorStop(0, `rgb(${mud} / 0.65)`);
+    fill.addColorStop(0.45, `rgb(${mud} / 0.3)`);
+    fill.addColorStop(1, `rgb(${shallow} / 0)`);
+    g.fillStyle = fill;
+    g.fillRect(c[0] - r, c[1] - r, r * 2, r * 2);
   }
 
   const rivers = of('river');
